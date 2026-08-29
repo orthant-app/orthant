@@ -161,6 +161,31 @@ sparkle_args_with_key_and_download_prefix() {
     [[ "${GENERATE_APPCAST_ARGS[*]}" == "--ed-key-file /tmp/sparkle.key --download-url-prefix https://example.test/v1.2.3/ -o $TMP_DIR/dist/appcast-beta.xml" ]]
 }
 
+sparkle_commands_with_ci_inputs_are_exact() {
+  APPCAST_OUTPUT_FILENAME='appcast-beta.xml'
+  SPARKLE_ED_KEY_FILE='/tmp/sparkle.key'
+  APPCAST_DOWNLOAD_URL_PREFIX='https://example.test/v1.2.3/'
+  select_appcast_output '/tmp/dist' &&
+    configure_sparkle_args || return 1
+
+  local sign_command=(sign_update "${SIGN_UPDATE_ARGS[@]}" /tmp/Orthant-1.2.3.dmg)
+  local generate_command=(generate_appcast "${GENERATE_APPCAST_ARGS[@]}" /tmp/dist)
+  [[ "${sign_command[*]}" == 'sign_update -f /tmp/sparkle.key /tmp/Orthant-1.2.3.dmg' ]] &&
+    [[ "${generate_command[*]}" == 'generate_appcast --ed-key-file /tmp/sparkle.key --download-url-prefix https://example.test/v1.2.3/ -o /tmp/dist/appcast-beta.xml /tmp/dist' ]]
+}
+
+sparkle_commands_without_ci_inputs_are_legacy() {
+  unset APPCAST_OUTPUT_FILENAME SPARKLE_ED_KEY_FILE APPCAST_DOWNLOAD_URL_PREFIX
+  select_appcast_output '/tmp/dist' &&
+    configure_sparkle_args || return 1
+
+  local sign_command=(sign_update "${SIGN_UPDATE_ARGS[@]}" /tmp/Orthant-1.2.3.dmg)
+  local generate_command=(generate_appcast "${GENERATE_APPCAST_ARGS[@]}" /tmp/dist)
+  [[ "${sign_command[*]}" == 'sign_update /tmp/Orthant-1.2.3.dmg' ]] &&
+    [[ "${generate_command[*]}" == 'generate_appcast /tmp/dist' ]] &&
+    [[ "$APPCAST_FILE" == '/tmp/dist/appcast.xml' ]]
+}
+
 assert_ok 'stable version exposes base and prerelease state' \
   version_state_is '1.2.3' '1.2.3' 'false'
 assert_ok 'prerelease version exposes base and prerelease state' \
@@ -230,6 +255,8 @@ assert_ok 'unset appcast output adds no Sparkle output flag' sparkle_args_withou
 assert_ok 'explicit stable appcast output adds Sparkle output flag' sparkle_args_with_explicit_stable_output
 assert_ok 'explicit beta appcast output adds Sparkle output flag' sparkle_args_with_explicit_beta_output
 assert_ok 'Sparkle key and download prefix arguments are preserved' sparkle_args_with_key_and_download_prefix
+assert_ok 'CI Sparkle inputs render exact commands' sparkle_commands_with_ci_inputs_are_exact
+assert_ok 'unset Sparkle inputs preserve legacy commands and feed' sparkle_commands_without_ci_inputs_are_legacy
 
 assert_ok 'unredacted diagnostics print sensitive output' redaction_unset_prints_raw
 assert_ok 'redacted diagnostics record raw output privately' redaction_enabled_records_raw

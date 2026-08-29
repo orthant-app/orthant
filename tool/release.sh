@@ -27,6 +27,8 @@
 # variable, so a workflow can call it later without a rewrite.
 #
 set -euo pipefail
+# shellcheck source=tool/ci/release_lib.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ci/release_lib.sh"
 
 VERSION="${1:?usage: tool/release.sh <version> [--sign-only]}"
 MODE="${2:-}"
@@ -48,6 +50,8 @@ cd "$REPO_ROOT"
 
 # ---------------------------------------------------------------- preflight --
 
+validate_release_version "$VERSION"
+
 # The expected team is read from a gitignored per-machine file, and the bundle
 # id stays a plain assignment — deliberately not `: "${VAR:=default}"` like
 # SIGN_IDENTITY/NOTARY_PROFILE above. Those pick a KIND of identity/profile,
@@ -63,52 +67,62 @@ cd "$REPO_ROOT"
 # environment cannot override it either.
 RELEASE_LOCAL="$REPO_ROOT/tool/release.local"
 [[ -f "$RELEASE_LOCAL" ]] ||
-  die "tool/release.local not found — create it (gitignored) containing: EXPECTED_TEAM=<your Apple Team ID>"
+  die "$RELEASE_LOCAL not found — create it (gitignored) containing: EXPECTED_TEAM=<your Apple Team ID>"
 # shellcheck source=/dev/null
 source "$RELEASE_LOCAL"
 [[ -n "${EXPECTED_TEAM:-}" ]] ||
-  die "tool/release.local must set EXPECTED_TEAM=<your Apple Team ID>"
+  die "$RELEASE_LOCAL must set EXPECTED_TEAM=<your Apple Team ID>"
 EXPECTED_BUNDLE_ID="app.orthant.orthant"
 
-# pubspec.yaml is the source of truth for what gets built, so a mismatch here
-# would name the DMG after a version the bundle does not contain. Sparkle (M12)
-# compares CFBundleVersion, so this has to be right.
-PUBSPEC_VERSION="$(sed -n 's/^version: \([0-9.]*\)+.*/\1/p' pubspec.yaml)"
-[[ "$PUBSPEC_VERSION" == "$VERSION" ]] ||
-  die "pubspec.yaml says $PUBSPEC_VERSION but you asked for $VERSION — bump it first"
+# pubspec.yaml is the source of truth for what gets built. Release labels may
+# carry a prerelease suffix for artifact naming, while Flutter's marketing
+# version remains the three-integer base version.
+PUBSPEC_FILE="$REPO_ROOT/pubspec.yaml"
+parse_pubspec_version "$PUBSPEC_FILE" ||
+  die "could not parse release version from $PUBSPEC_FILE"
+[[ "$PUBSPEC_BASE_VERSION" == "$RELEASE_BASE_VERSION" ]] ||
+  die "$PUBSPEC_FILE says $PUBSPEC_BASE_VERSION but $VERSION has base version $RELEASE_BASE_VERSION — bump it first"
 
-security find-identity -v -p codesigning | grep -qF "$SIGN_IDENTITY" ||
+if SECURITY_OUT="$(security find-identity -v -p codesigning 2>&1)"; then
+  SECURITY_RC=0
+else
+  SECURITY_RC=$?
+fi
+if (( SECURITY_RC != 0 )) || ! grep -qF "$SIGN_IDENTITY" <<<"$SECURITY_OUT"; then
+  if [[ "${REDACT_IDENTITY_OUTPUT-}" == 1 ]]; then
+    print_sensitive_or_record 'signing identity lookup' "$SECURITY_OUT" ||
+      die "could not record signing identity lookup"
+    die "no matching release signing identity in the keychain"
+  fi
   die "no '$SIGN_IDENTITY' in the keychain — create one in Xcode ▸ Settings ▸ Accounts (requires an Apple Developer Program membership)"
+fi
 
 # The check above guards the marketing string (CFBundleShortVersionString);
 # this one guards the BUILD number next to it (the `+N`, CFBundleVersion).
 # Sparkle compares CFBundleVersion, not the marketing string, to decide
 # whether an update is newer, so a release can pass the check above with a
 # fresh marketing version and still never be offered if the +N didn't move.
-# Parsed and checked here, before the build, so a stale +N costs a `sed`
+# Parsed and checked here, before the build, so a stale +N costs a small edit
 # rather than a full Release build and a signing pass.
 #
-# Blind spot: $DIST/appcast.xml is local and gitignored, so a fresh clone or
-# a cleaned build directory reports "first release" even when a published
-# feed already holds a higher build number, and a stale +N then surfaces
-# only downstream as Sparkle silently never offering the update — the real
-# check has to run at publish time against the *published* feed URL, and/or
-# from a canonical dist archive restored before this script runs.
-BUILD_NUMBER="$(sed -n 's/^version: [0-9.]*+\([0-9]*\)$/\1/p' pubspec.yaml)"
-[[ -n "$BUILD_NUMBER" ]] ||
-  die "pubspec.yaml's version line has no +N build number — Sparkle needs one to compare"
-
-FEED_MAX_VERSION=""
-if [[ -f "$DIST/appcast.xml" ]]; then
-  FEED_MAX_VERSION="$(sed -n 's/.*<sparkle:version>\([0-9]*\)<\/sparkle:version>.*/\1/p' \
-                           "$DIST/appcast.xml" | sort -n | tail -1)"
+# Blind spot: these feeds are local and gitignored, so a fresh clone or a
+# cleaned build directory reports "first release" even when a published feed
+# already holds a higher build number. The workflow restores the canonical
+# feed history before calling this script.
+BUILD_NUMBER="$PUBSPEC_BUILD_NUMBER"
+select_appcast_output "$DIST"
+FEED_HISTORY=("$DIST/appcast.xml")
+if [[ "${INCLUDE_BETA_APPCAST_HISTORY-}" == 1 ]]; then
+  FEED_HISTORY+=("$DIST/appcast-beta.xml")
 fi
+max_feed_version "${FEED_HISTORY[@]}" ||
+  die "could not inspect release feed history: ${FEED_HISTORY[*]}"
 
 if [[ -n "$FEED_MAX_VERSION" ]]; then
-  (( BUILD_NUMBER > FEED_MAX_VERSION )) ||
-    die "pubspec.yaml's build number ($BUILD_NUMBER) is not greater than $DIST/appcast.xml's newest ($FEED_MAX_VERSION) — Sparkle compares CFBundleVersion, so this release would never be offered as an update; bump the +N in pubspec.yaml, UNLESS this run immediately follows one that died signing the appcast for this same +N — that leaves a partially-written $DIST/appcast.xml behind, which is what this check is actually reading, and the fix is to remove or regenerate that file, not bump pubspec.yaml"
+  (( 10#$BUILD_NUMBER > 10#$FEED_MAX_VERSION )) ||
+    die "$PUBSPEC_FILE's build number ($BUILD_NUMBER) is not greater than the newest version ($FEED_MAX_VERSION) in ${FEED_HISTORY[*]} — Sparkle compares CFBundleVersion, so this release would never be offered as an update; bump the +N in $PUBSPEC_FILE, UNLESS this run immediately follows one that died signing the selected appcast for this same +N — that leaves a partially-written feed behind, which is what this check is actually reading, and the fix is to remove or regenerate that file, not bump $PUBSPEC_FILE"
 else
-  info "no prior release found under $DIST/appcast.xml — skipping the monotonic build-number check (first release)"
+  info "no prior release found in ${FEED_HISTORY[*]} — skipping the monotonic build-number check (first release)"
 fi
 
 # ------------------------------------------------------------------- build ---
@@ -178,14 +192,27 @@ codesign --verify --deep --strict --verbose=2 "$APP" ||
 # this asks whether Gatekeeper would accept it. Before notarization it will not,
 # and that is expected rather than a failure.
 SPCTL_OUT="$(spctl -a -vvv -t exec "$APP" 2>&1 || true)"
-printf '%s\n' "$SPCTL_OUT" | sed 's/^/    /'
+print_sensitive_or_record 'Gatekeeper pre-notarization output' \
+  "    ${SPCTL_OUT//$'\n'/$'\n    '}" ||
+  die "could not record Gatekeeper pre-notarization output"
 grep -q 'accepted' <<<"$SPCTL_OUT" ||
   warn "not yet accepted by Gatekeeper — expected until notarization has run"
 
 CODESIGN_DV="$(codesign -dv --verbose=4 "$APP" 2>&1)"
+if [[ "${REDACT_IDENTITY_OUTPUT-}" == 1 ]]; then
+  print_sensitive_or_record 'code-signing details' "$CODESIGN_DV" ||
+    die "could not record code-signing details"
+fi
 TEAM="$(sed -n 's/^TeamIdentifier=//p' <<<"$CODESIGN_DV")"
-[[ -n "$TEAM" && "$TEAM" != "not set" ]] ||
+if [[ -z "$TEAM" || "$TEAM" == "not set" ]]; then
+  if [[ "${REDACT_IDENTITY_OUTPUT-}" == 1 ]]; then
+    print_sensitive_or_record 'Team ID verification' \
+      "TeamIdentifier is '${TEAM:-empty}' — library validation will kill this at launch" ||
+      die "could not record Team ID verification failure"
+    die "the signing Team ID is missing — see release-diagnostics.log in the encrypted diagnostics archive"
+  fi
   die "TeamIdentifier is '${TEAM:-empty}' — library validation will kill this at launch"
+fi
 
 # A non-empty TeamIdentifier only proves SOME certificate signed the app —
 # SIGN_IDENTITY's substring match is satisfied by any "Developer ID
@@ -197,14 +224,27 @@ TEAM="$(sed -n 's/^TeamIdentifier=//p' <<<"$CODESIGN_DV")"
 # is gone on their next update, because the designated requirement it keys
 # on just changed. A stale or hand-edited bundle id would be exactly as
 # silent. Both come off the one `codesign -dv` call above, not a second one.
-[[ "$TEAM" == "$EXPECTED_TEAM" ]] ||
+if [[ "$TEAM" != "$EXPECTED_TEAM" ]]; then
+  if [[ "${REDACT_IDENTITY_OUTPUT-}" == 1 ]]; then
+    print_sensitive_or_record 'Team ID verification' \
+      "signed with Team $TEAM, expected $EXPECTED_TEAM — wrong certificate" ||
+      die "could not record Team ID verification failure"
+    die "the signing Team ID does not match the expected release identity — see release-diagnostics.log in the encrypted diagnostics archive"
+  fi
   die "signed with Team $TEAM, expected $EXPECTED_TEAM — wrong certificate: shipping this would silently revoke every user's Accessibility grant on update"
+fi
 
 BUNDLE_ID="$(sed -n 's/^Identifier=//p' <<<"$CODESIGN_DV")"
 [[ "$BUNDLE_ID" == "$EXPECTED_BUNDLE_ID" ]] ||
   die "signed bundle id is '$BUNDLE_ID', expected '$EXPECTED_BUNDLE_ID' — wrong build: shipping this would silently revoke every user's Accessibility grant on update"
 
-ok "Signed with Team $TEAM"
+if [[ "${REDACT_IDENTITY_OUTPUT-}" == 1 ]]; then
+  print_sensitive_or_record 'Team ID verification' "Signed with Team $TEAM" ||
+    die "could not record Team ID verification"
+  ok "Signing Team ID verified"
+else
+  ok "Signed with Team $TEAM"
+fi
 
 # An AND-list as the final statement would make the script's exit status the
 # status of the *test*, so a full run would sign successfully and then report
@@ -227,6 +267,7 @@ fi
 # password. It lives in the login keychain, which is why nothing here holds a
 # secret and this file is safe to commit.
 
+configure_notary_auth || die "invalid notary authentication configuration"
 mkdir -p "$DIST"
 
 # `notarytool submit --wait` has been observed to exit 0 on a terminal *Invalid*
@@ -235,19 +276,33 @@ mkdir -p "$DIST"
 # toward "fine" is worse than one that fails toward "broken", because nobody
 # investigates a pass.
 notarize() {
-  local artifact="$1" label="$2" out id
+  local artifact="$1" label="$2" out id log submit_rc
   # Braced deliberately. `$label…` puts a multi-byte ellipsis hard against the
   # name and bash takes the first byte of it as part of the identifier, so this
   # died with `label<?>: unbound variable` under `set -u` — after signing, right
   # before the first upload. shellcheck passes it. Every other `…` in this file
   # follows a literal word, which is why this was the only place it could bite.
   info "Notarizing the ${label}…"
-  out="$(xcrun notarytool submit "$artifact" \
-           --keychain-profile "$NOTARY_PROFILE" --wait 2>&1)" || true
-  printf '%s\n' "$out" | sed 's/^/    /'
-  if ! grep -qE '^[[:space:]]*status: Accepted$' <<<"$out"; then
+  if out="$(xcrun notarytool submit "$artifact" "${NOTARY_AUTH_ARGS[@]}" --wait 2>&1)"; then
+    submit_rc=0
+  else
+    submit_rc=$?
+  fi
+  print_sensitive_or_record "${label} notary submit output" \
+    "    ${out//$'\n'/$'\n    '}" ||
+    die "could not record $label notary submit output"
+  if (( submit_rc != 0 )) || ! grep -qE '^[[:space:]]*status: Accepted$' <<<"$out"; then
     id="$(sed -n 's/^[[:space:]]*id: \([0-9a-fA-F-]\{36\}\)$/\1/p' <<<"$out" | head -1)"
-    die "$label was not Accepted — xcrun notarytool log ${id:-<submission-id>} --keychain-profile $NOTARY_PROFILE"
+    if [[ -n "$id" ]]; then
+      log="$(xcrun notarytool log "$id" "${NOTARY_AUTH_ARGS[@]}" 2>&1)" || true
+      print_sensitive_or_record "${label} notary log output" \
+        "    ${log//$'\n'/$'\n    '}" ||
+        die "could not record $label notary log output"
+    fi
+    if [[ "${REDACT_IDENTITY_OUTPUT-}" == 1 ]]; then
+      die "$label was not Accepted — see release-diagnostics.log in the encrypted diagnostics archive"
+    fi
+    die "$label was not Accepted"
   fi
   ok "$label accepted"
 }
@@ -303,7 +358,9 @@ codesign --verify --deep --strict "$APP" || die "the stapled app no longer verif
 # Under `pipefail` a bare `spctl … | sed` would abort the script with no
 # explanation, so the verdict is captured and named.
 SPCTL_OUT="$(spctl -a -vvv -t exec "$APP" 2>&1 || true)"
-printf '%s\n' "$SPCTL_OUT" | sed 's/^/    /'
+print_sensitive_or_record 'Gatekeeper notarized-app output' \
+  "    ${SPCTL_OUT//$'\n'/$'\n    '}" ||
+  die "could not record Gatekeeper notarized-app output"
 grep -q 'source=Notarized Developer ID' <<<"$SPCTL_OUT" ||
   die "Gatekeeper does not see a notarized Developer ID app — stapling did not take"
 
@@ -338,6 +395,8 @@ SPARKLE_BIN="$REPO_ROOT/build/spm/artifacts/sparkle/Sparkle/bin"
 [[ -x "$SPARKLE_BIN/sign_update" && -x "$SPARKLE_BIN/generate_appcast" ]] ||
   die "no sign_update/generate_appcast under $SPARKLE_BIN — resolvePackageDependencies above should have produced them; confirm macos/Runner.xcodeproj still depends on the Sparkle package"
 
+configure_sparkle_args
+
 # generate_appcast refuses to write anything — not just skip the newest file
 # — when a .zip and a .dmg in its target directory share a CFBundleVersion:
 # "Duplicate updates are not supported." $DIST always has both, because the
@@ -362,7 +421,7 @@ rm -f "$DIST"/Orthant-*.zip
 DMG_COUNT=0
 while IFS= read -r -d '' dmg; do
   info "Signing $(basename "$dmg") for the appcast…"
-  SIG="$("$SPARKLE_BIN/sign_update" "$dmg")" ||
+  SIG="$("$SPARKLE_BIN/sign_update" "${SIGN_UPDATE_ARGS[@]}" "$dmg")" ||
     die "sign_update failed on $(basename "$dmg") — see output above"
   [[ -n "$SIG" ]] ||
     die "sign_update produced an empty signature for $(basename "$dmg")"
@@ -395,7 +454,7 @@ done < <(find "$DIST" -maxdepth 1 -name 'Orthant-*.dmg' -print0)
 # here once, during Task 7's acceptance) would be swept into a real, signed
 # feed alongside the intended ones.
 info "Regenerating the appcast…"
-"$SPARKLE_BIN/generate_appcast" "$DIST" ||
+"$SPARKLE_BIN/generate_appcast" "${GENERATE_APPCAST_ARGS[@]}" "$DIST" ||
   die "generate_appcast failed over $DIST — see output above"
 
 # generate_appcast can exit 0 having silently skipped signing: observed on
@@ -426,8 +485,8 @@ info "Regenerating the appcast…"
 # just to keep one grep simple). sed finds the boundary generate_appcast's
 # own output already gives it: <sparkle:deltas> is either a real tag pair
 # bracketing a delta, or absent — never empty or self-closing.
-TOP_XML="$(sed '/<sparkle:deltas>/,/<\/sparkle:deltas>/d' "$DIST/appcast.xml")"
-DELTA_XML="$(sed -n '/<sparkle:deltas>/,/<\/sparkle:deltas>/p' "$DIST/appcast.xml")"
+TOP_XML="$(sed '/<sparkle:deltas>/,/<\/sparkle:deltas>/d' "$APPCAST_FILE")"
+DELTA_XML="$(sed -n '/<sparkle:deltas>/,/<\/sparkle:deltas>/p' "$APPCAST_FILE")"
 
 # `|| true` on every count below, same reason as before: grep exits 1 on zero
 # matches — an empty $DELTA_XML, because nothing has a delta yet, is the
@@ -451,12 +510,12 @@ DELTA_XML="$(sed -n '/<sparkle:deltas>/,/<\/sparkle:deltas>/p' "$DIST/appcast.xm
 FULL_ENC_COUNT="$(grep -o '<enclosure' <<<"$TOP_XML" | wc -l | tr -d ' ')" || true
 FULL_SIG_COUNT="$(grep -o 'sparkle:edSignature=' <<<"$TOP_XML" | wc -l | tr -d ' ')" || true
 (( FULL_SIG_COUNT == FULL_ENC_COUNT )) ||
-  die "generate_appcast wrote $DIST/appcast.xml with $FULL_SIG_COUNT of $FULL_ENC_COUNT full-DMG item(s) signed — an unsigned item is refused by Sparkle's client, but only after a user's machine has already downloaded it. Try running '$SPARKLE_BIN/generate_appcast $DIST' once by hand in an interactive Terminal, so any Keychain access prompt has a screen to appear on, then re-run this script."
+  die "generate_appcast wrote $APPCAST_FILE with $FULL_SIG_COUNT of $FULL_ENC_COUNT full-DMG item(s) signed — an unsigned item is refused by Sparkle's client, but only after a user's machine has already downloaded it. Try running '$SPARKLE_BIN/generate_appcast ${GENERATE_APPCAST_ARGS[*]} $DIST' once by hand in an interactive Terminal, so any Keychain access prompt has a screen to appear on, then re-run this script."
 
 DELTA_ENC_COUNT="$(grep -o '<enclosure' <<<"$DELTA_XML" | wc -l | tr -d ' ')" || true
 DELTA_SIG_COUNT="$(grep -o 'sparkle:edSignature=' <<<"$DELTA_XML" | wc -l | tr -d ' ')" || true
 (( DELTA_SIG_COUNT == DELTA_ENC_COUNT )) ||
-  die "generate_appcast wrote $DIST/appcast.xml with $DELTA_SIG_COUNT of $DELTA_ENC_COUNT delta update(s) signed — an unsigned delta is refused by Sparkle's client exactly like an unsigned full DMG. Try running '$SPARKLE_BIN/generate_appcast $DIST' once by hand in an interactive Terminal, so any Keychain access prompt has a screen to appear on, then re-run this script."
+  die "generate_appcast wrote $APPCAST_FILE with $DELTA_SIG_COUNT of $DELTA_ENC_COUNT delta update(s) signed — an unsigned delta is refused by Sparkle's client exactly like an unsigned full DMG. Try running '$SPARKLE_BIN/generate_appcast ${GENERATE_APPCAST_ARGS[*]} $DIST' once by hand in an interactive Terminal, so any Keychain access prompt has a screen to appear on, then re-run this script."
 
 # Self-consistency above cannot catch a feed that pruned away the release
 # this run just built — --maximum-versions is only ever supposed to drop OLD
@@ -464,7 +523,7 @@ DELTA_SIG_COUNT="$(grep -o 'sparkle:edSignature=' <<<"$DELTA_XML" | wc -l | tr -
 # already required to be newer than anything the feed held before this run,
 # so its presence here is what makes trusting pruning for everything older
 # a safe conclusion instead of a hopeful one.
-grep -q "<sparkle:version>$BUILD_NUMBER</sparkle:version>" "$DIST/appcast.xml" ||
-  die "generate_appcast wrote $DIST/appcast.xml with no item for sparkle:version $BUILD_NUMBER (the release just built) — --maximum-versions pruning must never remove the newest item, so something is wrong beyond ordinary pruning. Try running '$SPARKLE_BIN/generate_appcast $DIST' once by hand in an interactive Terminal, so any Keychain access prompt has a screen to appear on, then re-run this script."
+grep -q "<sparkle:version>$BUILD_NUMBER</sparkle:version>" "$APPCAST_FILE" ||
+  die "generate_appcast wrote $APPCAST_FILE with no item for sparkle:version $BUILD_NUMBER (the release just built) — --maximum-versions pruning must never remove the newest item, so something is wrong beyond ordinary pruning. Try running '$SPARKLE_BIN/generate_appcast ${GENERATE_APPCAST_ARGS[*]} $DIST' once by hand in an interactive Terminal, so any Keychain access prompt has a screen to appear on, then re-run this script."
 
-ok "appcast: $DIST/appcast.xml"
+ok "appcast: $APPCAST_FILE"

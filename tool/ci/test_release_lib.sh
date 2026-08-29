@@ -127,6 +127,162 @@ redaction_without_runner_temp_fails() {
   ! print_sensitive_or_record 'notary output' 'TeamIdentifier=secret-team'
 }
 
+setup_redacted_release_fixture() {
+  [[ -n "${REDACT_FIXTURE_ROOT-}" ]] && return 0
+
+  REDACT_FIXTURE_ROOT="$TMP_DIR/WORKSPACE_MARKER-release-fixture"
+  REDACT_FIXTURE_BIN="$REDACT_FIXTURE_ROOT/stub-bin"
+  mkdir -p "$REDACT_FIXTURE_ROOT/tool/ci" \
+    "$REDACT_FIXTURE_ROOT/macos/Runner" "$REDACT_FIXTURE_BIN" \
+    "$REDACT_FIXTURE_ROOT/build/spm/artifacts/sparkle/Sparkle/bin"
+  cp "$SCRIPT_DIR/../release.sh" "$REDACT_FIXTURE_ROOT/tool/release.sh"
+  cp "$LIB" "$REDACT_FIXTURE_ROOT/tool/ci/release_lib.sh"
+  printf 'version: 1.2.3+4\n' >"$REDACT_FIXTURE_ROOT/pubspec.yaml"
+  printf 'EXPECTED_TEAM=TEAM_MARKER\n' >"$REDACT_FIXTURE_ROOT/tool/release.local"
+  : >"$REDACT_FIXTURE_ROOT/macos/Runner/Release.entitlements"
+
+  cat >"$REDACT_FIXTURE_BIN/security" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '1) CERT_MARKER Developer ID Application'
+EOF
+  cat >"$REDACT_FIXTURE_BIN/flutter" <<'EOF'
+#!/usr/bin/env bash
+mkdir -p build/macos/Build/Products/Release/Orthant.app/Contents/Frameworks/Injected.framework
+EOF
+  cat >"$REDACT_FIXTURE_BIN/codesign" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' 'CODESIGN_RAW CERT_MARKER TEAM_MARKER WORKSPACE_MARKER' >&2
+if [[ "${1-}" == '-dv' ]]; then
+  printf '%s\n' 'Identifier=app.orthant.orthant' 'TeamIdentifier=TEAM_MARKER' >&2
+  exit 0
+fi
+if [[ "${FAIL_CODESIGN_VERIFY-}" == 1 && "${1-}" == '--verify' ]]; then
+  exit 9
+fi
+EOF
+  cat >"$REDACT_FIXTURE_BIN/spctl" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' 'SPCTL_RAW CERT_MARKER TEAM_MARKER WORKSPACE_MARKER accepted source=Notarized Developer ID'
+EOF
+  cat >"$REDACT_FIXTURE_BIN/xcrun" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1-}" == notarytool && "${2-}" == submit ]]; then
+  printf '%s\n' 'NOTARY_RAW TEAM_MARKER WORKSPACE_MARKER' \
+    '  id: 12345678-1234-1234-1234-123456789abc' '  status: Accepted'
+fi
+EOF
+  cat >"$REDACT_FIXTURE_BIN/ditto" <<'EOF'
+#!/usr/bin/env bash
+last=''
+for arg in "$@"; do last="$arg"; done
+if [[ "${1-}" == '-c' ]]; then
+  : >"$last"
+else
+  mkdir -p "$last"
+fi
+EOF
+  cat >"$REDACT_FIXTURE_BIN/hdiutil" <<'EOF'
+#!/usr/bin/env bash
+last=''
+for arg in "$@"; do last="$arg"; done
+: >"$last"
+EOF
+  cat >"$REDACT_FIXTURE_BIN/xcodebuild" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  cat >"$REDACT_FIXTURE_ROOT/build/spm/artifacts/sparkle/Sparkle/bin/sign_update" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' 'sparkle-signature'
+EOF
+  cat >"$REDACT_FIXTURE_ROOT/build/spm/artifacts/sparkle/Sparkle/bin/generate_appcast" <<'EOF'
+#!/usr/bin/env bash
+output=''
+dist=''
+while (( $# > 0 )); do
+  case "$1" in
+    -o) output="$2"; shift 2 ;;
+    *) dist="$1"; shift ;;
+  esac
+done
+[[ -n "$output" ]] || output="$dist/appcast.xml"
+if [[ "${BAD_APPCAST-}" == 1 ]]; then
+  printf '%s\n' '<item><enclosure/><sparkle:version>4</sparkle:version></item>' >"$output"
+else
+  printf '%s\n' '<item><enclosure sparkle:edSignature="signed"/><sparkle:version>4</sparkle:version></item>' >"$output"
+fi
+EOF
+  chmod +x "$REDACT_FIXTURE_BIN"/* \
+    "$REDACT_FIXTURE_ROOT/build/spm/artifacts/sparkle/Sparkle/bin/sign_update" \
+    "$REDACT_FIXTURE_ROOT/build/spm/artifacts/sparkle/Sparkle/bin/generate_appcast"
+}
+
+run_redacted_release_fixture() {
+  local case_name="$1"
+  local bad_appcast=0 fail_codesign_verify=0
+  local release_args=()
+  case "$case_name" in
+    bad-appcast) bad_appcast=1 ;;
+    verify-failure) fail_codesign_verify=1; release_args=(--sign-only) ;;
+    *) return 1 ;;
+  esac
+  setup_redacted_release_fixture || return 1
+  REDACT_FIXTURE_RUNNER_TEMP="$REDACT_FIXTURE_ROOT/runner-$case_name"
+  rm -rf "$REDACT_FIXTURE_RUNNER_TEMP" \
+    "$REDACT_FIXTURE_ROOT/build/dist" "$REDACT_FIXTURE_ROOT/build/macos"
+  if REDACT_FIXTURE_OUTPUT="$(env \
+      PATH="$REDACT_FIXTURE_BIN:$PATH" \
+      REDACT_IDENTITY_OUTPUT=1 \
+      RUNNER_TEMP="$REDACT_FIXTURE_RUNNER_TEMP" \
+      SIGN_IDENTITY=CERT_MARKER \
+      SPARKLE_ED_KEY_FILE="$REDACT_FIXTURE_ROOT/KEY_MARKER.pem" \
+      APPCAST_DOWNLOAD_URL_PREFIX='https://KEY_MARKER.example/v1.2.3/' \
+      APPCAST_OUTPUT_FILENAME=appcast-beta.xml \
+      INCLUDE_BETA_APPCAST_HISTORY=1 \
+      NOTARY_KEY_FILE="$REDACT_FIXTURE_ROOT/KEY_MARKER.p8" \
+      NOTARY_KEY_ID=KEY_MARKER \
+      NOTARY_ISSUER=TEAM_MARKER \
+      BAD_APPCAST="$bad_appcast" \
+      FAIL_CODESIGN_VERIFY="$fail_codesign_verify" \
+      bash "$REDACT_FIXTURE_ROOT/tool/release.sh" 1.2.3-beta.1 "${release_args[@]}" 2>&1)"; then
+    REDACT_FIXTURE_RC=0
+  else
+    REDACT_FIXTURE_RC=$?
+  fi
+  REDACT_FIXTURE_DIAGNOSTICS="$REDACT_FIXTURE_RUNNER_TEMP/release-diagnostics.log"
+}
+
+redacted_release_hides_sensitive_markers() {
+  run_redacted_release_fixture bad-appcast || return 1
+  (( REDACT_FIXTURE_RC != 0 )) &&
+    [[ "$REDACT_FIXTURE_OUTPUT" != *CERT_MARKER* ]] &&
+    [[ "$REDACT_FIXTURE_OUTPUT" != *TEAM_MARKER* ]] &&
+    [[ "$REDACT_FIXTURE_OUTPUT" != *KEY_MARKER* ]] &&
+    [[ "$REDACT_FIXTURE_OUTPUT" != *WORKSPACE_MARKER* ]]
+}
+
+redacted_release_records_private_diagnostics() {
+  local diagnostics mode
+  diagnostics="$REDACT_FIXTURE_DIAGNOSTICS"
+  [[ -f "$diagnostics" ]] || return 1
+  mode="$(stat -f '%Lp' "$diagnostics")"
+  [[ "$(<"$diagnostics")" == *CERT_MARKER* ]] &&
+    [[ "$(<"$diagnostics")" == *TEAM_MARKER* ]] &&
+    [[ "$(<"$diagnostics")" == *KEY_MARKER* ]] &&
+    [[ "$(<"$diagnostics")" == *WORKSPACE_MARKER* ]] &&
+    [[ "$mode" == 600 ]]
+}
+
+redacted_codesign_verification_failure_is_fatal() {
+  run_redacted_release_fixture verify-failure || return 1
+  (( REDACT_FIXTURE_RC != 0 )) &&
+    [[ "$REDACT_FIXTURE_OUTPUT" != *CERT_MARKER* ]] &&
+    [[ "$REDACT_FIXTURE_OUTPUT" != *TEAM_MARKER* ]] &&
+    [[ "$REDACT_FIXTURE_OUTPUT" != *KEY_MARKER* ]] &&
+    [[ "$REDACT_FIXTURE_OUTPUT" != *WORKSPACE_MARKER* ]] &&
+    [[ "$(<"$REDACT_FIXTURE_DIAGNOSTICS")" == *CODESIGN_RAW* ]]
+}
+
 sparkle_args_without_output_flag() {
   unset APPCAST_OUTPUT_FILENAME SPARKLE_ED_KEY_FILE APPCAST_DOWNLOAD_URL_PREFIX
   select_appcast_output "$TMP_DIR/dist" &&
@@ -261,6 +417,12 @@ assert_ok 'unset Sparkle inputs preserve legacy commands and feed' sparkle_comma
 assert_ok 'unredacted diagnostics print sensitive output' redaction_unset_prints_raw
 assert_ok 'redacted diagnostics record raw output privately' redaction_enabled_records_raw
 assert_ok 'redacted diagnostics require RUNNER_TEMP' redaction_without_runner_temp_fails
+assert_ok 'redacted release output hides certificate, Team, key, and workspace markers' \
+  redacted_release_hides_sensitive_markers
+assert_ok 'redacted release stores complete mode-600 diagnostics' \
+  redacted_release_records_private_diagnostics
+assert_ok 'redacted codesign verification failure remains fatal' \
+  redacted_codesign_verification_failure_is_fatal
 
 printf 'release_lib: %d passed, %d failed\n' "$PASS_COUNT" "$FAIL_COUNT"
 (( FAIL_COUNT == 0 ))

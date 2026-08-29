@@ -1,0 +1,64 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Local agent workspace + session scratch. Internal docs, plans and the
+# acceptance harness live under .claude/ and are not part of the public tree;
+# the agent guides at the repo root are machine-local for the same reason.
+.claude/
+.superpowers/
+CLAUDE.md
+AGENTS.md
+
+# Machine-local signing configuration — the public tree carries no Apple
+# identity. Release builds read the signing team from these gitignored files.
+macos/Runner/Configs/Local.xcconfig
+tool/release.local
+
+# Xcode writes a second, non-authoritative Package.resolved into the top-level
+# workspace wrapper on some resolve invocations. The build-authoritative lockfile
+# is Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+# (committed — measured in M12 Task 1); this copy only regenerates and drifts.
+macos/Runner.xcworkspace/xcshareddata/swiftpm/

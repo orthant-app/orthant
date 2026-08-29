@@ -1,0 +1,27 @@
+// Application-level settings for the Runner target.
+//
+// This may be replaced with something auto-generated from metadata (e.g., pubspec.yaml) in the
+// future. If not, the values below would default to using the project name when this becomes a
+// 'flutter create' template.
+
+// The application's name. By default this is also the title of the Flutter window.
+// Capitalised because this is a user-visible name in more places than
+// CFBundleDisplayName covers: System Settings ▸ General ▸ Login Items reads
+// CFBundleName / the bundle filename, not the display name. It is also the
+// Swift module name (RunnerTests does `@testable import Orthant`) and the
+// .app filename, so the tool/ scripts track it — as does
+// RunnerTests' TEST_HOST in project.pbxproj, which spells the path out
+// literally and fails with "Could not find test host" if it drifts.
+PRODUCT_NAME = Orthant
+
+// The application's bundle identifier
+PRODUCT_BUNDLE_IDENTIFIER = app.orthant.orthant
+
+// The copyright displayed in application information
+PRODUCT_COPYRIGHT = Copyright © 2026 Optimal One. All rights reserved.
+
+// Machine-local overrides — optional and gitignored; the public tree carries
+// no Apple signing identity. Release builds pick up DEVELOPMENT_TEAM here,
+// and tool/release.sh independently verifies the signed result against the
+// team pinned in tool/release.local.
+#include? "Local.xcconfig"

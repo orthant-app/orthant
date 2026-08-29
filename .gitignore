@@ -49,6 +49,7 @@ app.*.map.json
 # the agent guides at the repo root are machine-local for the same reason.
 .claude/
 .superpowers/
+.worktrees/
 CLAUDE.md
 AGENTS.md
 

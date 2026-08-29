@@ -46,11 +46,116 @@ ok()   { printf '\033[1;32m✓\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m!\033[0m %s\n' "$*"; }
 die()  { printf '\033[1;31m✗\033[0m %s\n' "$*" >&2; exit 1; }
 
+redacting_output() {
+  [[ "${REDACT_IDENTITY_OUTPUT-}" == 1 ]]
+}
+
+record_sensitive_output() {
+  local label="$1" text="$2"
+  write_sensitive_diagnostic "$label" "$text" ||
+    die "could not record redacted release diagnostics"
+}
+
+sensitive_info() {
+  local label="$1" public_text="$2" detailed_text="$3"
+  if redacting_output; then
+    record_sensitive_output "$label" "$detailed_text"
+    info "$public_text"
+  else
+    info "$detailed_text"
+  fi
+}
+
+sensitive_ok() {
+  local label="$1" public_text="$2" detailed_text="$3"
+  if redacting_output; then
+    record_sensitive_output "$label" "$detailed_text"
+    ok "$public_text"
+  else
+    ok "$detailed_text"
+  fi
+}
+
+sensitive_die() {
+  local label="$1" public_text="$2" detailed_text="$3"
+  if redacting_output; then
+    record_sensitive_output "$label" "$detailed_text"
+    die "$public_text — see release-diagnostics.log in the encrypted diagnostics archive"
+  fi
+  die "$detailed_text"
+}
+
+run_redacted_check() {
+  local label="$1" error_file output rc
+  shift
+  if ! redacting_output; then
+    "$@"
+    return
+  fi
+
+  [[ -n "${RUNNER_TEMP-}" ]] ||
+    release_lib_error 'RUNNER_TEMP is required for redacted diagnostics' || return 1
+  mkdir -p "$RUNNER_TEMP" || return 1
+  error_file="$RUNNER_TEMP/release-check.$$.log"
+  : >"$error_file" || return 1
+  chmod 600 "$error_file" || return 1
+  if "$@" 2>"$error_file"; then
+    rc=0
+  else
+    rc=$?
+  fi
+  output="$(<"$error_file")"
+  rm -f "$error_file"
+  [[ -z "$output" ]] || record_sensitive_output "$label" "$output"
+  return "$rc"
+}
+
+run_codesign() {
+  local label="$1" output rc
+  shift
+  if ! redacting_output; then
+    codesign "$@"
+    return
+  fi
+
+  if output="$(codesign "$@" 2>&1)"; then
+    rc=0
+  else
+    rc=$?
+  fi
+  record_sensitive_output "$label" "$output"
+  if (( rc == 0 )); then
+    ok "$label"
+  else
+    warn "$label failed — see release-diagnostics.log in the encrypted diagnostics archive"
+  fi
+  return "$rc"
+}
+
+capture_codesign() {
+  local label="$1" rc
+  shift
+  if CODESIGN_CAPTURE="$(codesign "$@" 2>&1)"; then
+    rc=0
+  else
+    rc=$?
+  fi
+  if redacting_output; then
+    record_sensitive_output "$label" "$CODESIGN_CAPTURE"
+    if (( rc == 0 )); then
+      ok "$label"
+    else
+      warn "$label failed — see release-diagnostics.log in the encrypted diagnostics archive"
+    fi
+  fi
+  return "$rc"
+}
+
 cd "$REPO_ROOT"
 
 # ---------------------------------------------------------------- preflight --
 
-validate_release_version "$VERSION"
+run_redacted_check 'release version validation' validate_release_version "$VERSION"
 
 # The expected team is read from a gitignored per-machine file, and the bundle
 # id stays a plain assignment — deliberately not `: "${VAR:=default}"` like
@@ -67,21 +172,27 @@ validate_release_version "$VERSION"
 # environment cannot override it either.
 RELEASE_LOCAL="$REPO_ROOT/tool/release.local"
 [[ -f "$RELEASE_LOCAL" ]] ||
-  die "$RELEASE_LOCAL not found — create it (gitignored) containing: EXPECTED_TEAM=<your Apple Team ID>"
+  sensitive_die 'local release configuration path' \
+    'local release signing configuration is missing' \
+    "$RELEASE_LOCAL not found — create it (gitignored) containing: EXPECTED_TEAM=<your Apple Team ID>"
 # shellcheck source=/dev/null
 source "$RELEASE_LOCAL"
 [[ -n "${EXPECTED_TEAM:-}" ]] ||
-  die "$RELEASE_LOCAL must set EXPECTED_TEAM=<your Apple Team ID>"
+  sensitive_die 'local release configuration path' \
+    'local release signing configuration is incomplete' \
+    "$RELEASE_LOCAL must set EXPECTED_TEAM=<your Apple Team ID>"
 EXPECTED_BUNDLE_ID="app.orthant.orthant"
 
 # pubspec.yaml is the source of truth for what gets built. Release labels may
 # carry a prerelease suffix for artifact naming, while Flutter's marketing
 # version remains the three-integer base version.
 PUBSPEC_FILE="$REPO_ROOT/pubspec.yaml"
-parse_pubspec_version "$PUBSPEC_FILE" ||
-  die "could not parse release version from $PUBSPEC_FILE"
+run_redacted_check 'pubspec version validation' parse_pubspec_version "$PUBSPEC_FILE" ||
+  sensitive_die 'pubspec path' 'could not parse the release version' \
+    "could not parse release version from $PUBSPEC_FILE"
 [[ "$PUBSPEC_BASE_VERSION" == "$RELEASE_BASE_VERSION" ]] ||
-  die "$PUBSPEC_FILE says $PUBSPEC_BASE_VERSION but $VERSION has base version $RELEASE_BASE_VERSION — bump it first"
+  sensitive_die 'pubspec version mismatch' 'the requested release version does not match pubspec' \
+    "$PUBSPEC_FILE says $PUBSPEC_BASE_VERSION but $VERSION has base version $RELEASE_BASE_VERSION — bump it first"
 
 if SECURITY_OUT="$(security find-identity -v -p codesigning 2>&1)"; then
   SECURITY_RC=0
@@ -110,19 +221,25 @@ fi
 # already holds a higher build number. The workflow restores the canonical
 # feed history before calling this script.
 BUILD_NUMBER="$PUBSPEC_BUILD_NUMBER"
-select_appcast_output "$DIST"
+run_redacted_check 'appcast output selection' select_appcast_output "$DIST"
 FEED_HISTORY=("$DIST/appcast.xml")
 if [[ "${INCLUDE_BETA_APPCAST_HISTORY-}" == 1 ]]; then
   FEED_HISTORY+=("$DIST/appcast-beta.xml")
 fi
-max_feed_version "${FEED_HISTORY[@]}" ||
-  die "could not inspect release feed history: ${FEED_HISTORY[*]}"
+run_redacted_check 'release feed history validation' \
+  max_feed_version "${FEED_HISTORY[@]}" ||
+  sensitive_die 'release feed history paths' 'could not inspect release feed history' \
+    "could not inspect release feed history: ${FEED_HISTORY[*]}"
 
 if [[ -n "$FEED_MAX_VERSION" ]]; then
   (( 10#$BUILD_NUMBER > 10#$FEED_MAX_VERSION )) ||
-    die "$PUBSPEC_FILE's build number ($BUILD_NUMBER) is not greater than the newest version ($FEED_MAX_VERSION) in ${FEED_HISTORY[*]} — Sparkle compares CFBundleVersion, so this release would never be offered as an update; bump the +N in $PUBSPEC_FILE, UNLESS this run immediately follows one that died signing the selected appcast for this same +N — that leaves a partially-written feed behind, which is what this check is actually reading, and the fix is to remove or regenerate that file, not bump $PUBSPEC_FILE"
+    sensitive_die 'release feed monotonicity paths' \
+      'the build number is not newer than the release feed history' \
+      "$PUBSPEC_FILE's build number ($BUILD_NUMBER) is not greater than the newest version ($FEED_MAX_VERSION) in ${FEED_HISTORY[*]} — Sparkle compares CFBundleVersion, so this release would never be offered as an update; bump the +N in $PUBSPEC_FILE, UNLESS this run immediately follows one that died signing the selected appcast for this same +N — that leaves a partially-written feed behind, which is what this check is actually reading, and the fix is to remove or regenerate that file, not bump $PUBSPEC_FILE"
 else
-  info "no prior release found in ${FEED_HISTORY[*]} — skipping the monotonic build-number check (first release)"
+  sensitive_info 'release feed history paths' \
+    'no prior release found — skipping the monotonic build-number check (first release)' \
+    "no prior release found in ${FEED_HISTORY[*]} — skipping the monotonic build-number check (first release)"
 fi
 
 # ------------------------------------------------------------------- build ---
@@ -130,7 +247,9 @@ fi
 info "Building Release…"
 flutter build macos --release
 
-[[ -d "$APP" ]] || die "no app at $APP — did the build actually succeed?"
+[[ -d "$APP" ]] ||
+  sensitive_die 'release app path' 'the Release build produced no app' \
+    "no app at $APP — did the build actually succeed?"
 
 # -------------------------------------------------------------------- sign ---
 
@@ -139,7 +258,8 @@ flutter build macos --release
 # silently skips nested bundles it does not recognise. Deepest first, app last,
 # or the outer signature is invalidated by the inner ones.
 sign_nested() {
-  codesign --force --timestamp --options runtime --sign "$SIGN_IDENTITY" "$1"
+  run_codesign 'Nested code signing' \
+    --force --timestamp --options runtime --sign "$SIGN_IDENTITY" "$1"
 }
 
 # Everything inside the bundle that is code. Deliberately NOT limited to
@@ -178,14 +298,16 @@ done < <(find "$APP" -mindepth 1 -depth \
   die "signed no nested code — the find patterns no longer match the bundle"
 
 info "Signing the app…"
-codesign --force --timestamp --options runtime \
-         --entitlements macos/Runner/Release.entitlements \
-         --sign "$SIGN_IDENTITY" "$APP"
+run_codesign 'Release app signing' \
+  --force --timestamp --options runtime \
+  --entitlements macos/Runner/Release.entitlements \
+  --sign "$SIGN_IDENTITY" "$APP"
 
 # ------------------------------------------------------------------ verify ---
 
 info "Verifying…"
-codesign --verify --deep --strict --verbose=2 "$APP" ||
+run_codesign 'Release app signature verification' \
+  --verify --deep --strict --verbose=2 "$APP" ||
   die "signature does not verify"
 
 # Not the same check: --verify asks whether the signature is internally sound,
@@ -198,11 +320,8 @@ print_sensitive_or_record 'Gatekeeper pre-notarization output' \
 grep -q 'accepted' <<<"$SPCTL_OUT" ||
   warn "not yet accepted by Gatekeeper — expected until notarization has run"
 
-CODESIGN_DV="$(codesign -dv --verbose=4 "$APP" 2>&1)"
-if [[ "${REDACT_IDENTITY_OUTPUT-}" == 1 ]]; then
-  print_sensitive_or_record 'code-signing details' "$CODESIGN_DV" ||
-    die "could not record code-signing details"
-fi
+capture_codesign 'Code-signing identity inspection' -dv --verbose=4 "$APP"
+CODESIGN_DV="$CODESIGN_CAPTURE"
 TEAM="$(sed -n 's/^TeamIdentifier=//p' <<<"$CODESIGN_DV")"
 if [[ -z "$TEAM" || "$TEAM" == "not set" ]]; then
   if [[ "${REDACT_IDENTITY_OUTPUT-}" == 1 ]]; then
@@ -343,7 +462,8 @@ hdiutil create -volname "Orthant $VERSION" -srcfolder "$STAGE" \
 # alone does not supply one. No --options runtime here: that flag describes how
 # a *process* is launched, and a disk image is not one.
 info "Signing the DMG…"
-codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DMG"
+run_codesign 'Release DMG signing' \
+  --force --timestamp --sign "$SIGN_IDENTITY" "$DMG"
 
 notarize "$DMG" "DMG"
 xcrun stapler staple "$DMG"
@@ -353,7 +473,8 @@ xcrun stapler staple "$DMG"
 info "Verifying the finished artifacts…"
 xcrun stapler validate "$APP" || die "the app has no stapled ticket"
 xcrun stapler validate "$DMG" || die "the DMG has no stapled ticket"
-codesign --verify --deep --strict "$APP" || die "the stapled app no longer verifies"
+run_codesign 'Stapled app signature verification' \
+  --verify --deep --strict "$APP" || die "the stapled app no longer verifies"
 
 # Under `pipefail` a bare `spctl … | sed` would abort the script with no
 # explanation, so the verdict is captured and named.
@@ -364,7 +485,7 @@ print_sensitive_or_record 'Gatekeeper notarized-app output' \
 grep -q 'source=Notarized Developer ID' <<<"$SPCTL_OUT" ||
   die "Gatekeeper does not see a notarized Developer ID app — stapling did not take"
 
-ok "Ready: $DMG"
+sensitive_ok 'release DMG path' 'Release artifact ready' "Ready: $DMG"
 
 # ---------------------------------------------------------------- appcast ---
 #
@@ -393,7 +514,8 @@ xcodebuild -resolvePackageDependencies -project macos/Runner.xcodeproj \
 
 SPARKLE_BIN="$REPO_ROOT/build/spm/artifacts/sparkle/Sparkle/bin"
 [[ -x "$SPARKLE_BIN/sign_update" && -x "$SPARKLE_BIN/generate_appcast" ]] ||
-  die "no sign_update/generate_appcast under $SPARKLE_BIN — resolvePackageDependencies above should have produced them; confirm macos/Runner.xcodeproj still depends on the Sparkle package"
+  sensitive_die 'Sparkle tool path' 'Sparkle command-line tools were not resolved' \
+    "no sign_update/generate_appcast under $SPARKLE_BIN — resolvePackageDependencies above should have produced them; confirm macos/Runner.xcodeproj still depends on the Sparkle package"
 
 configure_sparkle_args
 
@@ -428,7 +550,9 @@ while IFS= read -r -d '' dmg; do
   ok "appcast entry: $SIG"
   DMG_COUNT=$((DMG_COUNT + 1))
 done < <(find "$DIST" -maxdepth 1 -name 'Orthant-*.dmg' -print0)
-(( DMG_COUNT > 0 )) || die "no DMG in $DIST to sign for the appcast"
+(( DMG_COUNT > 0 )) ||
+  sensitive_die 'release artifact directory' 'no DMG was available for the appcast' \
+    "no DMG in $DIST to sign for the appcast"
 
 # generate_appcast reads a directory of signed DMGs and writes the whole
 # feed, so the feed is derived from the artifacts rather than hand-edited
@@ -455,7 +579,8 @@ done < <(find "$DIST" -maxdepth 1 -name 'Orthant-*.dmg' -print0)
 # feed alongside the intended ones.
 info "Regenerating the appcast…"
 "$SPARKLE_BIN/generate_appcast" "${GENERATE_APPCAST_ARGS[@]}" "$DIST" ||
-  die "generate_appcast failed over $DIST — see output above"
+  sensitive_die 'appcast generation paths' 'generate_appcast failed' \
+    "generate_appcast failed over $DIST — see output above"
 
 # generate_appcast can exit 0 having silently skipped signing: observed on
 # this machine, it printed "Private key for account ed25519 not found in the
@@ -510,12 +635,16 @@ DELTA_XML="$(sed -n '/<sparkle:deltas>/,/<\/sparkle:deltas>/p' "$APPCAST_FILE")"
 FULL_ENC_COUNT="$(grep -o '<enclosure' <<<"$TOP_XML" | wc -l | tr -d ' ')" || true
 FULL_SIG_COUNT="$(grep -o 'sparkle:edSignature=' <<<"$TOP_XML" | wc -l | tr -d ' ')" || true
 (( FULL_SIG_COUNT == FULL_ENC_COUNT )) ||
-  die "generate_appcast wrote $APPCAST_FILE with $FULL_SIG_COUNT of $FULL_ENC_COUNT full-DMG item(s) signed — an unsigned item is refused by Sparkle's client, but only after a user's machine has already downloaded it. Try running '$SPARKLE_BIN/generate_appcast ${GENERATE_APPCAST_ARGS[*]} $DIST' once by hand in an interactive Terminal, so any Keychain access prompt has a screen to appear on, then re-run this script."
+  sensitive_die 'appcast full-item verification paths' \
+    'generate_appcast wrote an unsigned full-DMG item' \
+    "generate_appcast wrote $APPCAST_FILE with $FULL_SIG_COUNT of $FULL_ENC_COUNT full-DMG item(s) signed — an unsigned item is refused by Sparkle's client, but only after a user's machine has already downloaded it. Try running '$SPARKLE_BIN/generate_appcast ${GENERATE_APPCAST_ARGS[*]} $DIST' once by hand in an interactive Terminal, so any Keychain access prompt has a screen to appear on, then re-run this script."
 
 DELTA_ENC_COUNT="$(grep -o '<enclosure' <<<"$DELTA_XML" | wc -l | tr -d ' ')" || true
 DELTA_SIG_COUNT="$(grep -o 'sparkle:edSignature=' <<<"$DELTA_XML" | wc -l | tr -d ' ')" || true
 (( DELTA_SIG_COUNT == DELTA_ENC_COUNT )) ||
-  die "generate_appcast wrote $APPCAST_FILE with $DELTA_SIG_COUNT of $DELTA_ENC_COUNT delta update(s) signed — an unsigned delta is refused by Sparkle's client exactly like an unsigned full DMG. Try running '$SPARKLE_BIN/generate_appcast ${GENERATE_APPCAST_ARGS[*]} $DIST' once by hand in an interactive Terminal, so any Keychain access prompt has a screen to appear on, then re-run this script."
+  sensitive_die 'appcast delta verification paths' \
+    'generate_appcast wrote an unsigned delta update' \
+    "generate_appcast wrote $APPCAST_FILE with $DELTA_SIG_COUNT of $DELTA_ENC_COUNT delta update(s) signed — an unsigned delta is refused by Sparkle's client exactly like an unsigned full DMG. Try running '$SPARKLE_BIN/generate_appcast ${GENERATE_APPCAST_ARGS[*]} $DIST' once by hand in an interactive Terminal, so any Keychain access prompt has a screen to appear on, then re-run this script."
 
 # Self-consistency above cannot catch a feed that pruned away the release
 # this run just built — --maximum-versions is only ever supposed to drop OLD
@@ -524,6 +653,8 @@ DELTA_SIG_COUNT="$(grep -o 'sparkle:edSignature=' <<<"$DELTA_XML" | wc -l | tr -
 # so its presence here is what makes trusting pruning for everything older
 # a safe conclusion instead of a hopeful one.
 grep -q "<sparkle:version>$BUILD_NUMBER</sparkle:version>" "$APPCAST_FILE" ||
-  die "generate_appcast wrote $APPCAST_FILE with no item for sparkle:version $BUILD_NUMBER (the release just built) — --maximum-versions pruning must never remove the newest item, so something is wrong beyond ordinary pruning. Try running '$SPARKLE_BIN/generate_appcast ${GENERATE_APPCAST_ARGS[*]} $DIST' once by hand in an interactive Terminal, so any Keychain access prompt has a screen to appear on, then re-run this script."
+  sensitive_die 'appcast newest-item verification paths' \
+    'generate_appcast omitted the release just built' \
+    "generate_appcast wrote $APPCAST_FILE with no item for sparkle:version $BUILD_NUMBER (the release just built) — --maximum-versions pruning must never remove the newest item, so something is wrong beyond ordinary pruning. Try running '$SPARKLE_BIN/generate_appcast ${GENERATE_APPCAST_ARGS[*]} $DIST' once by hand in an interactive Terminal, so any Keychain access prompt has a screen to appear on, then re-run this script."
 
-ok "appcast: $APPCAST_FILE"
+sensitive_ok 'appcast output path' 'Appcast generated' "appcast: $APPCAST_FILE"

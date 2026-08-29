@@ -9,6 +9,10 @@
   </p>
 </div>
 
+<p align="center">
+  <img src=".github/demo.gif" alt="Demo: windows snap to halves and quarters with keyboard shortcuts; the grid overlay places a window on a drawn selection; a left-two-thirds region is drawn, saved with Cmd-S, bound to a shortcut of its own, and used.">
+</p>
+
 > [!NOTE]
 > Orthant is feature-complete, and its release pipeline (Developer ID signing, notarization, DMG, Sparkle in-app updates) is built and proven — but no binaries are published yet. For now, [build from source](#build-from-source); a signed, notarized download is the next step.
 

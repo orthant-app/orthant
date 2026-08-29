@@ -2,7 +2,7 @@
   <img src="macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_256.png" width="128" alt="Orthant icon">
   <h1>Orthant</h1>
   <p><strong>Grid-based window manager for macOS.</strong><br>
-  Snap the frontmost window with keyboard shortcuts — or summon a grid and draw exactly where it should go.</p>
+  Snap the frontmost window with keyboard shortcuts, or summon a grid and draw exactly where it should go.</p>
   <p>
     <img src="https://img.shields.io/badge/macOS-13%2B-blue" alt="macOS 13+">
     <img src="https://img.shields.io/badge/license-MIT-brightgreen" alt="MIT license">
@@ -14,25 +14,25 @@
 </p>
 
 > [!NOTE]
-> Orthant is feature-complete, and its release pipeline (Developer ID signing, notarization, DMG, Sparkle in-app updates) is built and proven — but no binaries are published yet. For now, [build from source](#build-from-source); a signed, notarized download is the next step.
+> There's no packaged download yet, so for now you [build from source](#build-from-source). It takes a few minutes with Flutter installed. Signed, notarized releases are the next step.
 
 ## What it does
 
-Orthant lives in the menu bar (no Dock icon) and moves the window you were just using — without ever stealing focus from it. The target window is captured *before* any Orthant UI appears, so the app you're arranging stays frontmost throughout.
+Orthant lives in the menu bar (no Dock icon) and moves the window you were just using, without ever stealing focus from it. The target window is captured *before* any Orthant UI appears, so the app you're arranging stays frontmost throughout.
 
 Two ways to place a window:
 
-- **Direct shortcuts** — halves, quarters, maximize, center, each on its own chord. Press `⌃⌥→` and the window fills the right half of its display. Instant.
-- **The grid overlay** — press `⌃⌥O` and a translucent grid appears over every display (median ~45 ms to first frame). Drag across cells — or arrow around with `⇧` to extend — and the selection previews exactly where the window will land. Release or `↩` places it; `Esc` cancels.
+- **Direct shortcuts.** Halves, quarters, maximize, center, each on its own chord. Press `⌃⌥→` and the window fills the right half of its display. Instant.
+- **The grid overlay.** Press `⌃⌥O` and a translucent grid appears over every display in about 50 ms. Drag across cells (or arrow around, with `⇧` to extend) and the selection previews exactly where the window will land. Release or `↩` places it, `Esc` cancels.
 
 And it grows with you:
 
-- **Custom regions** — draw any block on a grid of your own choosing ("left ⅔"), name it, give it a shortcut. A region remembers its own proportions, so changing the overlay's grid size later never moves your windows.
+- **Custom regions.** Draw any block on a grid of your own choosing ("left ⅔"), name it, give it a shortcut. A region remembers its own proportions, so changing the overlay's grid size later never moves your windows.
 - **`⌘S` on the overlay** saves the selection you just made as a region, pre-named and ready to bind.
 - **Every shortcut is rebindable**, including the overlay summon. Conflicts aren't refused or silently stolen: the pane names the current owner, asks, and leaves an Undo.
-- **Settings that stick** — grid size (2–12 per axis), gaps between windows, launch at login. Everything persists across relaunches; grid and gaps have a live preview.
-- **Multi-display aware** — windows snap within their *own* display (not the cursor's), mixed-DPI arrangements included.
-- **Keyboard-first and accessible** — the whole app is keyboard-drivable, and the settings window is labelled for VoiceOver.
+- **Settings that stick.** Grid size (2–12 per axis), gaps between windows, launch at login. Everything survives a relaunch, and grid and gaps have a live preview.
+- **Multi-display aware.** Windows snap within their *own* display, not the cursor's, mixed-DPI arrangements included.
+- **Keyboard-first and accessible.** The whole app is keyboard-drivable, and the settings window is labelled for VoiceOver.
 
 ## Default shortcuts
 
@@ -49,33 +49,39 @@ On the overlay: **drag** (or **arrow keys**, `⇧` to extend) to select, `↩` t
 
 All of these are rebindable in **Settings → Shortcuts**. (`⌃` Control, `⌥` Option, `⇧` Shift, `⌘` Command, `↩` Return.)
 
-## Requirements & permissions
+## Platforms
 
-- **macOS 13 (Ventura) or newer.**
-- **Accessibility permission.** Orthant positions other apps' windows through the macOS Accessibility API — the same mechanism every window manager uses — and macOS gates that behind **System Settings ▸ Privacy & Security ▸ Accessibility**. On first launch Orthant walks you through granting it, and gets out of the way the moment it's on.
+| Platform | Status |
+| --- | --- |
+| **macOS 13+** | Works today |
+| **Windows** | Planned: the same Dart UI over a pure-Dart Win32 backend, behind the same `WindowController` seam |
+| **Linux** | Not possible: Wayland doesn't let one app move another's windows, by design |
+
+## Permissions
+
+**Accessibility permission** is the one thing Orthant asks for. It positions other apps' windows through the macOS Accessibility API, the same mechanism every window manager uses, and macOS gates that behind **System Settings ▸ Privacy & Security ▸ Accessibility**. On first launch Orthant walks you through granting it, and gets out of the way the moment it's on.
 
 > [!TIP]
-> **Why isn't this on the Mac App Store?** The Accessibility API doesn't work from inside the App Sandbox, and the store requires the sandbox — which rules it out permanently, for Orthant and every app in this category. Signed, notarized direct distribution is the plan instead.
+> **Why isn't this on the Mac App Store?** The Accessibility API doesn't work from inside the App Sandbox, and the store requires the sandbox. That rules it out permanently, for Orthant and every app in this category.
 
 ## Build from source
 
-Prerequisites: [Flutter](https://flutter.dev) 3.35+ (stable channel) and a recent Xcode. Native dependencies resolve through Swift Package Manager — no CocoaPods.
+Prerequisites: [Flutter](https://flutter.dev) 3.35+ (stable channel) and a recent Xcode. Native dependencies resolve through Swift Package Manager, so there's no CocoaPods to install.
 
 ```sh
 git clone https://github.com/orthant-app/orthant.git
 cd orthant
 flutter pub get
-flutter test                 # fast: Dart unit + widget tests, no native build
-tool/dev_signing.sh setup    # once per machine — see below
+tool/dev_signing.sh setup    # once per machine, see below
 tool/run_dev.sh              # build, sign, and launch the menu-bar app
 ```
 
 > [!IMPORTANT]
-> **Run `tool/dev_signing.sh setup` before your first build.** macOS ties the Accessibility grant to an app's *code signature*, and Flutter re-signs debug builds ad-hoc — differently every build. Without a stable identity each rebuild orphans the grant, leaving the baffling state where System Settings shows Orthant **on** while the app insists permission is missing. The script creates one long-lived local signing certificate so the grant survives rebuilds (`tool/dev_signing.sh remove` undoes it).
+> **Run `tool/dev_signing.sh setup` before your first build.** macOS ties the Accessibility grant to an app's *code signature*, and Flutter re-signs debug builds ad-hoc, differently every build. Without a stable identity, each rebuild orphans the grant and leaves the baffling state where System Settings shows Orthant **on** while the app insists permission is missing. The script creates one long-lived local signing certificate so the grant survives rebuilds (`tool/dev_signing.sh remove` undoes it).
 
 Two more dev-loop notes:
 
-- Use `tool/run_dev.sh`, **not** `flutter run -d macos`, for manual testing — a menu-bar app whose stdin isn't a TTY gets killed seconds after launch.
+- Use `tool/run_dev.sh`, **not** `flutter run -d macos`, for manual testing: a menu-bar app whose stdin isn't a TTY gets killed seconds after launch.
 - If a grant ever wedges anyway: `tccutil reset Accessibility app.orthant.orthant`, then relaunch and re-grant. If the Accessibility row shows a stale name or icon, select it and remove it with **−** first.
 
 ## Architecture
@@ -100,8 +106,8 @@ tool/           run_dev.sh, dev_signing.sh, release.sh, reset_state.sh, make_app
 The choices that matter:
 
 - **One coordinate system.** All window geometry is top-left-origin global points (the Accessibility/CoreGraphics space), converted from AppKit's bottom-left space exactly once, natively. Mixing the two spaces is the classic correctness bug in this category of app.
-- **The overlay is a non-activating `NSPanel`** on a second, resident Flutter engine — it appears without Orthant ever becoming the frontmost app, and it idles at 0% CPU while hidden.
-- **Native handles never cross the platform channel** — only plain data does. A planned **Windows** backend (pure-Dart Win32) implements the same `WindowController` seam behind the same UI. **Linux** isn't possible: Wayland, by design, doesn't let one app move another's windows.
+- **The overlay is a non-activating `NSPanel`** on a second, resident Flutter engine. It appears without Orthant ever becoming the frontmost app, and idles at 0% CPU while hidden.
+- **Native handles never cross the platform channel.** Only plain data does, which is what keeps a second backend practical: the planned **Windows** port (pure-Dart Win32) implements the same `WindowController` seam behind the same UI. **Linux** isn't possible: Wayland doesn't let one app move another's windows, by design.
 
 ## Testing
 
@@ -120,7 +126,7 @@ Quit Orthant and delete the app. Settings live in `~/Library/Preferences/app.ort
 
 ## Name
 
-An **orthant** is the n-dimensional generalization of a quadrant — which is what you get when a grid meets a screen.
+An **orthant** is the n-dimensional generalization of a quadrant, which is what you get when a grid meets a screen.
 
 ## License
 

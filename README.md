@@ -6,6 +6,7 @@
   <p>
     <img src="https://img.shields.io/badge/macOS-13%2B-blue" alt="macOS 13+">
     <img src="https://img.shields.io/badge/license-MIT-brightgreen" alt="MIT license">
+    <a href="https://github.com/orthant-app/orthant/actions/workflows/ci.yml"><img src="https://github.com/orthant-app/orthant/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   </p>
 </div>
 

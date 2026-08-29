@@ -56,20 +56,25 @@ select_appcast_output() {
 }
 
 max_feed_version() {
-  local file item version
+  local file content version
+  local sparkle_version_tag_re='<sparkle:version>([^<]*)</sparkle:version>'
 
   FEED_MAX_VERSION=''
   for file in "$@"; do
     [[ -f "$file" ]] || continue
-    while IFS= read -r item; do
-      version="${item#<sparkle:version>}"
-      version="${version%</sparkle:version>}"
+    content="$(tr '\n' '\r' <"$file")" ||
+      release_lib_error "could not read feed: $file" || return 1
+    while [[ "$content" == *'<sparkle:version>'* ]]; do
+      [[ "$content" =~ $sparkle_version_tag_re ]] ||
+        release_lib_error "malformed sparkle version tag in $file" || return 1
+      version="${BASH_REMATCH[1]}"
       [[ "$version" =~ ^[0-9]+$ ]] ||
         release_lib_error "invalid sparkle version in $file: $version" || return 1
       if [[ -z "$FEED_MAX_VERSION" ]] || (( 10#$version > 10#$FEED_MAX_VERSION )); then
         FEED_MAX_VERSION="$version"
       fi
-    done < <(grep -o '<sparkle:version>[^<]*</sparkle:version>' "$file" || true)
+      content="${content#*"${BASH_REMATCH[0]}"}"
+    done
   done
 }
 

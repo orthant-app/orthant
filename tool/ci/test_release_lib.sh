@@ -121,6 +121,46 @@ redaction_enabled_records_raw() {
     [[ "$mode" == '600' ]]
 }
 
+redaction_without_runner_temp_fails() {
+  REDACT_IDENTITY_OUTPUT=1
+  unset RUNNER_TEMP
+  ! print_sensitive_or_record 'notary output' 'TeamIdentifier=secret-team'
+}
+
+sparkle_args_without_output_flag() {
+  unset APPCAST_OUTPUT_FILENAME SPARKLE_ED_KEY_FILE APPCAST_DOWNLOAD_URL_PREFIX
+  select_appcast_output "$TMP_DIR/dist" &&
+    configure_sparkle_args &&
+    [[ "${#SIGN_UPDATE_ARGS[@]}" == 0 ]] &&
+    [[ "${#GENERATE_APPCAST_ARGS[@]}" == 0 ]]
+}
+
+sparkle_args_with_explicit_stable_output() {
+  APPCAST_OUTPUT_FILENAME='appcast.xml'
+  unset SPARKLE_ED_KEY_FILE APPCAST_DOWNLOAD_URL_PREFIX
+  select_appcast_output "$TMP_DIR/dist" &&
+    configure_sparkle_args &&
+    [[ "${GENERATE_APPCAST_ARGS[*]}" == "-o $TMP_DIR/dist/appcast.xml" ]]
+}
+
+sparkle_args_with_explicit_beta_output() {
+  APPCAST_OUTPUT_FILENAME='appcast-beta.xml'
+  unset SPARKLE_ED_KEY_FILE APPCAST_DOWNLOAD_URL_PREFIX
+  select_appcast_output "$TMP_DIR/dist" &&
+    configure_sparkle_args &&
+    [[ "${GENERATE_APPCAST_ARGS[*]}" == "-o $TMP_DIR/dist/appcast-beta.xml" ]]
+}
+
+sparkle_args_with_key_and_download_prefix() {
+  APPCAST_OUTPUT_FILENAME='appcast-beta.xml'
+  SPARKLE_ED_KEY_FILE='/tmp/sparkle.key'
+  APPCAST_DOWNLOAD_URL_PREFIX='https://example.test/v1.2.3/'
+  select_appcast_output "$TMP_DIR/dist" &&
+    configure_sparkle_args &&
+    [[ "${SIGN_UPDATE_ARGS[*]}" == '-f /tmp/sparkle.key' ]] &&
+    [[ "${GENERATE_APPCAST_ARGS[*]}" == "--ed-key-file /tmp/sparkle.key --download-url-prefix https://example.test/v1.2.3/ -o $TMP_DIR/dist/appcast-beta.xml" ]]
+}
+
 assert_ok 'stable version exposes base and prerelease state' \
   version_state_is '1.2.3' '1.2.3' 'false'
 assert_ok 'prerelease version exposes base and prerelease state' \
@@ -165,6 +205,9 @@ assert_eq 'absent feeds produce no maximum' '' "$FEED_MAX_VERSION"
 printf '<sparkle:version>abc</sparkle:version>\n' >"$TMP_DIR/malformed.xml"
 assert_fails 'non-decimal sparkle version is rejected' \
   max_feed_version "$TMP_DIR/malformed.xml"
+printf '<sparkle:version>\nabc\n</sparkle:version>\n' >"$TMP_DIR/malformed-multiline.xml"
+assert_fails 'multiline non-decimal sparkle version is rejected' \
+  max_feed_version "$TMP_DIR/malformed-multiline.xml"
 
 unset APPCAST_OUTPUT_FILENAME
 assert_ok 'unset appcast output selects default' select_appcast_output "$TMP_DIR/dist"
@@ -183,8 +226,14 @@ assert_ok 'all P8 values select exact notary arguments' notary_p8_is
 assert_ok 'partial P8 configuration is rejected' notary_partial_fails
 assert_ok 'two-part P8 configuration is rejected' notary_two_partials_fail
 
+assert_ok 'unset appcast output adds no Sparkle output flag' sparkle_args_without_output_flag
+assert_ok 'explicit stable appcast output adds Sparkle output flag' sparkle_args_with_explicit_stable_output
+assert_ok 'explicit beta appcast output adds Sparkle output flag' sparkle_args_with_explicit_beta_output
+assert_ok 'Sparkle key and download prefix arguments are preserved' sparkle_args_with_key_and_download_prefix
+
 assert_ok 'unredacted diagnostics print sensitive output' redaction_unset_prints_raw
 assert_ok 'redacted diagnostics record raw output privately' redaction_enabled_records_raw
+assert_ok 'redacted diagnostics require RUNNER_TEMP' redaction_without_runner_temp_fails
 
 printf 'release_lib: %d passed, %d failed\n' "$PASS_COUNT" "$FAIL_COUNT"
 (( FAIL_COUNT == 0 ))

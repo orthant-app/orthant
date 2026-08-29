@@ -132,6 +132,28 @@ run_codesign() {
   return "$rc"
 }
 
+run_stapler() {
+  local label="$1" output rc
+  shift
+  if ! redacting_output; then
+    xcrun stapler "$@"
+    return
+  fi
+
+  if output="$(xcrun stapler "$@" 2>&1)"; then
+    rc=0
+  else
+    rc=$?
+  fi
+  record_sensitive_output "$label" "$output"
+  if (( rc == 0 )); then
+    ok "$label"
+  else
+    warn "$label failed — see release-diagnostics.log in the encrypted diagnostics archive"
+  fi
+  return "$rc"
+}
+
 capture_codesign() {
   local label="$1" rc
   shift
@@ -434,7 +456,7 @@ notarize() {
 rm -f "$ZIP"
 ditto -c -k --keepParent "$APP" "$ZIP"   # ditto, not zip: preserves the bundle
 notarize "$ZIP" "app"
-xcrun stapler staple "$APP"
+run_stapler 'App ticket stapling' staple "$APP"
 ok "App stapled"
 
 # ------------------------------------------------------------------- pack ---
@@ -466,13 +488,15 @@ run_codesign 'Release DMG signing' \
   --force --timestamp --sign "$SIGN_IDENTITY" "$DMG"
 
 notarize "$DMG" "DMG"
-xcrun stapler staple "$DMG"
+run_stapler 'DMG ticket stapling' staple "$DMG"
 
 # ----------------------------------------------------------------- verify ---
 
 info "Verifying the finished artifacts…"
-xcrun stapler validate "$APP" || die "the app has no stapled ticket"
-xcrun stapler validate "$DMG" || die "the DMG has no stapled ticket"
+run_stapler 'App ticket validation' validate "$APP" ||
+  die "the app has no stapled ticket"
+run_stapler 'DMG ticket validation' validate "$DMG" ||
+  die "the DMG has no stapled ticket"
 run_codesign 'Stapled app signature verification' \
   --verify --deep --strict "$APP" || die "the stapled app no longer verifies"
 

@@ -170,6 +170,14 @@ if [[ "${1-}" == notarytool && "${2-}" == submit ]]; then
   printf '%s\n' 'NOTARY_RAW TEAM_MARKER WORKSPACE_MARKER' \
     '  id: 12345678-1234-1234-1234-123456789abc' '  status: Accepted'
 fi
+if [[ "${1-}" == stapler ]]; then
+  printf 'STAPLER_RAW WORKSPACE_MARKER'
+  printf ' %s' "$@"
+  printf '\n'
+  if [[ "${FAIL_STAPLER_VALIDATE-}" == 1 && "${2-}" == validate ]]; then
+    exit 11
+  fi
+fi
 EOF
   cat >"$REDACT_FIXTURE_BIN/ditto" <<'EOF'
 #!/usr/bin/env bash
@@ -219,11 +227,12 @@ EOF
 
 run_redacted_release_fixture() {
   local case_name="$1"
-  local bad_appcast=0 fail_codesign_verify=0
+  local bad_appcast=0 fail_codesign_verify=0 fail_stapler_validate=0
   local release_args=()
   case "$case_name" in
     bad-appcast) bad_appcast=1 ;;
     verify-failure) fail_codesign_verify=1; release_args=(--sign-only) ;;
+    stapler-failure) fail_stapler_validate=1 ;;
     *) return 1 ;;
   esac
   setup_redacted_release_fixture || return 1
@@ -244,6 +253,7 @@ run_redacted_release_fixture() {
       NOTARY_ISSUER=TEAM_MARKER \
       BAD_APPCAST="$bad_appcast" \
       FAIL_CODESIGN_VERIFY="$fail_codesign_verify" \
+      FAIL_STAPLER_VALIDATE="$fail_stapler_validate" \
       bash "$REDACT_FIXTURE_ROOT/tool/release.sh" 1.2.3-beta.1 "${release_args[@]}" 2>&1)"; then
     REDACT_FIXTURE_RC=0
   else
@@ -270,6 +280,7 @@ redacted_release_records_private_diagnostics() {
     [[ "$(<"$diagnostics")" == *TEAM_MARKER* ]] &&
     [[ "$(<"$diagnostics")" == *KEY_MARKER* ]] &&
     [[ "$(<"$diagnostics")" == *WORKSPACE_MARKER* ]] &&
+    [[ "$(<"$diagnostics")" == *STAPLER_RAW* ]] &&
     [[ "$mode" == 600 ]]
 }
 
@@ -281,6 +292,15 @@ redacted_codesign_verification_failure_is_fatal() {
     [[ "$REDACT_FIXTURE_OUTPUT" != *KEY_MARKER* ]] &&
     [[ "$REDACT_FIXTURE_OUTPUT" != *WORKSPACE_MARKER* ]] &&
     [[ "$(<"$REDACT_FIXTURE_DIAGNOSTICS")" == *CODESIGN_RAW* ]]
+}
+
+redacted_stapler_validation_failure_is_fatal() {
+  run_redacted_release_fixture stapler-failure || return 1
+  (( REDACT_FIXTURE_RC != 0 )) &&
+    [[ "$REDACT_FIXTURE_OUTPUT" != *STAPLER_RAW* ]] &&
+    [[ "$REDACT_FIXTURE_OUTPUT" != *WORKSPACE_MARKER* ]] &&
+    [[ "$(<"$REDACT_FIXTURE_DIAGNOSTICS")" == *STAPLER_RAW* ]] &&
+    [[ "$(<"$REDACT_FIXTURE_DIAGNOSTICS")" == *WORKSPACE_MARKER* ]]
 }
 
 sparkle_args_without_output_flag() {
@@ -423,6 +443,8 @@ assert_ok 'redacted release stores complete mode-600 diagnostics' \
   redacted_release_records_private_diagnostics
 assert_ok 'redacted codesign verification failure remains fatal' \
   redacted_codesign_verification_failure_is_fatal
+assert_ok 'redacted stapler validation failure remains fatal' \
+  redacted_stapler_validation_failure_is_fatal
 
 printf 'release_lib: %d passed, %d failed\n' "$PASS_COUNT" "$FAIL_COUNT"
 (( FAIL_COUNT == 0 ))

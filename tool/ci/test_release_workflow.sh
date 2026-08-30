@@ -161,7 +161,7 @@ if [[ "${1-}" == api ]]; then
   status="$(<"$FIXTURES/gh_api_status")"
   printf 'HTTP/2.0 %s Fixture\r\ncontent-type: application/json\r\n\r\n' "$status"
   if [[ "$status" == 200 ]]; then
-    printf '{"draft":%s}\n' "$(<"$FIXTURES/gh_api_draft")"
+    cat "$FIXTURES/gh_api_body"
   else
     printf '{"message":"fixture"}\n'
   fi
@@ -234,7 +234,7 @@ reset_fixture() {
   printf '0\n' >"$FIXTURES/gh_api_exit"
   printf '0\n' >"$FIXTURES/gh_api_response_exit"
   printf '404\n' >"$FIXTURES/gh_api_status"
-  printf 'true\n' >"$FIXTURES/gh_api_draft"
+  printf '{"draft":true}\n' >"$FIXTURES/gh_api_body"
   : >"$FIXTURES/prior_tag"
   : >"$FIXTURES/stable_tags"
   : >"$FIXTURES/actual_assets"
@@ -309,15 +309,29 @@ assert_fails 'non-ancestral tag commit fails' \
 
 reset_fixture
 printf '200\n' >"$FIXTURES/gh_api_status"
-printf 'false\n' >"$FIXTURES/gh_api_draft"
-assert_fails 'current public release fails metadata' \
+printf '{"metadata":{"draft":true},"draft":false}\n' >"$FIXTURES/gh_api_body"
+assert_fails 'nested draft cannot hide a current public release' \
   run_workflow metadata push tag v1.0.0 orthant-app/orthant "$WORKSPACE/output"
 
 reset_fixture
 printf '200\n' >"$FIXTURES/gh_api_status"
-printf 'true\n' >"$FIXTURES/gh_api_draft"
+printf '{"draft":true}\n' >"$FIXTURES/gh_api_body"
 assert_ok 'current draft release permits metadata retry' \
   run_workflow metadata push tag v1.0.0 orthant-app/orthant "$WORKSPACE/output"
+
+for invalid_body in \
+  '{}' \
+  '{"draft":null}' \
+  '{"draft":"true"}' \
+  '{"draft":true,"draft":false}' \
+  '{"draft":true,"invalid":NaN}' \
+  '{"draft":true'; do
+  reset_fixture
+  printf '200\n' >"$FIXTURES/gh_api_status"
+  printf '%s\n' "$invalid_body" >"$FIXTURES/gh_api_body"
+  assert_fails "invalid release draft JSON fails closed: $invalid_body" \
+    run_workflow metadata push tag v1.0.0 orthant-app/orthant "$WORKSPACE/output"
+done
 
 reset_fixture
 printf '1\n' >"$FIXTURES/gh_api_response_exit"
@@ -353,9 +367,17 @@ done
 reset_fixture
 printf 'v0.9.0\n' >"$FIXTURES/prior_tag"
 printf '200\n' >"$FIXTURES/curl_stable_status"
-printf '<!-- /releases/download/v0.9.0/ is not an enclosure -->\n<enclosure url="https://example.invalid/releases/download/v0.8.0/old.dmg"/>\n' \
+printf '<rss><channel>\n<!-- <enclosure\n  url="https://example.invalid/releases/download/v0.9.0/commented.dmg"/> -->\n<enclosure\n  length="10"\n  url="https://example.invalid/releases/download/v0.8.0/old.dmg"/>\n</channel></rss>\n' \
   >"$FIXTURES/curl_stable_body"
-assert_fails 'prior public release absent from both feeds is unsettled' \
+assert_fails 'commented enclosure cannot settle the prior public release' \
+  run_workflow check-settled orthant-app/orthant
+
+reset_fixture
+printf 'v0.9.0\n' >"$FIXTURES/prior_tag"
+printf '200\n' >"$FIXTURES/curl_stable_status"
+printf '<rss><channel><![CDATA[<enclosure url="https://example.invalid/releases/download/v0.9.0/cdata.dmg"/>]]><enclosure url="https://example.invalid/releases/download/v0.8.0/old.dmg"/></channel></rss>\n' \
+  >"$FIXTURES/curl_stable_body"
+assert_fails 'CDATA enclosure text cannot settle the prior public release' \
   run_workflow check-settled orthant-app/orthant
 
 for status in 401 500; do
@@ -465,7 +487,7 @@ printf 'dmg\n' >"$WORKSPACE/dist/Orthant-1.1.0-beta.1.dmg"
 printf 'delta a\n' >"$WORKSPACE/dist/a.delta"
 printf 'delta z\n' >"$WORKSPACE/dist/z.delta"
 printf '200\n' >"$FIXTURES/gh_api_status"
-printf 'true\n' >"$FIXTURES/gh_api_draft"
+printf '{"draft":true}\n' >"$FIXTURES/gh_api_body"
 printf 'stale.zip\nOrthant-1.1.0-beta.1.dmg\n' >"$FIXTURES/actual_assets"
 assert_ok 'draft retry replaces stale assets and uploads all deltas' \
   run_workflow publish orthant-app/orthant 1.1.0-beta.1 true "$WORKSPACE/dist"
@@ -486,7 +508,7 @@ reset_fixture
 mkdir -p "$WORKSPACE/dist"
 printf 'dmg\n' >"$WORKSPACE/dist/Orthant-1.0.0.dmg"
 printf '200\n' >"$FIXTURES/gh_api_status"
-printf 'false\n' >"$FIXTURES/gh_api_draft"
+printf '{"draft":false}\n' >"$FIXTURES/gh_api_body"
 assert_fails 'publication defensively rejects a public release' \
   run_workflow publish orthant-app/orthant 1.0.0 false "$WORKSPACE/dist"
 assert_not_contains 'public release rejection does not upload' '<upload>' "$(<"$CALL_LOG")"

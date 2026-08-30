@@ -66,7 +66,7 @@ fetch_feed() {
 }
 
 query_release_state() {
-  local repo="$1" tag="$2" response exit_code status body
+  local repo="$1" tag="$2" response exit_code status body draft
   local old_umask
   old_umask="$(umask)"
   umask 077
@@ -113,14 +113,37 @@ query_release_state() {
     }
   ' "$response")"
   rm -f "$response"
-  if [[ "$body" =~ \"draft\"[[:space:]]*:[[:space:]]*(true|false) ]]; then
-    if [[ "${BASH_REMATCH[1]}" == true ]]; then
-      RELEASE_QUERY_STATE=draft
-    else
-      RELEASE_QUERY_STATE=public
-    fi
+  draft="$(printf '%s\n' "$body" | python3 -c '
+import json
+import sys
+
+def unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON key")
+        result[key] = value
+    return result
+
+def reject_constant(value):
+    raise ValueError("invalid JSON constant")
+
+try:
+    document = json.load(
+        sys.stdin,
+        object_pairs_hook=unique_object,
+        parse_constant=reject_constant,
+    )
+    if type(document) is not dict or type(document.get("draft")) is not bool:
+        raise ValueError("top-level draft must be boolean")
+    print("true" if document["draft"] else "false")
+except (TypeError, ValueError):
+    sys.exit(1)
+')" || workflow_error "release API response has invalid top-level draft state for $tag" || return 1
+  if [[ "$draft" == true ]]; then
+    RELEASE_QUERY_STATE=draft
   else
-    workflow_error "release API response omitted boolean draft state for $tag" || return 1
+    RELEASE_QUERY_STATE=public
   fi
 }
 
@@ -166,18 +189,27 @@ metadata() {
 }
 
 feed_encloses_release() {
-  local file="$1" tag="$2" content enclosure needle
+  local file="$1" tag="$2" needle
   [[ -f "$file" ]] || return 1
-  content="$(tr '\n' ' ' <"$file")" || return 1
   needle="/releases/download/$tag/"
-  while [[ "$content" == *'<enclosure'* ]]; do
-    content="${content#*<enclosure}"
-    [[ "$content" == *'>'* ]] || return 1
-    enclosure="${content%%>*}"
-    [[ "$enclosure" == *"$needle"* ]] && return 0
-    content="${content#*>}"
-  done
-  return 1
+  python3 - "$file" "$needle" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+
+try:
+    root = ET.parse(sys.argv[1]).getroot()
+except (ET.ParseError, OSError):
+    sys.exit(1)
+
+needle = sys.argv[2]
+for element in root.iter():
+    if element.tag.rsplit("}", 1)[-1] != "enclosure":
+        continue
+    url = element.attrib.get("url")
+    if isinstance(url, str) and needle in url:
+        sys.exit(0)
+sys.exit(1)
+PY
 }
 
 check_settled() {

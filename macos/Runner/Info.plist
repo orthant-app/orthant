@@ -40,8 +40,13 @@
 	<string>NSApplication</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
+	<!-- Served by GitHub Pages from this repo, behind our own domain. The domain
+	     is deliberate: SUFeedURL is compiled into every shipped build and can
+	     never be changed for copies already installed, so pointing at a host we
+	     do not control would marry the app to that host forever. Owning the URL
+	     keeps the hosting swappable. -->
 	<key>SUFeedURL</key>
-	<string>https://orthant-app.github.io/orthant/appcast.xml</string>
+	<string>https://updates.orthant.app/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>Oyo4ZcSrr7nWOq3L3vrTmzbQS8efqoGK0ifYh0EB27w=</string>
 </dict>

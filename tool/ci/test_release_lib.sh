@@ -114,7 +114,12 @@ redaction_enabled_records_raw() {
   local output diagnostics mode
   output="$(print_sensitive_or_record 'notary output' 'TeamIdentifier=secret-team' 2>&1)"
   diagnostics="$RUNNER_TEMP/release-diagnostics.log"
-  mode="$(stat -f '%Lp' "$diagnostics")"
+  # /usr/bin/stat explicitly: Homebrew coreutils shadows `stat` on PATH for many
+  # macOS developers, and GNU stat reads -f as "filesystem status", so the bare
+  # form silently returns filesystem info instead of a permission mode and this
+  # assertion fails on a dev machine while passing on a clean CI runner.
+  # test_release_workflow.sh avoids this by pinning PATH; this suite does not.
+  mode="$(/usr/bin/stat -f '%Lp' "$diagnostics")"
   [[ "$output" != *'TeamIdentifier=secret-team'* ]] &&
     [[ "$output" == *'notary output'* ]] &&
     [[ "$(<"$diagnostics")" == *'TeamIdentifier=secret-team'* ]] &&
@@ -275,7 +280,12 @@ redacted_release_records_private_diagnostics() {
   local diagnostics mode
   diagnostics="$REDACT_FIXTURE_DIAGNOSTICS"
   [[ -f "$diagnostics" ]] || return 1
-  mode="$(stat -f '%Lp' "$diagnostics")"
+  # /usr/bin/stat explicitly: Homebrew coreutils shadows `stat` on PATH for many
+  # macOS developers, and GNU stat reads -f as "filesystem status", so the bare
+  # form silently returns filesystem info instead of a permission mode and this
+  # assertion fails on a dev machine while passing on a clean CI runner.
+  # test_release_workflow.sh avoids this by pinning PATH; this suite does not.
+  mode="$(/usr/bin/stat -f '%Lp' "$diagnostics")"
   [[ "$(<"$diagnostics")" == *CERT_MARKER* ]] &&
     [[ "$(<"$diagnostics")" == *TEAM_MARKER* ]] &&
     [[ "$(<"$diagnostics")" == *KEY_MARKER* ]] &&

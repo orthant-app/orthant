@@ -19,14 +19,21 @@ require_mode() {
   esac
 }
 
+# The domain shipped in every build's SUFeedURL. Pages serves the site at this
+# name once assemble_pages emits a matching CNAME.
+PAGES_CUSTOM_DOMAIN="${PAGES_CUSTOM_DOMAIN:-updates.orthant.app}"
+
+# Deliberately the custom domain rather than <owner>.github.io/<project>. Once a
+# custom domain is set the github.io address only reaches the site by redirect,
+# so fetching it would still "work" even if CNAME had been dropped and the real
+# feed were dead — a check that passes while the thing it protects is broken.
+# Fetching the canonical URL means check-settled verifies exactly what installed
+# clients poll.
 feed_url() {
-  local repo="$1" name="$2" owner project
-  owner="${repo%%/*}"
-  project="${repo#*/}"
-  [[ -n "$owner" && -n "$project" && "$owner" != "$project" ]] ||
-    workflow_error "invalid repository: $repo" || return 1
-  printf 'https://%s.github.io/%s/%s?run=%s-%s\n' \
-    "$owner" "$project" "$name" "${GITHUB_RUN_ID-}" "${GITHUB_RUN_ATTEMPT-}"
+  local name="$1"
+  [[ -n "$name" ]] || workflow_error 'feed name is required' || return 1
+  printf 'https://%s/%s?run=%s-%s\n' \
+    "$PAGES_CUSTOM_DOMAIN" "$name" "${GITHUB_RUN_ID-}" "${GITHUB_RUN_ATTEMPT-}"
 }
 
 fetch_feed() {
@@ -220,11 +227,11 @@ check_settled() {
     rm -rf "$temporary"
     workflow_error 'could not query previous public release' || return 1
   }
-  stable_url="$(feed_url "$repo" appcast.xml)" || {
+  stable_url="$(feed_url appcast.xml)" || {
     rm -rf "$temporary"
     return 1
   }
-  beta_url="$(feed_url "$repo" appcast-beta.xml)" || {
+  beta_url="$(feed_url appcast-beta.xml)" || {
     rm -rf "$temporary"
     return 1
   }
@@ -262,8 +269,8 @@ restore() {
     -name 'appcast.xml' -o -name 'appcast-beta.xml' -o \
     -name 'Orthant-*.dmg' -o -name '*.delta' \
   \) -delete || return 1
-  stable_url="$(feed_url "$repo" appcast.xml)" || return 1
-  beta_url="$(feed_url "$repo" appcast-beta.xml)" || return 1
+  stable_url="$(feed_url appcast.xml)" || return 1
+  beta_url="$(feed_url appcast-beta.xml)" || return 1
   fetch_feed "$stable_url" "$dist/appcast.xml" || return 1
   fetch_feed "$beta_url" "$dist/appcast-beta.xml" || return 1
 
@@ -302,6 +309,13 @@ assemble_pages() {
       fi
       ;;
   esac
+  # A Pages deploy replaces the WHOLE site, so anything absent from this
+  # directory ceases to exist at the next release — which is why both feeds are
+  # copied above rather than just the one generated. CNAME is subject to the
+  # same rule: without it here, the custom domain is dropped on the first
+  # deploy and every installed copy's SUFeedURL starts 404ing. Emitting it on
+  # every assembly is what makes the domain durable.
+  printf '%s\n' "$PAGES_CUSTOM_DOMAIN" > "$site/CNAME" || return 1
 }
 
 asset_name_expected() {

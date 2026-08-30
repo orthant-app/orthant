@@ -470,6 +470,24 @@ else
   fail 'first beta leaves stable feed absent'
 fi
 
+# A Pages deploy replaces the whole site, so CNAME must be re-emitted by EVERY
+# assembly or the custom domain is dropped on the next release and every shipped
+# copy's SUFeedURL starts 404ing. Asserted in all three modes because a mode that
+# forgot it would break the domain only on the release that used that mode.
+for cname_mode in stable dry-run beta; do
+  reset_fixture
+  mkdir -p "$WORKSPACE/dist"
+  printf 'stable bytes\n' >"$WORKSPACE/dist/appcast.xml"
+  printf 'beta bytes\n' >"$WORKSPACE/dist/appcast-beta.xml"
+  assert_ok "$cname_mode Pages assembly succeeds" \
+    run_workflow assemble-pages "$cname_mode" "$WORKSPACE/dist" "$WORKSPACE/site"
+  if [[ "$(cat "$WORKSPACE/site/CNAME" 2>/dev/null)" == 'updates.orthant.app' ]]; then
+    pass "$cname_mode assembly emits CNAME for the shipped SUFeedURL host"
+  else
+    fail "$cname_mode assembly emits CNAME for the shipped SUFeedURL host"
+  fi
+done
+
 reset_fixture
 mkdir -p "$WORKSPACE/dist"
 printf 'dmg\n' >"$WORKSPACE/dist/Orthant-1.0.0.dmg"

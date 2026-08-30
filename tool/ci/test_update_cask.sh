@@ -73,7 +73,7 @@ cask "orthant" do
   homepage "https://github.com/orthant-app/orthant"
 
   livecheck do
-    url "https://orthant-app.github.io/orthant/appcast.xml"
+    url "https://updates.orthant.app/appcast.xml"
     strategy :sparkle do |items|
       items.find { |item| item.channel.nil? }&.short_version
     end

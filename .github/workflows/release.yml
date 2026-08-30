@@ -269,7 +269,9 @@ jobs:
           shopt -s nullglob
           deltas=(build/dist/*.delta)
           shopt -u nullglob
-          paths+=("${deltas[@]}")
+          if [[ -n "${deltas[0]+present}" ]]; then
+            paths+=("${deltas[@]}")
+          fi
           [[ -f "$diagnostics" ]] && paths+=("$diagnostics")
 
           if [[ '${{ steps.release.outcome }}' == success ]]; then

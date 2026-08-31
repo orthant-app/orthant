@@ -112,6 +112,22 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       case "openLoginItemsSettings":
         LoginItem.openLoginItemsSettings()
         result(nil)
+      // Read from the running bundle, never from a Dart constant or a build-time
+      // define: those drift from what actually shipped, and a version display that
+      // can be wrong about itself is worse than none. `Bundle.main` is the only
+      // source that cannot disagree with the binary being asked.
+      //
+      // A pre-release label is deliberately absent. CFBundleShortVersionString is
+      // three integers by Apple's rule, so "1.0.0-beta.2" lives only in the tag,
+      // the DMG name and the release title. The build number is what actually
+      // distinguishes one beta from the next, which is why both halves are
+      // returned rather than the marketing string alone.
+      case "appVersion":
+        let info = Bundle.main.infoDictionary
+        result([
+          "shortVersion": info?["CFBundleShortVersionString"] as? String ?? "",
+          "buildNumber": info?["CFBundleVersion"] as? String ?? "",
+        ])
       default:
         self.windowControl.handle(call, result: result)
       }

@@ -38,6 +38,9 @@ class _FakeWc implements WindowController {
   // Launch-at-login is not what any of these tests exercise; the seam just
   // requires an answer. `unavailable` is the honest default for a fake.
   @override
+  Future<AppVersion> appVersion() async => const AppVersion('1.0.0', '1');
+
+  @override
   Future<LoginItemStatus> loginItemStatus() async => LoginItemStatus.unavailable;
   @override
   Future<LoginItemStatus> setLoginItem(bool enabled) async =>

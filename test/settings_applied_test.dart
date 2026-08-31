@@ -47,6 +47,9 @@ class _RecordingWc implements WindowController {
   @override
   Future<void> hideOverlay() async {}
   @override
+  Future<AppVersion> appVersion() async => const AppVersion('1.0.0', '1');
+
+  @override
   Future<LoginItemStatus> loginItemStatus() async => LoginItemStatus.unavailable;
   @override
   Future<LoginItemStatus> setLoginItem(bool enabled) async =>

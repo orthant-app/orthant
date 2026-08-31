@@ -22,6 +22,7 @@ class _FakeWc implements WindowController {
   final List<String> calls = [];
   ({int cols, int rows, double gap, bool saveHint})? grid;
   LoginItemStatus login = LoginItemStatus.disabled;
+  AppVersion version = const AppVersion('1.0.0', '2');
 
   @override
   Future<bool> checkPermission() async => permission;
@@ -76,6 +77,9 @@ class _FakeWc implements WindowController {
     grid = (cols: cols, rows: rows, gap: gap, saveHint: saveHint);
     calls.add('setOverlayGrid');
   }
+
+  @override
+  Future<AppVersion> appVersion() async => version;
 
   @override
   Future<LoginItemStatus> loginItemStatus() async => login;
@@ -164,6 +168,46 @@ void main() {
       expect(t.app.bindings, isNotEmpty);
       expect(t.app.settings.gridCols, 4);
       expect(t.keys.applied, isEmpty, reason: 'but nothing is registered');
+    });
+
+    test('the tray shows the running version, immediately above the update '
+        'check', () async {
+      final t = build();
+      t.wc.version = const AppVersion('1.0.0', '2');
+      await t.app.start();
+
+      final keys = t.app.trayMenu.map((e) => e.key).toList();
+      final version = t.app.trayMenu.firstWhere((e) => e.key == 'version');
+
+      expect(version.label, 'Orthant 1.0.0 (2)');
+      expect(
+        version.disabled,
+        isTrue,
+        reason: 'it is a label, not a command — there is nothing to click',
+      );
+      // Placement is the whole argument for putting it here rather than in an
+      // About window: the version answers "am I current?", and the action that
+      // question leads to must be the very next row.
+      expect(
+        keys.indexOf('updates'),
+        keys.indexOf('version') + 1,
+        reason: 'the version must sit directly above Check for Updates',
+      );
+    });
+
+    test('a version the platform could not supply shows no row at all',
+        () async {
+      final t = build();
+      t.wc.version = const AppVersion('', '');
+      await t.app.start();
+
+      final keys = t.app.trayMenu.map((e) => e.key);
+      expect(
+        keys,
+        isNot(contains('version')),
+        reason: 'better absent than "Orthant  ()"',
+      );
+      expect(keys, contains('updates'), reason: 'the rest of the menu stands');
     });
 
     test(

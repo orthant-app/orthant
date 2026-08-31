@@ -1,0 +1,31 @@
+# Keeps SHA-pinned actions current without giving up the pin.
+#
+# Every third-party action in this repo is pinned to a full commit SHA, because
+# `release.yml` can read the Developer ID certificate and the Sparkle private
+# key: a mutable tag that upstream repoints would run unreviewed code in a job
+# that can sign software as us and sign updates every installed copy trusts.
+# That is not hypothetical — tj-actions/changed-files (March 2025) was
+# compromised by exactly that mechanism.
+#
+# A pin left alone rots, though, so Dependabot watches the actions and opens a
+# PR bumping the SHA *and* its version comment whenever one releases. Upstream
+# fixes still arrive; they just arrive through review instead of silently.
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    labels:
+      - dependencies
+    groups:
+      # One PR for the routine actions/* bumps rather than four. Grouping keeps
+      # the review surface small enough that the SHA is actually looked at,
+      # which is the entire point of pinning.
+      github-actions:
+        patterns:
+          - '*'

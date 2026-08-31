@@ -39,6 +39,40 @@ enum LoginItemStatus {
   unavailable,
 }
 
+/// What the running bundle says it is. Both halves, because
+/// `CFBundleShortVersionString` alone cannot distinguish one pre-release from
+/// the next — Apple requires it to be three integers, so a `-beta.N` label
+/// lives only in the git tag, the DMG filename and the release title. The
+/// build number is the part that actually changes between betas, and the part
+/// Sparkle compares.
+class AppVersion {
+  const AppVersion(this.shortVersion, this.buildNumber);
+
+  final String shortVersion;
+  final String buildNumber;
+
+  /// Whether the platform gave us anything usable. A build that cannot say what
+  /// it is renders nothing rather than an empty or half-formed string.
+  bool get isKnown => shortVersion.isNotEmpty && buildNumber.isNotEmpty;
+
+  /// `1.0.0 (2)` — the macOS convention, and the form Sparkle's own update
+  /// prompt uses ("Orthant 1.0.0 (2) is now available—you have 1.0.0 (1)"),
+  /// so the app and its updater agree on how a version looks.
+  String get display => isKnown ? '$shortVersion ($buildNumber)' : '';
+
+  @override
+  bool operator ==(Object other) =>
+      other is AppVersion &&
+      other.shortVersion == shortVersion &&
+      other.buildNumber == buildNumber;
+
+  @override
+  int get hashCode => Object.hash(shortVersion, buildNumber);
+
+  @override
+  String toString() => 'AppVersion($shortVersion, $buildNumber)';
+}
+
 /// Platform-agnostic window control. Native handles never cross this seam —
 /// only plain data does. macOS is backed by a MethodChannel to Swift.
 abstract class WindowController {
@@ -89,6 +123,12 @@ abstract class WindowController {
 
   Future<void> showOverlay();
   Future<void> hideOverlay();
+
+  /// What the running bundle reports itself to be. Read natively from
+  /// `Bundle.main`, never from pubspec or a Dart constant — those drift
+  /// from what actually shipped, which is the whole failure this exists to
+  /// prevent.
+  Future<AppVersion> appVersion();
 
   /// Whether the app currently launches at login, per the OS.
   Future<LoginItemStatus> loginItemStatus();

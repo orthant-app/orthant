@@ -124,6 +124,12 @@ class OrthantCoordinator extends ChangeNotifier {
   LoginItemStatus _loginStatus = LoginItemStatus.unknown;
   LoginItemStatus get loginStatus => _loginStatus;
 
+  /// What the running bundle says it is. Read once at start-up: unlike the
+  /// login-item status, this cannot change under a running process, so there
+  /// is nothing to re-read and no staleness to guard against.
+  AppVersion _appVersion = const AppVersion('', '');
+  AppVersion get appVersion => _appVersion;
+
   /// Which pane the settings window should open on. Only ever not `general`
   /// when something asked for a specific one by name.
   SettingsTab _settingsTab = SettingsTab.general;
@@ -140,6 +146,10 @@ class OrthantCoordinator extends ChangeNotifier {
   /// The launch sequence. Returns once the app knows what to show.
   Future<void> start() async {
     await permissions.refresh();
+
+    // Before anything can render the tray. Cheap, and it cannot change
+    // under a running process, so this is the only read.
+    _appVersion = await wc.appVersion();
 
     // Preferences load **either way**. They are settings, not capabilities:
     // Accessibility governs whether a shortcut can move a window, not whether
@@ -376,6 +386,16 @@ class OrthantCoordinator extends ChangeNotifier {
     // they persist perfectly well without the grant.
     TrayEntry('overlay', openGridLabel, disabled: !permissions.granted),
     const TrayEntry('settings', 'Settings…'),
+    // Directly above the update check, and disabled: nobody wants a version
+    // number for its own sake, they want to know whether they are current, and
+    // this puts the answer and the next action in one glance.
+    //
+    // The tray rather than an About window because Orthant has no Dock icon —
+    // this menu is the only front door, so a version here costs no discovery.
+    // Omitted entirely when the platform could not say, rather than rendering
+    // "Orthant  ()".
+    if (appVersion.isKnown)
+      TrayEntry('version', 'Orthant ${appVersion.display}', disabled: true),
     const TrayEntry('updates', 'Check for Updates…'),
     const TrayEntry.separator(),
     const TrayEntry('quit', 'Quit Orthant'),

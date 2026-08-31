@@ -20,3 +20,5 @@ const String kSetLoginItem = 'setLoginItem';
 const String kOpenLoginItemsSettings = 'openLoginItemsSettings';
 
 const String kCheckForUpdates = 'checkForUpdates';
+
+const String kAppVersion = 'appVersion';

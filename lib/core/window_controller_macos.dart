@@ -84,6 +84,21 @@ class MacosWindowController implements WindowController {
   Future<void> hideOverlay() => _channel.invokeMethod<void>(kHideOverlay);
 
   @override
+  Future<AppVersion> appVersion() async {
+    // Defensive on every field: a reply that is missing, the wrong shape, or
+    // half-populated must degrade to "unknown" rather than throw. This is read
+    // during the tray build, and a throw there is a menu that never appears.
+    final reply = await _channel.invokeMethod<Object?>(kAppVersion);
+    if (reply is! Map) return const AppVersion('', '');
+    final short = reply['shortVersion'];
+    final build = reply['buildNumber'];
+    return AppVersion(
+      short is String ? short : '',
+      build is String ? build : '',
+    );
+  }
+
+  @override
   Future<LoginItemStatus> loginItemStatus() async =>
       _statusFromReply(await _channel.invokeMethod<Object?>(kLoginItemStatus));
 

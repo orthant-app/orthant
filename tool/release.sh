@@ -273,6 +273,35 @@ flutter build macos --release
   sensitive_die 'release app path' 'the Release build produced no app' \
     "no app at $APP — did the build actually succeed?"
 
+# ------------------------------------------------------------ release name ---
+
+# Stamp the release's real name — "1.0.1", "1.0.1-beta.2" — into the bundle so
+# the app can say what it is.
+#
+# It cannot come from either version key. CFBundleShortVersionString must be
+# three integers by Apple's rule, so a pre-release label has nowhere to live
+# there, and CFBundleVersion is a build counter Sparkle orders by. Without this
+# key an installed beta and the stable that follows it both render an identical
+# "1.0.0", which is exactly the ambiguity the About pane exists to remove.
+#
+# Written here, after the build and **before any signing**: editing Info.plist
+# invalidates a signature, so doing this later would silently produce a bundle
+# that fails verification.
+#
+# Absent from a local `flutter build` and from dev builds, deliberately — there
+# is no release name for an untagged build to claim, and the app falls back to
+# "1.0.0 (4)" rather than inventing one.
+info "Stamping the release name…"
+plutil -replace ORTHANTReleaseName -string "$VERSION" "$APP/Contents/Info.plist" ||
+  sensitive_die 'release name stamp' 'could not stamp the release name' \
+    "plutil could not write ORTHANTReleaseName into $APP/Contents/Info.plist"
+STAMPED_NAME="$(plutil -extract ORTHANTReleaseName raw "$APP/Contents/Info.plist")" ||
+  sensitive_die 'release name stamp' 'could not read back the release name' \
+    "plutil could not read ORTHANTReleaseName back from $APP/Contents/Info.plist"
+[[ "$STAMPED_NAME" == "$VERSION" ]] ||
+  sensitive_die 'release name stamp' 'the stamped release name does not match' \
+    "stamped ORTHANTReleaseName is '$STAMPED_NAME', expected '$VERSION'"
+
 # -------------------------------------------------------------------- sign ---
 
 # Signed **inside-out and explicitly**, never with --deep. Apple discourages

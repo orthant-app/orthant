@@ -32,7 +32,7 @@ cask "orthant" do
   url "https://github.com/orthant-app/orthant/releases/download/v#{version}/Orthant-#{version}.dmg",
       verified: "github.com/orthant-app/orthant/"
   name "Orthant"
-  desc "Grid-based window manager: snap windows with shortcuts or a drag-on-a-grid overlay"
+  desc "Grid-based window manager driven by shortcuts or a drag-on-a-grid overlay"
   homepage "https://github.com/orthant-app/orthant"
 
   livecheck do
@@ -43,18 +43,20 @@ cask "orthant" do
   end
 
   auto_updates true
-  depends_on macos: ">= :ventura"
+  depends_on macos: :ventura
 
   app "Orthant.app"
 
   uninstall quit: "app.orthant.orthant"
 
   zap script: {
-        executable: "/bin/sh",
-        args: ["-c", "defaults delete app.orthant.orthant 2>/dev/null; /usr/bin/tccutil reset Accessibility app.orthant.orthant"],
+        executable:   "/bin/sh",
+        args:         ["-c",
+                       "defaults delete app.orthant.orthant 2>/dev/null; " \\
+                       "/usr/bin/tccutil reset Accessibility app.orthant.orthant"],
         must_succeed: true,
       },
-      trash: [
+      trash:  [
         "~/Library/Caches/app.orthant.orthant",
         "~/Library/HTTPStorages/app.orthant.orthant",
         "~/Library/Preferences/app.orthant.orthant.plist",

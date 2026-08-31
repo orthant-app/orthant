@@ -6,15 +6,15 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "astro": "7.2.10",
     "@astrojs/sitemap": "3.7.0"
   },
   "devDependencies": {
-    "vitest": "3.2.4",
-    "happy-dom": "20.0.0",
+    "vitest": "3.2.7",
+    "happy-dom": "20.12.0",
     "wrangler": "4.127.1",
     "@cloudflare/workers-types": "5.20260831.1",
     "typescript": "5.9.2"

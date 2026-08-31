@@ -170,44 +170,47 @@ void main() {
       expect(t.keys.applied, isEmpty, reason: 'but nothing is registered');
     });
 
-    test('the tray shows the running version, immediately above the update '
-        'check', () async {
-      final t = build();
+    test('the tray offers About, and nothing in it is greyed out', () async {
+      // Granted deliberately: `Open Grid` is greyed while ungranted *on
+      // purpose* — it cannot work without the permission, and the row above it
+      // says so. The property below is about rows greyed for no reason, so it
+      // has to be asked in the state where there is no reason.
+      final t = build(granted: true);
       t.wc.version = const AppVersion('1.0.0', '2');
       await t.app.start();
 
       final keys = t.app.trayMenu.map((e) => e.key).toList();
-      final version = t.app.trayMenu.firstWhere((e) => e.key == 'version');
+      final about = t.app.trayMenu.firstWhere((e) => e.key == 'about');
 
-      expect(version.label, 'Orthant 1.0.0 (2)');
+      expect(about.label, 'About Orthant');
+      // The defect this row replaced: the version shipped as a *disabled*
+      // label, which reads as a command that is broken, because macOS greys
+      // what you cannot do. Asserting the whole menu rather than this one row —
+      // the property is "no dead-looking rows", and a future addition should
+      // have to argue with this test.
       expect(
-        version.disabled,
-        isTrue,
-        reason: 'it is a label, not a command — there is nothing to click',
+        t.app.trayMenu.where((e) => !e.isSeparator && e.disabled),
+        isEmpty,
+        reason: 'a fully working app should have nothing greyed out',
       );
-      // Placement is the whole argument for putting it here rather than in an
-      // About window: the version answers "am I current?", and the action that
-      // question leads to must be the very next row.
       expect(
         keys.indexOf('updates'),
-        keys.indexOf('version') + 1,
-        reason: 'the version must sit directly above Check for Updates',
+        keys.indexOf('about') + 1,
+        reason: 'About sits directly above Check for Updates',
       );
     });
 
-    test('a version the platform could not supply shows no row at all',
-        () async {
+    test('About is offered even when the platform cannot say what version it '
+        'is', () async {
       final t = build();
       t.wc.version = const AppVersion('', '');
       await t.app.start();
 
-      final keys = t.app.trayMenu.map((e) => e.key);
-      expect(
-        keys,
-        isNot(contains('version')),
-        reason: 'better absent than "Orthant  ()"',
-      );
-      expect(keys, contains('updates'), reason: 'the rest of the menu stands');
+      // The old version row was conditional, because "Orthant  ()" is worse
+      // than nothing. This one must not be: the tray is the only front door,
+      // and About is where Check for Updates now lives beside. Losing it
+      // because a value is missing would hide the pane, not just the version.
+      expect(t.app.trayMenu.map((e) => e.key), contains('about'));
     });
 
     test(

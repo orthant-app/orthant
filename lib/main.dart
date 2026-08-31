@@ -115,6 +115,8 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
         await app.summon();
       case 'settings':
         await app.openSettings();
+      case 'about':
+        await app.openSettings(tab: SettingsTab.about);
       case 'updates':
         await app.wc.checkForUpdates();
       case 'quit':
@@ -164,6 +166,8 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
               onRegionDeleted: app.deleteRegion,
               pendingRegion: app.pendingRegion,
               onPendingConsumed: app.consumePendingRegion,
+              version: app.appVersion,
+              onCheckForUpdates: app.wc.checkForUpdates,
             ),
           AppScreen.none => const SizedBox.shrink(),
         },

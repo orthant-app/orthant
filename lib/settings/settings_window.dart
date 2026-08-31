@@ -10,6 +10,7 @@ import '../shortcuts/bindings.dart';
 import '../shortcuts/command_ref.dart';
 import '../shortcuts/custom_region.dart';
 import '../shortcuts/shortcut_command.dart';
+import 'about_pane.dart';
 import 'general_pane.dart';
 import 'mac_control.dart';
 import 'mac_theme.dart';
@@ -52,6 +53,8 @@ class SettingsWindow extends StatefulWidget {
     this.onCaptureEnd,
     this.onResetBindings,
     this.initialTab = SettingsTab.general,
+    this.version = const AppVersion('', ''),
+    this.onCheckForUpdates,
   });
 
   /// The pane to open on. Read once, in [State] creation — a window already on
@@ -74,6 +77,13 @@ class SettingsWindow extends StatefulWidget {
   final bool permissionGranted;
   final LoginItemStatus loginStatus;
 
+  /// What the running bundle reports itself to be, for the About pane. An
+  /// unknown version renders no version line rather than a half-formed one.
+  final AppVersion version;
+
+  /// The About pane's update button — the same call the tray item makes.
+  final VoidCallback? onCheckForUpdates;
+
   final void Function(Settings) onSettingsChanged;
   final void Function(Binding) onRebound;
 
@@ -95,7 +105,7 @@ class SettingsWindow extends StatefulWidget {
 /// Which pane the window is showing. Public because callers need to *ask* for
 /// one: "Change these shortcuts…" on the ready screen opened this window on
 /// General, one click short of the list it named.
-enum SettingsTab { general, shortcuts }
+enum SettingsTab { general, shortcuts, about }
 
 class _SettingsWindowState extends State<SettingsWindow> {
   late SettingsTab _tab = widget.initialTab;
@@ -105,6 +115,7 @@ class _SettingsWindowState extends State<SettingsWindow> {
   final Map<SettingsTab, ScrollController> _scroll = {
     SettingsTab.general: ScrollController(),
     SettingsTab.shortcuts: ScrollController(),
+    SettingsTab.about: ScrollController(),
   };
 
   @override
@@ -201,6 +212,11 @@ class _SettingsWindowState extends State<SettingsWindow> {
                 pendingRegion: widget.pendingRegion,
                 onPendingConsumed: widget.onPendingConsumed,
               ),
+              SettingsTab.about => AboutPane(
+                scrollController: _scroll[SettingsTab.about],
+                version: widget.version,
+                onCheckForUpdates: widget.onCheckForUpdates,
+              ),
             },
           ),
         ],
@@ -227,6 +243,7 @@ class _TabBar extends StatelessWidget {
   static const _labels = {
     SettingsTab.general: ('General', Icons.tune),
     SettingsTab.shortcuts: ('Shortcuts', Icons.keyboard_outlined),
+    SettingsTab.about: ('About', Icons.info_outline),
   };
 
   @override

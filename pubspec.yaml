@@ -67,6 +67,9 @@ flutter:
 
   assets:
     - assets/tray_icon.png
+    # The About pane's icon. Both this and the .app's icon set are emitted by
+    # tool/make_app_icon.py from one set of constants, so they cannot drift.
+    - assets/app_icon.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

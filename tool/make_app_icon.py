@@ -20,9 +20,17 @@ import pathlib
 
 from PIL import Image, ImageDraw
 
-OUT = pathlib.Path(__file__).resolve().parent.parent / (
-    "macos/Runner/Assets.xcassets/AppIcon.appiconset"
-)
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+OUT = ROOT / "macos/Runner/Assets.xcassets/AppIcon.appiconset"
+
+# The same icon, as a Flutter asset, for the About pane to draw.
+#
+# Emitted by this script rather than copied by hand: a second PNG maintained
+# separately is a second PNG that silently goes stale the first time the
+# constants above change, and the whole point of this file is that the icon has
+# one source. 256 px is generous for a 64 pt view even at 2x, and costs ~10 KB.
+FLUTTER_ASSET = ROOT / "assets/app_icon.png"
+FLUTTER_ASSET_SIZE = 256
 
 # Rendered large and downsampled — Pillow has no analytic antialiasing, so
 # supersampling is what keeps the 16 pt corners clean.
@@ -106,6 +114,9 @@ def main() -> None:
     for size in (16, 32, 64, 128, 256, 512, 1024):
         icon.resize((size, size), Image.LANCZOS).save(OUT / f"app_icon_{size}.png")
         print(f"wrote app_icon_{size}.png")
+
+    icon.resize((FLUTTER_ASSET_SIZE,) * 2, Image.LANCZOS).save(FLUTTER_ASSET)
+    print(f"wrote {FLUTTER_ASSET.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

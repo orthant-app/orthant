@@ -130,6 +130,20 @@ class OrthantCoordinator extends ChangeNotifier {
   AppVersion _appVersion = const AppVersion('', '');
   AppVersion get appVersion => _appVersion;
 
+  /// Whether the updater checks on its own schedule.
+  ///
+  /// Read when the settings window opens, alongside the login-item status, and
+  /// for the same reason: Sparkle owns and persists it, so a copy kept here
+  /// would start lying the moment it changed elsewhere. Reading it at launch
+  /// would cost a channel round trip nobody asked for — nothing outside this
+  /// pane consults it.
+  ///
+  /// Defaults to true because `SUEnableAutomaticChecks` in Info.plist is true:
+  /// it matches what the app does before anyone has said otherwise, so the
+  /// checkbox never briefly shows a state the updater is not in.
+  bool _autoUpdateChecks = true;
+  bool get autoUpdateChecks => _autoUpdateChecks;
+
   /// Which pane the settings window should open on. Only ever not `general`
   /// when something asked for a specific one by name.
   SettingsTab _settingsTab = SettingsTab.general;
@@ -465,6 +479,7 @@ class OrthantCoordinator extends ChangeNotifier {
     await wc.showConfigWindow();
     final shown = DateTime.now();
     _loginStatus = await wc.loginItemStatus();
+    _autoUpdateChecks = await wc.automaticUpdateChecks();
     final statused = DateTime.now();
     notifyListeners();
     if (!kReleaseMode) {
@@ -514,6 +529,17 @@ class OrthantCoordinator extends ChangeNotifier {
 
   Future<void> setLoginItem(bool enabled) async {
     _loginStatus = await wc.setLoginItem(enabled);
+    notifyListeners();
+  }
+
+  /// Turn scheduled update checks on or off.
+  ///
+  /// Stores what the updater reports *after* the change, never what was asked
+  /// for. The two differ when the updater refuses, and a checkbox that follows
+  /// the click rather than the updater would claim a state the app is not in —
+  /// the same shape as [setLoginItem].
+  Future<void> setAutoUpdateChecks(bool enabled) async {
+    _autoUpdateChecks = await wc.setAutomaticUpdateChecks(enabled);
     notifyListeners();
   }
 

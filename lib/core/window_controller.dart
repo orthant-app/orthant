@@ -165,6 +165,18 @@ abstract class WindowController {
   /// [LoginItemStatus.requiresApproval], since no API can flip that switch.
   Future<void> openLoginItemsSettings();
 
+  /// Whether the updater checks on its own schedule.
+  ///
+  /// Read from the updater every time, never cached: the value is Sparkle's
+  /// and it persists the user's choice itself, so a copy on our side would
+  /// start lying the moment it changed. Same reasoning as [loginItemStatus].
+  Future<bool> automaticUpdateChecks();
+
+  /// Turn scheduled checks on or off, returning the state **after** the
+  /// attempt. Echoing back the request would let the checkbox claim a state the
+  /// updater never entered.
+  Future<bool> setAutomaticUpdateChecks(bool enabled);
+
   /// Show Sparkle's update check, the same as the tray item does.
   ///
   /// Fire-and-forget: the updater owns the whole flow from here, including its

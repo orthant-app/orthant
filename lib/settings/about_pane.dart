@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/window_controller.dart';
-import 'mac_button.dart';
+import 'mac_controls.dart';
 import 'mac_theme.dart';
 
 /// What the running build is, and the one action anyone wants after reading it.
@@ -33,6 +33,8 @@ class AboutPane extends StatelessWidget {
     super.key,
     required this.version,
     this.onCheckForUpdates,
+    this.automaticChecks = true,
+    this.onAutomaticChecksChanged,
     this.scrollController,
   });
 
@@ -44,6 +46,14 @@ class AboutPane extends StatelessWidget {
   /// Null disables the button. The same call the tray's *Check for Updates…*
   /// makes; two entry points, one updater session.
   final VoidCallback? onCheckForUpdates;
+
+  /// Whether the updater checks on its own schedule. Owned by the updater, not
+  /// by us — this is a render of what it reported, not a stored preference.
+  final bool automaticChecks;
+
+  /// Null makes the checkbox read-only. Never a local `setState`: the control
+  /// must show what the updater holds after the attempt, not what was clicked.
+  final void Function(bool)? onAutomaticChecksChanged;
 
   final ScrollController? scrollController;
 
@@ -117,6 +127,23 @@ class AboutPane extends StatelessWidget {
                     label: 'Check for Updates…',
                     tokens: t,
                     onPressed: onCheckForUpdates,
+                  ),
+                  const SizedBox(height: 18),
+                  // The consent this app owes and did not have.
+                  //
+                  // `SUEnableAutomaticChecks` is true in Info.plist, so Orthant
+                  // contacts updates.orthant.app on a schedule. Setting that key
+                  // also **suppresses Sparkle's own permission prompt**, which
+                  // would otherwise ask on first run — a deliberate choice,
+                  // because a second dialog during onboarding is exactly the
+                  // "two surfaces, one question" mistake spec §8 argues against.
+                  // But suppressing the ask is only defensible if the answer is
+                  // reachable somewhere, and until now it was not.
+                  MacCheckbox(
+                    label: 'Check for updates automatically',
+                    tokens: t,
+                    value: automaticChecks,
+                    onChanged: onAutomaticChecksChanged,
                   ),
                   const SizedBox(height: 16),
                   Text(

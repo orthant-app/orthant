@@ -101,6 +101,21 @@ class MacosWindowController implements WindowController {
   }
 
   @override
+  Future<bool> automaticUpdateChecks() async =>
+      // Defensive: a reply of the wrong shape must not throw into the settings
+      // pane's build. Absent or malformed reads as "off", which is the safer
+      // way to be wrong about a network call.
+      await _channel.invokeMethod<Object?>(kAutomaticUpdateChecks) == true;
+
+  @override
+  Future<bool> setAutomaticUpdateChecks(bool enabled) async =>
+      await _channel.invokeMethod<Object?>(
+        kSetAutomaticUpdateChecks,
+        enabled,
+      ) ==
+      true;
+
+  @override
   Future<LoginItemStatus> loginItemStatus() async =>
       _statusFromReply(await _channel.invokeMethod<Object?>(kLoginItemStatus));
 

@@ -6,7 +6,7 @@ import '../shortcuts/command_ref.dart';
 import '../shortcuts/shortcut_command.dart';
 import 'grid_preview.dart';
 import 'keycap.dart';
-import 'mac_button.dart';
+import 'mac_controls.dart';
 import 'mac_control.dart';
 import 'mac_stepper.dart';
 import 'mac_theme.dart';
@@ -181,7 +181,7 @@ class GeneralPane extends StatelessWidget {
             ]),
             const SizedBox(height: 15),
             _group(t, 'Gaps', [
-              _Checkbox(
+              MacCheckbox(
                 label: 'Leave gaps',
                 tokens: t,
                 value: settings.gaps,
@@ -366,7 +366,7 @@ class GeneralPane extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _Checkbox(
+        MacCheckbox(
           label: 'Launch at login',
           tokens: t,
           value: on,
@@ -414,64 +414,6 @@ class GeneralPane extends StatelessWidget {
 }
 
 /// A macOS-weight checkbox with its label, clickable as one unit.
-class _Checkbox extends StatelessWidget {
-  const _Checkbox({
-    required this.label,
-    required this.tokens,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String label;
-  final MacTokens tokens;
-  final bool value;
-  final void Function(bool)? onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onChanged != null;
-    return Opacity(
-      opacity: enabled ? 1 : 0.42,
-      child: MacControl(
-        onPressed: enabled ? () => onChanged!(!value) : null,
-        // The box and its label are one control, so it announces as one thing.
-        // The state rides as a *flag* rather than in the name: a screen reader
-        // says "checkbox, unchecked" itself, and spelling it out here as well
-        // had it read twice.
-        semanticLabel: label,
-        checked: value,
-        focusRingRadius: 4,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 16,
-              height: 16,
-              // Excluded: MacControl above already announces this row as one
-              // control with its state, and a nested Checkbox would have
-              // VoiceOver read the state a second time.
-              child: ExcludeSemantics(
-                child: Checkbox(
-                  value: value,
-                  onChanged: enabled ? (v) => onChanged!(v ?? false) : null,
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  activeColor: tokens.accent,
-                  side: BorderSide(color: tokens.keycapBorder, width: 1),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(fontSize: 13, color: tokens.labelPrimary),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _LinkButton extends StatelessWidget {
   const _LinkButton({

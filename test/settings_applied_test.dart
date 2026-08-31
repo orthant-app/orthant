@@ -50,6 +50,12 @@ class _RecordingWc implements WindowController {
   Future<AppVersion> appVersion() async => const AppVersion('1.0.0', '1');
 
   @override
+  Future<bool> automaticUpdateChecks() async => true;
+
+  @override
+  Future<bool> setAutomaticUpdateChecks(bool enabled) async => enabled;
+
+  @override
   Future<LoginItemStatus> loginItemStatus() async => LoginItemStatus.unavailable;
   @override
   Future<LoginItemStatus> setLoginItem(bool enabled) async =>

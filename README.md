@@ -14,8 +14,15 @@
   <img src=".github/demo.gif" alt="Demo: windows snap to halves and quarters with keyboard shortcuts; the grid overlay places a window on a drawn selection; a left-two-thirds region is drawn, saved with Cmd-S, bound to a shortcut of its own, and used.">
 </p>
 
-> [!NOTE]
-> There's no packaged download yet, so for now you [build from source](#build-from-source). It takes a few minutes with Flutter installed. Signed, notarized releases are the next step.
+## Install
+
+```sh
+brew install --cask orthant-app/tap/orthant
+```
+
+Or grab the `.dmg` from [the latest release](https://github.com/orthant-app/orthant/releases/latest) and drag Orthant to Applications. Either way you get the same build: signed with an Apple Developer ID and notarized by Apple, so it opens without a trip through System Settings. You can also [build from source](#build-from-source).
+
+Orthant checks for updates on its own and installs them in place, so `brew upgrade` has nothing to do.
 
 ## What it does
 
@@ -123,7 +130,13 @@ The Dart side (geometry, bindings, regions, coordinator, overlay model) is devel
 
 ## Uninstall
 
-Quit Orthant and delete the app. Settings live in `~/Library/Preferences/app.orthant.orthant.plist`, and the Accessibility entry can be removed in System Settings ▸ Privacy & Security ▸ Accessibility.
+```sh
+brew uninstall --zap orthant
+```
+
+`--zap` is the complete removal: it also clears Orthant's preferences, caches and saved state, and revokes its Accessibility grant. A plain `brew uninstall` leaves those behind.
+
+Installed by hand instead? Quit Orthant and delete the app. Settings live in `~/Library/Preferences/app.orthant.orthant.plist`, and the Accessibility entry can be removed in System Settings ▸ Privacy & Security ▸ Accessibility.
 
 ## Name
 

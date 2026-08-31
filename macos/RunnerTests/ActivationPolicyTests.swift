@@ -17,6 +17,37 @@ final class ActivationPolicyTests: XCTestCase {
     XCTAssertTrue(mayReturnToAccessory(windows: []))
   }
 
+  /// The exact state that produced the 2026-08-31 defect: Sparkle is about to
+  /// put an error alert on screen, so nothing is in the window list *yet*, and
+  /// the window-based rule alone says "safe to drop the Dock icon". It is not.
+  /// Dropping to `.accessory` here leaves the alert with no Dock icon, no
+  /// ⌘-Tab entry and a disabled menu — reachable only by minimising every
+  /// other window on screen.
+  ///
+  /// An empty list is deliberate rather than incidental: it is what makes this
+  /// case unreachable by the window rule, so the flag is the only thing that
+  /// can refuse it. Delete the `modalAlertOnScreen` guard and this is the test
+  /// that fails.
+  func testModalAlertRefusesAccessoryEvenWithNoWindowsYetOnScreen() {
+    XCTAssertFalse(mayReturnToAccessory(windows: [], modalAlertOnScreen: true))
+  }
+
+  /// …and it must not become a one-way latch. Once the alert is dismissed the
+  /// app has to get back to `.accessory`, or a single failed update check
+  /// leaves a menu-bar app showing a Dock icon until it is relaunched.
+  func testAccessoryIsPermittedAgainOnceTheModalAlertIsGone() {
+    XCTAssertTrue(mayReturnToAccessory(windows: [], modalAlertOnScreen: false))
+  }
+
+  /// The flag outranks the window list rather than being merged with it: a
+  /// visible, exempt window would otherwise still permit `.accessory` while an
+  /// alert owns the screen.
+  func testModalAlertOutranksAnOtherwisePermittedWindowSet() {
+    XCTAssertFalse(mayReturnToAccessory(windows: [
+      fact("NSStatusBarWindow", visible: true),
+    ], modalAlertOnScreen: true))
+  }
+
   func testEveryWindowHiddenPermitsAccessoryRegardlessOfClass() {
     // Mirrors what `hideConfigWindow` actually sees: measured (Task 8), its
     // own window's `isVisible` already reads false immediately after

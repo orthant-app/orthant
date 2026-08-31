@@ -213,6 +213,33 @@ enum Updater {
       DispatchQueue.main.async { finished() }
     }
 
+  /// Whether Sparkle checks for updates on its own schedule.
+  ///
+  /// Answered by Sparkle rather than by anything we store. `Info.plist`'s
+  /// `SUEnableAutomaticChecks` is only the *initial* value; Sparkle persists
+  /// the user's choice in its own defaults from then on, so a cached copy here
+  /// would start lying the first time it was changed. Same reasoning as
+  /// `LoginItemStatus`: ask the owner.
+  ///
+  /// Main thread, per `SPUUpdater`'s header. Every caller is a channel handler,
+  /// which is already on it.
+  static var automaticallyChecksForUpdates: Bool {
+    get { controller.updater.automaticallyChecksForUpdates }
+    set { controller.updater.automaticallyChecksForUpdates = newValue }
+  }
+
+  /// Set it, then answer with what Sparkle actually holds afterwards.
+  ///
+  /// Deliberately not echoing back what was asked for. The property is Sparkle's
+  /// and nothing here guarantees it took the value; a checkbox that reports the
+  /// request rather than the result is a checkbox that can claim a state the
+  /// system never entered. `setLoginItem` has the same shape for the same
+  /// reason.
+  static func setAutomaticallyChecksForUpdates(_ enabled: Bool) -> Bool {
+    automaticallyChecksForUpdates = enabled
+    return automaticallyChecksForUpdates
+  }
+
   static func checkForUpdates() {
     // Forces `closeObserver` to register before this session's windows can
     // open and close — a `static let` initialises on first access, and

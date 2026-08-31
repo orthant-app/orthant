@@ -5,13 +5,20 @@ import 'package:orthant/settings/about_pane.dart';
 import 'package:orthant/settings/mac_theme.dart';
 
 void main() {
-  Widget host(AppVersion version, {VoidCallback? onCheckForUpdates}) =>
+  Widget host(
+    AppVersion version, {
+    VoidCallback? onCheckForUpdates,
+    bool automaticChecks = true,
+    void Function(bool)? onAutomaticChecksChanged,
+  }) =>
       MaterialApp(
         theme: macTheme(Brightness.light),
         home: Scaffold(
           body: AboutPane(
             version: version,
             onCheckForUpdates: onCheckForUpdates,
+            automaticChecks: automaticChecks,
+            onAutomaticChecksChanged: onAutomaticChecksChanged,
           ),
         ),
       );
@@ -75,6 +82,62 @@ void main() {
       await tester.tap(find.text('Check for Updates…'));
       await tester.pump();
       expect(calls, 1);
+    });
+
+
+    testWidgets('the automatic-check state is offered, and reflects what it is '
+        'given', (tester) async {
+      const label = 'Check for updates automatically';
+      await tester.pumpWidget(
+        host(const AppVersion('1.0.0', '4'), automaticChecks: true),
+      );
+      expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isTrue);
+
+      await tester.pumpWidget(
+        host(const AppVersion('1.0.0', '4'), automaticChecks: false),
+      );
+      expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isFalse);
+      expect(find.text(label), findsOneWidget);
+    });
+
+    testWidgets('toggling asks for the opposite of what is shown',
+        (tester) async {
+      final asked = <bool>[];
+      await tester.pumpWidget(host(
+        const AppVersion('1.0.0', '4'),
+        automaticChecks: true,
+        onAutomaticChecksChanged: asked.add,
+      ));
+      await tester.tap(find.text('Check for updates automatically'));
+      await tester.pump();
+      expect(asked, [false]);
+    });
+
+    testWidgets('the checkbox shows the updater, not the click', (tester) async {
+      // The property that matters and the reason nothing here calls setState:
+      // the pane renders `automaticChecks` as given. If the updater refuses the
+      // change, the prop comes back unchanged and the box must stay where it
+      // was rather than following the click. A locally-toggled checkbox would
+      // claim a state the updater never entered.
+      var accepted = true;
+      await tester.pumpWidget(host(
+        const AppVersion('1.0.0', '4'),
+        automaticChecks: accepted,
+        onAutomaticChecksChanged: (_) {}, // refuses: never changes `accepted`
+      ));
+      await tester.tap(find.text('Check for updates automatically'));
+      await tester.pump();
+      expect(
+        tester.widget<Checkbox>(find.byType(Checkbox)).value,
+        isTrue,
+        reason: 'still on, because the updater never said otherwise',
+      );
+      expect(accepted, isTrue);
+    });
+
+    testWidgets('a null callback makes the checkbox read-only', (tester) async {
+      await tester.pumpWidget(host(const AppVersion('1.0.0', '4')));
+      expect(tester.widget<Checkbox>(find.byType(Checkbox)).onChanged, isNull);
     });
 
     testWidgets('the pane scrolls, so a short window cannot strand the button',

@@ -64,6 +64,14 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       case "checkForUpdates":
         Updater.checkForUpdates()
         result(nil)
+      // Sparkle owns this value and persists it; we never cache it. Both
+      // answer with what Sparkle holds *after* the call, so the checkbox can
+      // never claim a state the updater did not enter.
+      case "automaticUpdateChecks":
+        result(Updater.automaticallyChecksForUpdates)
+      case "setAutomaticUpdateChecks":
+        result(Updater.setAutomaticallyChecksForUpdates(
+          call.arguments as? Bool ?? false))
       case "openAccessibilitySettings":
         AppShell.openAccessibilitySettings()
         result(nil)

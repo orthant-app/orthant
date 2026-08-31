@@ -22,6 +22,9 @@ class _FakeWc implements WindowController {
   final List<String> calls = [];
   ({int cols, int rows, double gap, bool saveHint})? grid;
   LoginItemStatus login = LoginItemStatus.disabled;
+  bool autoUpdates = true;
+  bool autoUpdatesRefuses = false;
+  final List<bool> autoUpdatesRequests = [];
   AppVersion version = const AppVersion('1.0.0', '2');
 
   @override
@@ -80,6 +83,19 @@ class _FakeWc implements WindowController {
 
   @override
   Future<AppVersion> appVersion() async => version;
+
+  @override
+  Future<bool> automaticUpdateChecks() async => autoUpdates;
+
+  @override
+  Future<bool> setAutomaticUpdateChecks(bool enabled) async {
+    autoUpdatesRequests.add(enabled);
+    // Answers with what it *holds*, not what was asked, so a test can make the
+    // updater refuse and see the checkbox follow the updater rather than the
+    // click.
+    if (!autoUpdatesRefuses) autoUpdates = enabled;
+    return autoUpdates;
+  }
 
   @override
   Future<LoginItemStatus> loginItemStatus() async => login;
@@ -142,6 +158,46 @@ void main() {
     built.add(app);
     return (app: app, wc: wc, keys: keys);
   }
+
+  group('automatic update checks', () {
+    test('read when the settings window opens, not at launch', () async {
+      // A channel round trip at launch that nothing outside this one pane
+      // consults. Sparkle owns and persists the value, so it is asked for when
+      // it is about to be shown.
+      final t = build(granted: true);
+      t.wc.autoUpdates = false;
+      await t.app.start();
+      expect(t.app.autoUpdateChecks, isTrue,
+          reason: 'still the Info.plist default; nothing has asked yet');
+
+      await t.app.openSettings(tab: SettingsTab.about);
+      expect(t.app.autoUpdateChecks, isFalse, reason: 'now it has');
+    });
+
+    test('turning it off asks the updater and keeps its answer', () async {
+      final t = build(granted: true);
+      await t.app.start();
+      await t.app.setAutoUpdateChecks(false);
+      expect(t.wc.autoUpdatesRequests, [false]);
+      expect(t.app.autoUpdateChecks, isFalse);
+    });
+
+    test('a refused change leaves the state where the updater left it',
+        () async {
+      // The property the whole read-back exists for. `setAutomaticUpdateChecks`
+      // answers with what the updater *holds*, not what was asked, so a refusal
+      // must not leave the app claiming a state the updater never entered —
+      // the same shape as setLoginItem, and the reason neither echoes its
+      // argument.
+      final t = build(granted: true);
+      await t.app.start();
+      t.wc.autoUpdatesRefuses = true;
+
+      await t.app.setAutoUpdateChecks(false);
+      expect(t.wc.autoUpdatesRequests, [false], reason: 'it was asked');
+      expect(t.app.autoUpdateChecks, isTrue, reason: 'and it said no');
+    });
+  });
 
   group('launch', () {
     test('ungranted: onboarding, a visible window, and no prompt', () async {

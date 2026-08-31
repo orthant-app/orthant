@@ -168,6 +168,8 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
               onPendingConsumed: app.consumePendingRegion,
               version: app.appVersion,
               onCheckForUpdates: app.wc.checkForUpdates,
+              automaticChecks: app.autoUpdateChecks,
+              onAutomaticChecksChanged: app.setAutoUpdateChecks,
             ),
           AppScreen.none => const SizedBox.shrink(),
         },

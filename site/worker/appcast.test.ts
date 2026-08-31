@@ -46,6 +46,25 @@ describe('resolveDownloadUrl', () => {
     expect(resolveDownloadUrl(feed(two))).toBeNull();
   });
 
+  // An item with NO full enclosure — deltas only. Without this, `full.length !== 1`
+  // can be weakened to `> 1` and every other test still passes: the zero case
+  // survives by accident, because `new URL(undefined)` happens to throw into the
+  // catch. A security check that is correct by accident is not checked.
+  it('rejects an item whose only enclosure is a delta', () => {
+    const deltaOnly = `<item><sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
+      <sparkle:deltas><enclosure url="https://github.com/orthant-app/orthant/releases/download/v1.0.1/Orthant5-4.delta"/></sparkle:deltas></item>`;
+    expect(resolveDownloadUrl(feed(deltaOnly))).toBeNull();
+  });
+
+  // Nothing else exercises the search/hash rejection, so it could be deleted
+  // silently — and it is the check that stops an attacker-controlled query
+  // string riding along on the redirect.
+  it('rejects a query string or fragment on an otherwise valid URL', () => {
+    for (const suffix of ['?ref=evil', '#evil']) {
+      expect(resolveDownloadUrl(feed(item({ url: GOOD + suffix, short: '1.0.1' })))).toBeNull();
+    }
+  });
+
   it.each([
     ['a foreign host', 'https://evil.example/orthant-app/orthant/releases/download/v1.0.1/Orthant-1.0.1.dmg'],
     ['http', 'http://github.com/orthant-app/orthant/releases/download/v1.0.1/Orthant-1.0.1.dmg'],

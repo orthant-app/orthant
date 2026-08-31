@@ -150,9 +150,22 @@ setup_redacted_release_fixture() {
 #!/usr/bin/env bash
 printf '%s\n' '1) CERT_MARKER Developer ID Application'
 EOF
+  # Writes an Info.plist as well as the bundle, because a real build does and
+  # release.sh stamps the release name into it before signing. `plutil` is not
+  # stubbed, so that stamp is genuinely exercised here rather than mocked.
   cat >"$REDACT_FIXTURE_BIN/flutter" <<'EOF'
 #!/usr/bin/env bash
-mkdir -p build/macos/Build/Products/Release/Orthant.app/Contents/Frameworks/Injected.framework
+app=build/macos/Build/Products/Release/Orthant.app
+mkdir -p "$app/Contents/Frameworks/Injected.framework"
+printf '%s\n' \
+  '<?xml version="1.0" encoding="UTF-8"?>' \
+  '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
+  '<plist version="1.0">' \
+  '<dict>' \
+  '<key>CFBundleShortVersionString</key><string>1.2.3</string>' \
+  '<key>CFBundleVersion</key><string>4</string>' \
+  '</dict>' \
+  '</plist>' >"$app/Contents/Info.plist"
 EOF
   cat >"$REDACT_FIXTURE_BIN/codesign" <<'EOF'
 #!/usr/bin/env bash
@@ -265,6 +278,19 @@ run_redacted_release_fixture() {
     REDACT_FIXTURE_RC=$?
   fi
   REDACT_FIXTURE_DIAGNOSTICS="$REDACT_FIXTURE_RUNNER_TEMP/release-diagnostics.log"
+}
+
+redacted_release_stamps_the_release_name() {
+  # The pre-release label is the whole point: a bundle built for 1.2.3-beta.1
+  # has CFBundleShortVersionString "1.2.3" and cannot say which beta it is.
+  # `plutil` is not stubbed in this fixture, so this exercises the real write
+  # and the real read-back.
+  run_redacted_release_fixture bad-appcast || return 1
+  local plist stamped
+  plist="$REDACT_FIXTURE_ROOT/build/macos/Build/Products/Release/Orthant.app/Contents/Info.plist"
+  [[ -f "$plist" ]] || return 1
+  stamped="$(plutil -extract ORTHANTReleaseName raw "$plist")" || return 1
+  [[ "$stamped" == '1.2.3-beta.1' ]]
 }
 
 redacted_release_hides_sensitive_markers() {
@@ -447,6 +473,8 @@ assert_ok 'unset Sparkle inputs preserve legacy commands and feed' sparkle_comma
 assert_ok 'unredacted diagnostics print sensitive output' redaction_unset_prints_raw
 assert_ok 'redacted diagnostics record raw output privately' redaction_enabled_records_raw
 assert_ok 'redacted diagnostics require RUNNER_TEMP' redaction_without_runner_temp_fails
+assert_ok 'the release name, label and all, is stamped into the bundle' \
+  redacted_release_stamps_the_release_name
 assert_ok 'redacted release output hides certificate, Team, key, and workspace markers' \
   redacted_release_hides_sensitive_markers
 assert_ok 'redacted release stores complete mode-600 diagnostics' \

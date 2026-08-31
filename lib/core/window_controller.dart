@@ -46,31 +46,54 @@ enum LoginItemStatus {
 /// build number is the part that actually changes between betas, and the part
 /// Sparkle compares.
 class AppVersion {
-  const AppVersion(this.shortVersion, this.buildNumber);
+  const AppVersion(this.shortVersion, this.buildNumber, {this.releaseName = ''});
 
   final String shortVersion;
   final String buildNumber;
 
-  /// Whether the platform gave us anything usable. A build that cannot say what
-  /// it is renders nothing rather than an empty or half-formed string.
-  bool get isKnown => shortVersion.isNotEmpty && buildNumber.isNotEmpty;
+  /// The release's real name — `1.0.1`, or `1.0.1-beta.2` — stamped into the
+  /// bundle by `tool/release.sh` from the tag it is building.
+  ///
+  /// Empty for anything not built by that script: a local `flutter build`, a
+  /// dev build, a debug run. There is no release name for an untagged build to
+  /// claim, and inventing one would be the drift this whole value exists to
+  /// avoid.
+  final String releaseName;
 
-  /// `1.0.0 (2)` — the macOS convention, and the form Sparkle's own update
-  /// prompt uses ("Orthant 1.0.0 (2) is now available—you have 1.0.0 (1)"),
-  /// so the app and its updater agree on how a version looks.
-  String get display => isKnown ? '$shortVersion ($buildNumber)' : '';
+  /// Whether there is anything worth showing.
+  bool get isKnown => display.isNotEmpty;
+
+  /// What to call this build, in one string.
+  ///
+  /// The release name wins when there is one, because it is the only form that
+  /// can say `1.0.1-beta.2`: `CFBundleShortVersionString` must be three
+  /// integers by Apple's rule, so a pre-release label cannot live there, and
+  /// without this an installed beta and the stable after it both render an
+  /// identical `1.0.0`.
+  ///
+  /// Otherwise `1.0.0 (4)` — the macOS convention, and the form Sparkle's own
+  /// update prompt uses ("Orthant 1.0.0 (2) is now available—you have
+  /// 1.0.0 (1)"). That is the right answer for a dev build, where the build
+  /// number is the only thing distinguishing one from the last.
+  String get display {
+    if (releaseName.isNotEmpty) return releaseName;
+    if (shortVersion.isEmpty || buildNumber.isEmpty) return '';
+    return '$shortVersion ($buildNumber)';
+  }
 
   @override
   bool operator ==(Object other) =>
       other is AppVersion &&
       other.shortVersion == shortVersion &&
-      other.buildNumber == buildNumber;
+      other.buildNumber == buildNumber &&
+      other.releaseName == releaseName;
 
   @override
-  int get hashCode => Object.hash(shortVersion, buildNumber);
+  int get hashCode => Object.hash(shortVersion, buildNumber, releaseName);
 
   @override
-  String toString() => 'AppVersion($shortVersion, $buildNumber)';
+  String toString() =>
+      'AppVersion($shortVersion, $buildNumber, releaseName: $releaseName)';
 }
 
 /// Platform-agnostic window control. Native handles never cross this seam —

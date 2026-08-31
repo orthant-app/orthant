@@ -98,9 +98,12 @@ class AboutPane extends StatelessWidget {
                   if (version.isKnown) ...[
                     const SizedBox(height: 4),
                     Text(
-                      // `Version 1.0.0 (2)` — the macOS form, and the one Sparkle's
-                      // own update prompt uses, so the app and its updater describe
-                      // versions identically.
+                      // `Version 1.0.1-beta.2` on a released build — the name the
+                      // release actually has, and what someone filing a bug would
+                      // quote. A build with no release name to stamp (a dev build)
+                      // falls back to `1.0.0 (4)`, where the build number is the
+                      // only thing separating it from the last one.
+                      // [AppVersion.display] owns that choice.
                       //
                       // labelSecondary, never labelTertiary: tertiary is macOS's
                       // *disabled* weight at 2.4:1, and this text is not disabled.

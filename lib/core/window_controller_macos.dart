@@ -92,9 +92,11 @@ class MacosWindowController implements WindowController {
     if (reply is! Map) return const AppVersion('', '');
     final short = reply['shortVersion'];
     final build = reply['buildNumber'];
+    final name = reply['releaseName'];
     return AppVersion(
       short is String ? short : '',
       build is String ? build : '',
+      releaseName: name is String ? name : '',
     );
   }
 

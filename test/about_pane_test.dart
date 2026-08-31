@@ -40,6 +40,18 @@ void main() {
       expect(find.text('Version 1.0.0 (8)'), findsOneWidget);
     });
 
+    testWidgets('a released build shows its release name, label and all',
+        (tester) async {
+      // What a bug report should be able to quote verbatim. The build number is
+      // deliberately absent here: the release name already identifies the build
+      // uniquely, and "(5)" was the part users could not interpret.
+      await tester.pumpWidget(
+        host(const AppVersion('1.0.0', '5', releaseName: '1.0.1-beta.2')),
+      );
+      expect(find.text('Version 1.0.1-beta.2'), findsOneWidget);
+      expect(find.textContaining('(5)'), findsNothing);
+    });
+
     testWidgets('a version the platform could not supply renders no version '
         'line, and does not throw', (tester) async {
       // This repo has shipped a build-time throw twice, and in Release that is

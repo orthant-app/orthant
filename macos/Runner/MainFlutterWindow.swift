@@ -127,6 +127,11 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         result([
           "shortVersion": info?["CFBundleShortVersionString"] as? String ?? "",
           "buildNumber": info?["CFBundleVersion"] as? String ?? "",
+          // Written by tool/release.sh from the tag it is building, so it is the
+          // only value here that can carry a pre-release label. Absent from
+          // every locally-built bundle, which is why Dart treats "" as "fall
+          // back to short version and build number" rather than as an error.
+          "releaseName": info?["ORTHANTReleaseName"] as? String ?? "",
         ])
       default:
         self.windowControl.handle(call, result: result)

@@ -23,7 +23,7 @@ jobs:
       publish: ${{ steps.metadata.outputs.publish }}
       mode: ${{ steps.metadata.outputs.mode }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Derive and validate release metadata
@@ -54,7 +54,7 @@ jobs:
       sha256: ${{ steps.digest.outputs.sha256 }}
     steps:
       - name: Check out
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Resolve Flutter cache paths
         id: flutter-meta
@@ -65,13 +65,13 @@ jobs:
           dry-run: true
 
       - name: Restore Flutter SDK
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.flutter-meta.outputs.CACHE-PATH }}
           key: flutter-${{ runner.os }}-${{ runner.arch }}-3.47.2
 
       - name: Restore pub cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.flutter-meta.outputs.PUB-CACHE-PATH }}
           key: pub-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pubspec.lock') }}
@@ -372,11 +372,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out Orthant
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: .
       - name: Check out Homebrew tap
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: orthant-app/homebrew-tap
           path: tap

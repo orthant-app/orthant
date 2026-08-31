@@ -21,6 +21,40 @@ enum Updater {
   /// session's end. It is the *primary* trigger, not the only one — see
   /// `closeObserver` below for why a second one exists.
   private final class SessionDelegate: NSObject, SPUStandardUserDriverDelegate {
+    /// Sparkle is about to run a modal alert. This is the **only** hook that
+    /// covers an *error* alert: `standardUserDriverWillHandleShowingUpdate`
+    /// below fires for an update Sparkle found, but a failure — a bad
+    /// signature, an unreachable feed — never takes that path. Without this,
+    /// `showUpdaterError:` closes the preceding status window one line before
+    /// building its `NSAlert`, the session-end hook below fires on that close,
+    /// and its deferred `finished()` drops the app to `.accessory` while the
+    /// alert does not exist yet. The alert then appears in an app with no Dock
+    /// icon and no ⌘-Tab entry, reachable only by minimising every other
+    /// window — reproduced by the tamper test on 2026-08-31, and the answer to
+    /// the question M12 Task 9 left open.
+    ///
+    /// Fires strictly before `[alert runModal]` (verified in
+    /// `SPUStandardUserDriver.m` `-showAlert:secondaryAction:`), so the policy
+    /// is already `.regular` when the window appears. A fix by construction
+    /// rather than by timing: nothing here depends on when the alert registers
+    /// in `NSApp.windows`, which is the actual bug.
+    func standardUserDriverWillShowModalAlert() {
+      sparkleModalAlertOnScreen = true
+      NSApp.setActivationPolicy(.regular)
+      NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// Fires after `runModal` **returns** — after the user dismissed the alert,
+    /// not when it appeared. The name reads like the latter; the source says
+    /// otherwise, and the pair brackets the whole modal session. Clearing the
+    /// flag and re-asking `finished()` is what restores `.accessory`: any
+    /// deferred call that ran mid-session was correctly refused, so something
+    /// has to ask again once the alert is gone.
+    func standardUserDriverDidShowModalAlert() {
+      sparkleModalAlertOnScreen = false
+      DispatchQueue.main.async { Updater.finished() }
+    }
+
     func standardUserDriverWillFinishUpdateSession() {
       // Fires while Sparkle's own status/alert window can still be on
       // screen — the method is "will finish", not "did finish". Calling

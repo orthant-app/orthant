@@ -54,9 +54,31 @@ private let windowClassesExemptFromRegular: Set<String> = [
 /// undone by anything the user can do to it (M7's own settings-window comment
 /// on this: a window shown from an `.accessory` app cannot take keyboard
 /// focus properly).
-func mayReturnToAccessory(windows: [WindowActivationFact]) -> Bool {
-  !windows.contains { $0.isVisible && !windowClassesExemptFromRegular.contains($0.className) }
+///
+/// **`modalAlertOnScreen` exists because the window list is not always enough.**
+/// A window can be *about to appear* and therefore absent from `NSApp.windows`
+/// at the instant this is asked. That is not hypothetical: it is the defect
+/// reproduced on 2026-08-31 by the tamper test. Sparkle's `showUpdaterError:`
+/// closes the preceding status window one line before building its `NSAlert`;
+/// that close triggers the session-end hook, whose deferred `finished()` asks
+/// this question while the alert **does not exist yet**, gets "yes, nothing is
+/// visible", and strips the Dock icon out from under a window that appears a
+/// moment later — leaving an error dialog with no Dock icon, no ⌘-Tab entry
+/// and a disabled menu, reachable only by minimising every other window.
+/// Sparkle brackets the whole modal session for us (`standardUserDriverWill/
+/// DidShowModalAlert`, verified in `SPUStandardUserDriver.m` to fire either
+/// side of `runModal`), so the flag answers "a modal alert owns the screen"
+/// without depending on when its window registers.
+func mayReturnToAccessory(windows: [WindowActivationFact],
+                          modalAlertOnScreen: Bool = false) -> Bool {
+  if modalAlertOnScreen { return false }
+  return !windows.contains { $0.isVisible && !windowClassesExemptFromRegular.contains($0.className) }
 }
+
+/// Set while Sparkle owns the screen with a modal alert. Not `Updater`-private:
+/// `AppShell.hideConfigWindow` shares this predicate, and closing the settings
+/// window must not strip the Dock icon from an update alert either.
+var sparkleModalAlertOnScreen = false
 
 /// Whether it is safe to drop back to `.accessory` right now. The one
 /// predicate both call sites share — deliberately untested: `NSApp.windows`
@@ -67,5 +89,5 @@ func mayReturnToAccessory() -> Bool {
   mayReturnToAccessory(windows: NSApp.windows.map {
     WindowActivationFact(className: String(describing: type(of: $0)),
                           isVisible: $0.isVisible)
-  })
+  }, modalAlertOnScreen: sparkleModalAlertOnScreen)
 }

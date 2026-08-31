@@ -1,0 +1,22 @@
+---
+const links = [
+  { href: '/docs/', label: 'Docs' },
+  { href: '/changelog/', label: 'Changelog' },
+  { href: '/faq/', label: 'FAQ' },
+  { href: 'https://github.com/orthant-app/orthant', label: 'GitHub' },
+];
+---
+<nav class="wrap nav" aria-label="Primary">
+  <a class="brand" href="/">Orthant</a>
+  <ul>
+    {links.map((l) => <li><a href={l.href}>{l.label}</a></li>)}
+  </ul>
+</nav>
+
+<style>
+  .nav { display: flex; align-items: center; justify-content: space-between; padding-block: 20px; }
+  .brand { font-weight: 600; text-decoration: none; color: var(--label); }
+  ul { display: flex; gap: 20px; list-style: none; margin: 0; padding: 0; }
+  a { color: var(--label-secondary); text-decoration: none; }
+  a:hover, a:focus-visible { color: var(--label); }
+</style>

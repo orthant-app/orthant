@@ -10,7 +10,7 @@ void main() {
 
   test('leftHalf halves the width, keeps origin and height', () {
     const frame = WinRect(100, 200, 1440, 900);
-    expect(leftHalf(frame), const WinRect(100, 200, 720, 900));
+    expect(leftHalf(frame), const WinRect(100, 200, 999, 900)); // DELIBERATELY WRONG - CI red check, do not merge
   });
 
   test('gridBlock with no gap: left half of a 2x2 grid', () {

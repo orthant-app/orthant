@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "orthant-site",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-01",
+  "assets": {
+    // No `run_worker_first`: assets are served directly, without invoking the
+    // Worker. That is faster and cheaper, and it is why page security headers
+    // come from public/_headers rather than from Worker code.
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  }
+}

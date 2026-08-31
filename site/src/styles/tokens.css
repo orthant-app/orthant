@@ -1,0 +1,64 @@
+:root {
+  color-scheme: light dark;
+
+  --accent: #007AFF;
+  --surface: #FFFFFF;
+  --label: rgb(0 0 0 / 0.90);
+  --label-secondary: rgb(0 0 0 / 0.55);
+  --separator: rgb(0 0 0 / 0.08);
+  --keycap-fill: #FDFDFD;
+  --keycap-border: rgb(0 0 0 / 0.14);
+
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --col: 1fr;
+  --gutter: 24px;
+  --measure: 68ch;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #0A84FF;
+    --surface: #1E1E1F;
+    --label: rgb(255 255 255 / 0.90);
+    --label-secondary: rgb(255 255 255 / 0.55);
+    --separator: rgb(255 255 255 / 0.10);
+    --keycap-fill: #3A3A3C;
+    --keycap-border: rgb(255 255 255 / 0.20);
+  }
+}
+
+/*
+ * `labelTertiary` from the app (0x59 alpha — 2.4:1 light, 3.1:1 dark) is
+ * macOS's DISABLED weight and is deliberately absent. It shipped once in the
+ * app as readable text and had to be reverted. Use --label-secondary.
+ */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--label);
+  font-family: var(--font-ui);
+  font-size: 17px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 var(--gutter); }
+.prose { max-width: var(--measure); }
+
+/* The grid is structure: sections begin on cell boundaries and are separated
+   by a hairline. It becomes explicit only in the hero and the regions section. */
+.section { border-top: 1px solid var(--separator); padding: 72px 0; }
+
+code, kbd, pre { font-family: var(--font-mono); font-size: 0.9em; }
+
+kbd {
+  background: var(--keycap-fill);
+  border: 1px solid var(--keycap-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}

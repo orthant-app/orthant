@@ -1,3 +1,16 @@
+/*
+ * Ported from lib/settings/mac_theme.dart:47-77.
+ *
+ * `--surface` maps asymmetrically on purpose: light is `contentBackground`
+ * (#FFFFFF), dark is `windowBackground`'s dark value (#1E1E1F) rather than
+ * `contentBackground` dark (#2C2C2E). A page wants near-black in dark mode —
+ * #2C2C2E reads as a raised card, not a background — and #1E1E1F also
+ * measures better: --label scores 13.71:1 on it against 11.62:1, and
+ * --label-secondary 5.89:1 against 5.32:1.
+ *
+ * What is never used is `windowBackground`'s LIGHT value (#ECECEE): system
+ * chrome in an app, dead grey on a page.
+ */
 :root {
   color-scheme: light dark;
 

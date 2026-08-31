@@ -386,16 +386,18 @@ class OrthantCoordinator extends ChangeNotifier {
     // they persist perfectly well without the grant.
     TrayEntry('overlay', openGridLabel, disabled: !permissions.granted),
     const TrayEntry('settings', 'Settings…'),
-    // Directly above the update check, and disabled: nobody wants a version
-    // number for its own sake, they want to know whether they are current, and
-    // this puts the answer and the next action in one glance.
+    // Opens Settings on the About pane, which is where the version lives.
     //
-    // The tray rather than an About window because Orthant has no Dock icon —
-    // this menu is the only front door, so a version here costs no discovery.
-    // Omitted entirely when the platform could not say, rather than rendering
-    // "Orthant  ()".
-    if (appVersion.isKnown)
-      TrayEntry('version', 'Orthant ${appVersion.display}', disabled: true),
+    // This row used to *be* the version, rendered as a disabled label. It read
+    // as a command that was broken — macOS greys what you cannot do — and the
+    // reasoning behind putting it here did not survive use: "the version and
+    // the next action in one glance" assumes a user can tell whether their
+    // version is current, and they cannot, because they do not know what the
+    // current one is. Only the row below answers that. The version's real
+    // audience is a bug report, which can afford a click. Unconditional, unlike
+    // the old row: this menu is Orthant's only front door, so About must be
+    // reachable even from a build that cannot say what version it is.
+    const TrayEntry('about', 'About Orthant'),
     const TrayEntry('updates', 'Check for Updates…'),
     const TrayEntry.separator(),
     const TrayEntry('quit', 'Quit Orthant'),

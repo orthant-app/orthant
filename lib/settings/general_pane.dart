@@ -6,6 +6,7 @@ import '../shortcuts/command_ref.dart';
 import '../shortcuts/shortcut_command.dart';
 import 'grid_preview.dart';
 import 'keycap.dart';
+import 'mac_button.dart';
 import 'mac_control.dart';
 import 'mac_stepper.dart';
 import 'mac_theme.dart';
@@ -87,7 +88,7 @@ class GeneralPane extends StatelessWidget {
       // foot of a pane reads as "everything", and this touches neither
       // the shortcuts (Settings holds no bindings) nor launch-at-login
       // (the OS owns that). The Shortcuts tab has its own.
-      child: _PushButton(
+      child: MacPushButton(
         label: 'Reset Grid & Gaps',
         tokens: t,
         onPressed: () => onSettingsChanged(const Settings()),
@@ -340,7 +341,7 @@ class GeneralPane extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 9),
-        _PushButton(
+        MacPushButton(
           label: 'Open Accessibility Settings…',
           tokens: t,
           onPressed: onOpenAccessibility,
@@ -466,45 +467,6 @@ class _Checkbox extends StatelessWidget {
               style: TextStyle(fontSize: 13, color: tokens.labelPrimary),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PushButton extends StatelessWidget {
-  const _PushButton({
-    required this.label,
-    required this.tokens,
-    required this.onPressed,
-  });
-
-  final String label;
-  final MacTokens tokens;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return MacControl(
-      onPressed: onPressed,
-      focusRingRadius: 6,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-        decoration: BoxDecoration(
-          color: tokens.contentBackground,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: tokens.keycapBorder),
-          boxShadow: [
-            BoxShadow(
-              color: tokens.keycapShadow,
-              blurRadius: 1,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Text(
-          label,
-          style: TextStyle(fontSize: 12.5, color: tokens.labelPrimary),
         ),
       ),
     );

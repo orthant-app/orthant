@@ -6,11 +6,15 @@ order: 8
 
 ## System Settings shows Orthant as enabled, but Orthant says permission is missing
 
-This is the common one, and it is not your mistake. macOS ties the Accessibility grant to
-an app's **code signature**, not to its name or its location. If a differently-signed build
-of Orthant has ever run on this Mac, macOS keeps a separate record for it — and the
-Accessibility list collapses both records into one row with one toggle. The row can show
-**on** while the copy you are running is genuinely ungranted, and toggling it does nothing.
+This is not your mistake, and it has a specific cause. macOS ties the Accessibility grant to
+an app's **code signature**, not to its name or its location. If a differently-signed build of
+Orthant has ever run on this Mac, macOS keeps a separate record for it — and the Accessibility
+list collapses both records into one row with one toggle. The row can show **on** while the copy
+you are running is genuinely ungranted, and toggling it does nothing.
+
+Every released build is signed identically, so a `.dmg` install and a Homebrew install cannot
+produce this between them. You are most likely to hit it if you have also **built Orthant from
+source** and run that copy alongside an installed one.
 
 To fix it:
 

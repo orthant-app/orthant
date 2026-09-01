@@ -16,7 +16,7 @@ proportions.
 
 A gap is a request rather than a promise. If the gap you ask for would make the window smaller
 than 40 points, Orthant quietly reduces it rather than refusing, so the number beside the
-slider is a maximum. This is measured against the block you actually placed, not the smallest
+stepper is a maximum. This is measured against the block you actually placed, not the smallest
 cell on the grid, so a half-screen window keeps a wide gap that a single small cell could not.
 
 **Launch at login.** Registers Orthant with macOS to start when you log in.

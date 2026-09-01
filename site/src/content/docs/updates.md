@@ -12,7 +12,7 @@ regions.
 
 ## Turning it off
 
-**Settings ▸ General ▸ Check for updates automatically.** With it off, Orthant never contacts
+**Settings ▸ About ▸ Check for updates automatically.** With it off, Orthant never contacts
 the update server; you can still check by hand from the menu bar.
 
 ## If you installed with Homebrew

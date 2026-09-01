@@ -179,6 +179,26 @@ describe('attachHero — a cancelled gesture', () => {
     expect($('hero-window').style.width).toBe('');
   });
 
+  // The compound sequence: activate, move, exit deliberately, THEN have a later
+  // gesture cancelled. `exit()` never resets `selection`, so the widget parks at
+  // a non-default position with the two agreeing — and a cancel that restored
+  // "the CSS default" instead of "what was there" would desync them, making the
+  // next activation jump. Every other cancellation test starts from a fresh
+  // mount, so none of them reach this state.
+  it('restores a parked position, not the CSS default', () => {
+    activate();
+    press('ArrowRight');
+    const parked = $('hero-window').style.cssText;
+    expect(parked).not.toBe('');
+
+    press('Escape');
+    expect($('hero-window').style.cssText).toBe(parked);
+
+    pointer('pointerdown', $('hero-cell-0-0'));
+    pointer('pointercancel', grid());
+    expect($('hero-window').style.cssText).toBe(parked);
+  });
+
   it('restores the selection the press had changed', () => {
     activate();
     const before = $('hero-window').style.width;

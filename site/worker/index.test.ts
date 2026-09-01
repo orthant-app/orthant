@@ -58,6 +58,28 @@ describe('handleDownload', () => {
     expect(res.headers.get('location')).toBe(FALLBACK_URL);
   });
 
+  // The plain 500 above cannot verify the `!res.ok` guard: its body is
+  // unparseable, so the fallback happens for the wrong reason and the test
+  // passes with the guard deleted. This one carries a VALID feed on a 500 —
+  // without the guard it resolves and redirects, trusting a response the
+  // origin explicitly told us not to.
+  it('falls back on a non-200 feed even when its body is a valid appcast', async () => {
+    const res = await handleDownload({
+      fetch: async () => new Response(FEED, { status: 500 }),
+      cache: memoryCache(),
+    });
+    expect(res.headers.get('location')).toBe(FALLBACK_URL);
+  });
+
+  // "caches the validated target" only counts fetches, and "serves a cached
+  // target" pre-seeds the cache — so nothing checks that what gets WRITTEN is
+  // what was resolved. A cache.put storing the wrong value survives both.
+  it('caches the resolved target itself, not merely something', async () => {
+    const cache = memoryCache();
+    await handleDownload({ fetch: async () => ok(FEED), cache });
+    expect(cache.store.get('download-target')).toBe(GOOD);
+  });
+
   it('falls back on an unusable feed', async () => {
     const res = await handleDownload({ fetch: async () => ok('<rss/>'), cache: memoryCache() });
     expect(res.headers.get('location')).toBe(FALLBACK_URL);

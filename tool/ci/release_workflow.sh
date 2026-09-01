@@ -12,6 +12,16 @@ workflow_error() {
   return 1
 }
 
+# A changelog entry's body, with YAML frontmatter stripped. Shared by
+# metadata()'s early guard and publish()'s --notes-file extraction so the two
+# body-blank checks can never drift apart the way the entry PATH once did.
+changelog_body() {
+  local entry="$1"
+  awk 'BEGIN { fences = 0 }
+       /^---[[:space:]]*$/ && fences < 2 { fences++; next }
+       fences >= 2 { print }' "$entry"
+}
+
 require_mode() {
   case "${1-}" in
     stable|beta|dry-run) ;;
@@ -188,9 +198,19 @@ metadata() {
     # Fail here rather than in publish(), which runs after build, sign and
     # notarize. The changelog entry is a precondition of the release, not a
     # detail of publishing it.
-    local entry="site/src/content/changelog/$version.md"
+    #
+    # Keyed by BASE version, not the full tag: a beta (e.g. 1.0.2-beta.1) and
+    # its eventual stable (1.0.2) share one entry, because a beta's release
+    # notes are the upcoming release's notes and the site lists stable
+    # releases only. test/site_docs_test.dart's own guard requires the
+    # entry's frontmatter `version:` to equal pubspec.yaml's marketing
+    # version, which never carries a "-beta.N" label — so a per-tag filename
+    # could never satisfy both guards at once.
+    local entry="site/src/content/changelog/$base.md"
     [[ -f "$entry" ]] ||
       workflow_error "changelog entry missing: $entry" || return 1
+    changelog_body "$entry" | grep -q '[^[:space:]]' ||
+      workflow_error "changelog entry has no body: $entry" || return 1
   fi
 
   {
@@ -375,15 +395,17 @@ publish() {
       # first or every release body starts with `---` and `published: false`.
       # The output path is fixed rather than mktemp so the harness's call-log
       # assertions stay deterministic.
+      #
+      # Keyed by RELEASE_BASE_VERSION (set by validate_release_version above),
+      # not $tag: see the matching comment in metadata() for why a beta and
+      # its eventual stable must resolve to the same entry.
       local notes_source notes_file
-      notes_source="site/src/content/changelog/${tag#v}.md"
+      notes_source="site/src/content/changelog/$RELEASE_BASE_VERSION.md"
       [[ -f "$notes_source" ]] ||
         workflow_error "changelog entry missing: $notes_source" || return 1
       notes_file='build/dist/release-notes.md'
       mkdir -p "$(dirname "$notes_file")" || return 1
-      awk 'BEGIN { fences = 0 }
-           /^---[[:space:]]*$/ && fences < 2 { fences++; next }
-           fences >= 2 { print }' "$notes_source" >"$notes_file" || return 1
+      changelog_body "$notes_source" >"$notes_file" || return 1
       # NOT `[[ -s ]]`: the extractor keeps the blank line that follows the
       # frontmatter, so a body-less entry yields a one-newline file, which is
       # non-empty and would publish a blank release body.

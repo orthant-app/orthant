@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { FALLBACK_URL, handleDownload, type CacheLike } from './index';
+import handler, { FALLBACK_URL, handleDownload, type CacheLike } from './index';
 
 const GOOD = 'https://github.com/orthant-app/orthant/releases/download/v1.0.1/Orthant-1.0.1.dmg';
 
@@ -100,5 +100,45 @@ describe('handleDownload', () => {
     const res = await handleDownload({ fetch: async () => ok(FEED), cache: memoryCache() });
     expect(res.headers.get('x-content-type-options')).toBe('nosniff');
     expect(res.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
+  });
+
+  it('carries the CSP and Permissions-Policy too, not just three of the five', async () => {
+    const res = await handleDownload({ fetch: async () => ok(FEED), cache: memoryCache() });
+    expect(res.headers.get('content-security-policy')).toContain("default-src 'self'");
+    expect(res.headers.get('permissions-policy')).toBe('camera=(), microphone=(), geolocation=()');
+  });
+});
+
+// Cloudflare does not apply public/_headers to a response this Worker
+// returns, even one obtained by passing env.ASSETS.fetch() straight through
+// — so the ASSETS fallthrough (everything except /download, including a 404
+// served via wrangler.jsonc's not_found_handling) must carry the same
+// headers itself or it ships with no CSP at all.
+describe('the ASSETS fallthrough', () => {
+  const env = { ASSETS: { fetch: async () => new Response('page body', {
+    status: 200,
+    headers: { 'content-type': 'text/html' },
+  }) } };
+
+  it('attaches every security header to an ordinary page response', async () => {
+    const res = await handler.fetch(new Request('https://orthant.app/faq/'), env);
+    expect(res.headers.get('content-security-policy')).toContain("default-src 'self'");
+    expect(res.headers.get('permissions-policy')).toBe('camera=(), microphone=(), geolocation=()');
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(res.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
+    expect(res.headers.get('strict-transport-security')).toBe('max-age=31536000; includeSubDomains');
+  });
+
+  it('preserves the original response body and headers alongside the added ones', async () => {
+    const res = await handler.fetch(new Request('https://orthant.app/faq/'), env);
+    expect(res.headers.get('content-type')).toBe('text/html');
+    expect(await res.text()).toBe('page body');
+  });
+
+  it('attaches the same headers to a 404 (the case the review flagged as likely bare)', async () => {
+    const notFoundEnv = { ASSETS: { fetch: async () => new Response('not found', { status: 404 }) } };
+    const res = await handler.fetch(new Request('https://orthant.app/does/not/exist'), notFoundEnv);
+    expect(res.status).toBe(404);
+    expect(res.headers.get('content-security-policy')).toContain("default-src 'self'");
   });
 });

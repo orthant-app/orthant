@@ -33,18 +33,45 @@ export interface Deps {
   cache: CacheLike;
 }
 
-/** Applied to Worker-generated responses. Static pages get the same set from
- *  public/_headers, because assets never reach this code. */
+/** The complete set spec §8.1 calls for, matching public/_headers exactly —
+ *  keep the two in sync by hand; nothing shares them at build time.
+ *
+ *  Applied to every Worker-generated response AND re-attached to every
+ *  ASSETS fallthrough response below, including the 404 page. Cloudflare
+ *  does NOT apply public/_headers to a response a Worker returns, even one
+ *  obtained by calling env.ASSETS.fetch() and passing it straight through —
+ *  so without this, every non-asset path (which is everything except a
+ *  handful of static files, once a Worker route exists at all) would ship
+ *  with no CSP. Pages reached without going through a Worker fetch handler
+ *  at all still get the same set directly from public/_headers. */
 const SECURITY_HEADERS: Record<string, string> = {
+  'content-security-policy':
+    "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self' data:; media-src 'self'; connect-src 'self' https://cloudflareinsights.com; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
   'referrer-policy': 'strict-origin-when-cross-origin',
   'x-content-type-options': 'nosniff',
   'strict-transport-security': 'max-age=31536000; includeSubDomains',
+  'permissions-policy': 'camera=(), microphone=(), geolocation=()',
 };
 
 function redirect(location: string, cacheControl: string): Response {
   return new Response(null, {
     status: 302,
     headers: { location, 'cache-control': cacheControl, ...SECURITY_HEADERS },
+  });
+}
+
+/** Re-emits a response with SECURITY_HEADERS attached, rather than mutating
+ *  it in place — a Response's headers are not guaranteed mutable once
+ *  constructed, and env.ASSETS.fetch() results are exactly that case. */
+function withSecurityHeaders(response: Response): Response {
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    headers.set(name, value);
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
   });
 }
 
@@ -93,6 +120,6 @@ export default {
     if (url.pathname === '/download' || url.pathname === '/download/') {
       return handleDownload({ fetch: globalThis.fetch, cache: runtimeCache() });
     }
-    return env.ASSETS.fetch(request);
+    return withSecurityHeaders(await env.ASSETS.fetch(request));
   },
 };

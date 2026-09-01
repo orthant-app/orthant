@@ -1,11 +1,107 @@
 ---
 import Base from '../layouts/Base.astro';
 import Hero from '../components/Hero.astro';
+import TrustBand from '../components/TrustBand.astro';
 ---
 <Base
   title="Orthant — grid-based window manager for macOS"
-  description="Snap the frontmost window with keyboard shortcuts, or summon a grid and draw exactly where it should go. Free and open source."
+  description="Snap the frontmost window with keyboard shortcuts, or summon a grid and draw exactly where it should go. Free and open source, for macOS 13+."
   path="/"
 >
   <Hero />
+  <TrustBand />
+
+  <section class="section wrap">
+    <video
+      controls muted playsinline loop
+      preload="none"
+      poster="/demo-poster.png"
+      width="1280"
+      aria-label="Windows snap to halves and quarters with keyboard shortcuts; the grid overlay places a window on a drawn selection; a left-two-thirds region is drawn, saved, bound to a shortcut, and used."
+    >
+      <source src="/demo.webm" type="video/webm" />
+      <source src="/demo.mp4" type="video/mp4" />
+    </video>
+  </section>
+
+  <section class="section wrap prose">
+    <h2>Two ways to place a window</h2>
+    <p>
+      <strong>Direct shortcuts.</strong> Halves, quarters, maximize and center, each on its
+      own chord. Press <kbd>⌃⌥→</kbd> and the window fills the right half of its display.
+      Instant.
+    </p>
+    <p>
+      <strong>The grid overlay.</strong> Press <kbd>⌃⌥O</kbd> and a translucent grid appears
+      over every display in about 50 milliseconds. Drag across cells — or arrow around,
+      with <kbd>⇧</kbd> to extend — and the selection previews exactly where the window will
+      land. Release or <kbd>↩</kbd> places it, <kbd>Esc</kbd> cancels.
+    </p>
+    <p><a href="/docs/shortcuts/">Every default shortcut →</a></p>
+  </section>
+
+  <section class="section wrap prose">
+    <h2>Custom regions</h2>
+    <p>
+      Draw any block on a grid of your own choosing — "left two-thirds" being the usual first
+      one — name it, and give it a shortcut. A region remembers its own proportions, so
+      changing the overlay's grid size later never moves your windows.
+    </p>
+    <p>
+      <kbd>⌘S</kbd> on the overlay saves the selection you just made as a region, pre-named
+      and ready to bind.
+    </p>
+    <p><a href="/docs/custom-regions/">How custom regions work →</a></p>
+  </section>
+
+  <section class="section wrap prose">
+    <h2>Why it needs Accessibility permission</h2>
+    <p>
+      Orthant positions other apps' windows through the macOS Accessibility API. That is the
+      same mechanism every window manager in this category uses, and macOS gates it
+      behind <strong>System Settings ▸ Privacy &amp; Security ▸ Accessibility</strong>.
+    </p>
+    <p>
+      It is the only permission Orthant asks for. On first launch it walks you through
+      granting it, and gets out of the way the moment it is on. Orthant has no account, sends
+      no telemetry, and its only network access is checking for updates — which you can turn
+      off.
+    </p>
+    <p><a href="/privacy/">What the app and this site collect →</a></p>
+  </section>
+
+  <section class="section wrap prose">
+    <h2>Built for more than one display</h2>
+    <p>
+      A window snaps within <em>its own</em> display, not the one your pointer happens to be
+      on — mixed-DPI arrangements included. The overlay puts a grid on every screen at once.
+    </p>
+    <p>
+      It idles at 0% CPU with zero wake-ups while hidden, and never becomes the frontmost
+      app, so the window you are arranging stays active throughout.
+    </p>
+  </section>
+
+  <section class="section wrap prose">
+    <h2>Install</h2>
+    <pre><code>brew install --cask orthant-app/tap/orthant </code></pre>
+    <p>
+      Or <a href="/download">download the disk image</a> and drag Orthant to Applications.
+      Either way you get the same build. Requires <strong>macOS 13+</strong>.
+    </p>
+    <p>
+      Orthant updates itself in place. Homebrew knows this, so <code>brew upgrade</code> deliberately
+      skips it rather than fighting over the same app.
+    </p>
+    <p class="quiet">
+      Windows support is planned, behind the same interface. Linux is not possible: Wayland
+      does not let one app move another's windows, by design.
+    </p>
+  </section>
 </Base>
+
+<style>
+  .quiet { color: var(--label-secondary); }
+  pre { background: var(--keycap-fill); border: 1px solid var(--separator); border-radius: 8px; padding: 14px 16px; overflow-x: auto; }
+  video { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--separator); }
+</style>

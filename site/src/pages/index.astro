@@ -1,13 +1,40 @@
 ---
+import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
 import Hero from '../components/Hero.astro';
 import TrustBand from '../components/TrustBand.astro';
+import { currentVersion } from '../lib/releases';
+
+// The newest PUBLISHED STABLE entry. An unpublished release (written at release
+// prep, before the tag is approved) and a beta can therefore never become the
+// version the site advertises, which would otherwise point at a build
+// /download does not serve.
+const releases = (await getCollection('changelog')).map((e) => e.data);
+const version = currentVersion(releases);
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Orthant',
+  description: 'Grid-based window manager for macOS.',
+  applicationCategory: 'UtilitiesApplication',
+  operatingSystem: 'macOS 13+',
+  url: 'https://orthant.app/',
+  downloadUrl: 'https://orthant.app/download',
+  license: 'https://opensource.org/licenses/MIT',
+  isAccessibleForFree: true,
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  ...(version ? { softwareVersion: version } : {}),
+};
 ---
 <Base
   title="Orthant — grid-based window manager for macOS"
   description="Snap the frontmost window with keyboard shortcuts, or summon a grid and draw exactly where it should go. Free and open source, for macOS 13+."
   path="/"
 >
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  </Fragment>
   <Hero />
   <TrustBand />
 
@@ -93,6 +120,11 @@ import TrustBand from '../components/TrustBand.astro';
       Orthant updates itself in place. Homebrew knows this, so <code>brew upgrade</code> deliberately
       skips it rather than fighting over the same app.
     </p>
+    {version && (
+      <p class="quiet">
+        Latest release: <a href="/changelog/">{version}</a>.
+      </p>
+    )}
     <p class="quiet">
       Windows support is planned, behind the same interface. Linux is not possible: Wayland
       does not let one app move another's windows, by design.

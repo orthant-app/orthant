@@ -48,7 +48,7 @@ export function attachHero(root: HTMLElement): void {
    * a swipe past the hero would leave the selection changed and the widget
    * activated. Restoring here is what makes the touch promise true.
    */
-  let beforeDrag: { selection: Selection; anchor: typeof anchor; cursor: typeof cursor; active: boolean } | null = null;
+  let beforeDrag: { selection: Selection; anchor: typeof anchor; cursor: typeof cursor; active: boolean; style: string } | null = null;
 
   const rowEls = Array.from(grid.querySelectorAll<HTMLElement>('.row'));
   const cellEls = Array.from(grid.querySelectorAll<HTMLElement>('.cell'));
@@ -168,7 +168,7 @@ export function attachHero(root: HTMLElement): void {
     const cell = (event.target as HTMLElement).closest<HTMLElement>('.cell');
     if (!cell) return;
     // Snapshot BEFORE anything changes, so pointercancel can put it all back.
-    beforeDrag = { selection: { ...selection }, anchor: { ...anchor }, cursor: { ...cursor }, active };
+    beforeDrag = { selection: { ...selection }, anchor: { ...anchor }, cursor: { ...cursor }, active, style: windowEl!.style.cssText };
     // A pointer press is as deliberate as pressing the button, so it performs
     // the SAME transition. Mutating the grid without it would leave a state
     // that is interactive by mouse while still claiming to be dormant —
@@ -193,22 +193,20 @@ export function attachHero(root: HTMLElement): void {
     selection = snapshot.selection;
     anchor = snapshot.anchor;
     cursor = snapshot.cursor;
-    if (!snapshot.active) {
-      exit();
-      // Hand the geometry back to the stylesheet too. exit() strips ARIA but
-      // does not repaint, so without this the page scrolls AND the window
-      // stays where the finger landed — the exact failure this handler exists
-      // to prevent, half-fixed. Removing the inline properties (rather than
-      // repainting) is deliberate: while dormant the position MUST come from
-      // CSS, since that is what a no-JS visitor sees and what
-      // hero-default.test.ts pins to gridBlock.
-      //
-      // Only the CANCEL path clears. Esc is a deliberate exit, so it leaves
-      // the window where the user put it, and `selection` still agrees.
-      for (const property of ['left', 'top', 'width', 'height']) {
-        windowEl!.style.removeProperty(property);
-      }
-    } else paint();
+    // Put back exactly what was on the element, rather than assuming a
+    // cancelled gesture means "return to the CSS default". That assumption
+    // holds only until the first deliberate exit: `exit()` never touches
+    // `selection`, so after activate -> move -> Esc the widget parks at a
+    // non-default position with `selection` agreeing. Clearing there would
+    // desync them and make the NEXT activation jump.
+    //
+    // At rest for the first time this snapshot is '', so the inline styles
+    // painted by pointerdown are still cleared — which is the case that
+    // matters on touch: without it, a swipe reclaimed as a page scroll leaves
+    // the window wherever the finger landed.
+    windowEl!.style.cssText = snapshot.style;
+    if (!snapshot.active) exit();
+    else paint();
   });
 
   grid.addEventListener('pointermove', (event: PointerEvent) => {

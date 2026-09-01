@@ -196,7 +196,15 @@ case "${2-}" in
     mkdir -p "$dir"
     printf 'downloaded %s\n' "$tag" >"$dir/Orthant-${tag#v}.dmg"
     ;;
-  create) ;;
+  create)
+    shift 2
+    while (( $# > 0 )); do
+      case "$1" in
+        --notes-file) cp "$2" "$FIXTURES/actual_notes"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    ;;
   view)
     cat "$FIXTURES/actual_assets"
     ;;
@@ -230,6 +238,30 @@ reset_fixture() {
   mkdir -p "$WORKSPACE"
   : >"$CALL_LOG"
   printf 'version: 1.0.0+1\n' >"$WORKSPACE/pubspec.yaml"
+  mkdir -p "$WORKSPACE/site/src/content/changelog"
+  cat >"$WORKSPACE/site/src/content/changelog/1.0.0.md" <<'ENTRY'
+---
+version: 1.0.0
+build: 1
+channel: stable
+published: false
+date: 2026-08-31
+---
+
+First stable release.
+ENTRY
+  cat >"$WORKSPACE/site/src/content/changelog/1.1.0-beta.1.md" <<'ENTRY'
+---
+version: 1.1.0-beta.1
+build: 2
+channel: beta
+published: false
+date: 2026-08-31
+---
+
+Beta body.
+ENTRY
+  : >"$FIXTURES/actual_notes"
   printf '0\n' >"$FIXTURES/git_ancestor_exit"
   printf '0\n' >"$FIXTURES/gh_api_exit"
   printf '0\n' >"$FIXTURES/gh_api_response_exit"
@@ -349,6 +381,17 @@ reset_fixture
 printf '1\n' >"$FIXTURES/gh_api_exit"
 assert_fails 'release API transport failure fails closed' \
   run_workflow metadata push tag v1.0.0 orthant-app/orthant "$WORKSPACE/output"
+
+# This file has no $STDERR fixture, so stderr is captured directly: swap fds so
+# the command substitution collects fd 2 while fd 1 (the metadata output file
+# path is written via --output, not stdout) is discarded.
+reset_fixture
+rm -f "$WORKSPACE/site/src/content/changelog/1.0.0.md"
+stderr="$(run_workflow metadata push tag v1.0.0 orthant-app/orthant "$WORKSPACE/output" 2>&1 1>/dev/null)"
+status=$?
+assert_eq 'metadata rejects a tag with no changelog entry' 1 "$status"
+assert_contains 'metadata names the missing entry' \
+  'changelog entry missing: site/src/content/changelog/1.0.0.md' "$stderr"
 
 reset_fixture
 assert_ok 'no release and two missing feeds is first publication' \
@@ -495,9 +538,15 @@ assert_ok 'draft publication with no delta succeeds' \
   run_workflow publish orthant-app/orthant 1.0.0 false "$WORKSPACE/dist"
 calls="$(<"$CALL_LOG")"
 assert_contains 'new draft is created explicitly' \
-  'gh <release> <create> <v1.0.0> <--draft> <--verify-tag> <--generate-notes> <--repo> <orthant-app/orthant>' "$calls"
+  'gh <release> <create> <v1.0.0> <--draft> <--verify-tag> <--notes-file> <build/dist/release-notes.md> <--repo> <orthant-app/orthant>' "$calls"
 assert_contains 'single DMG is uploaded explicitly' \
   "gh <release> <upload> <v1.0.0> <$WORKSPACE/dist/Orthant-1.0.0.dmg> <--clobber> <--repo> <orthant-app/orthant>" "$calls"
+assert_contains 'release notes carry the changelog body' \
+  'First stable release.' "$(<"$FIXTURES/actual_notes")"
+assert_not_contains 'release notes exclude the frontmatter delimiter' \
+  '---' "$(<"$FIXTURES/actual_notes")"
+assert_not_contains 'release notes exclude the published flag' \
+  'published:' "$(<"$FIXTURES/actual_notes")"
 
 reset_fixture
 mkdir -p "$WORKSPACE/dist"
@@ -556,7 +605,7 @@ assert_ok 'exact asset equality publishes prerelease' \
   run_workflow publish orthant-app/orthant 1.1.0-beta.1 true "$WORKSPACE/dist"
 calls="$(<"$CALL_LOG")"
 assert_contains 'prerelease creation flags are exact' \
-  'gh <release> <create> <v1.1.0-beta.1> <--draft> <--verify-tag> <--generate-notes> <--prerelease> <--latest=false>' "$calls"
+  'gh <release> <create> <v1.1.0-beta.1> <--draft> <--verify-tag> <--notes-file> <build/dist/release-notes.md> <--prerelease> <--latest=false>' "$calls"
 assert_contains 'publication edit carries prerelease latest flags' \
   'gh <release> <edit> <v1.1.0-beta.1> <--draft=false> <--prerelease=true> <--latest=false> <--repo> <orthant-app/orthant>' "$calls"
 assert_eq 'publication edit is the final state-changing call' \

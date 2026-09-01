@@ -4,8 +4,12 @@ import Base from '../layouts/Base.astro';
 // Bump this to the date you actually re-verified the rows below (Step 2a).
 const checked = '2026-08-31';
 
-const yes = '●';
-const no = '—';
+// Three states, not two. Rectangle's paid tier has custom sizes but no grid,
+// and flattening that to "no" understates it — the same capability is why
+// Divvy's and Moom's cells read yes.
+const yes = { mark: '●', label: 'Yes' };
+const no = { mark: '—', label: 'No' };
+const pro = { mark: 'Pro', label: 'In the paid tier only' };
 
 const rows = [
   { name: 'macOS built-in tiling', href: null,
@@ -13,7 +17,7 @@ const rows = [
   { name: 'Orthant', href: null, self: true,
     grid: yes, regions: yes, rebind: yes, price: 'Free' },
   { name: 'Rectangle', href: 'https://rectangleapp.com',
-    grid: no, regions: no, rebind: yes, price: 'Free' },
+    grid: no, regions: pro, rebind: yes, price: 'Free · paid Pro tier' },
   { name: 'Divvy', href: 'https://mizage.com/divvy/',
     grid: yes, regions: yes, rebind: yes, price: '$13.99' },
   { name: 'Magnet', href: 'https://magnet.crowdcafe.com',
@@ -60,13 +64,17 @@ const rows = [
         {rows.map((r) => (
           <tr class={r.self ? 'self' : undefined}>
             <td>{r.href ? <a href={r.href} rel="noopener">{r.name}</a> : r.name}</td>
-            <td>{r.grid}</td><td>{r.regions}</td><td>{r.rebind}</td><td>{r.price}</td>
+            {[r.grid, r.regions, r.rebind].map((c) => (
+              <td><span aria-hidden="true">{c.mark}</span><span class="sr">{c.label}</span></td>
+            ))}
+            <td>{r.price}</td>
           </tr>
         ))}
       </tbody>
     </table>
     <p class="quiet">Prices and capabilities checked {checked}. Corrections welcome — <a
-      href="https://github.com/orthant-app/orthant/issues">open an issue</a>.</p>
+      href="https://github.com/orthant-app/orthant/issues">open an issue</a>. Magnet's own site
+      lists no price; the figure above is from its Mac App Store listing.</p>
 
     <h2>Which one should you use?</h2>
     <p>
@@ -74,9 +82,10 @@ const rows = [
       halves and quarters on keyboard shortcuts, use it — this is not a pitch to switch.
     </p>
     <p>
-      Orthant is for the case Rectangle deliberately does not cover: when you want to
-      <em>draw</em> where a window goes rather than pick from a fixed set, and keep the result
-      as a named shortcut.
+      Orthant is for the case Rectangle's free tier does not cover: when you want to
+      <em>draw</em> where a window goes on a grid, and keep the result as a named shortcut.
+      Rectangle <strong>Pro</strong> can define a custom size and position too — what it does
+      not have is a grid to draw one on.
     </p>
     <p>
       <strong>Divvy and Moom cover that ground too</strong>, as the table says — both are
@@ -93,4 +102,8 @@ const rows = [
   th { font-weight: 550; font-size: 15px; color: var(--label-secondary); }
   tr.self { background: color-mix(in srgb, var(--accent) 6%, transparent); }
   .quiet { color: var(--label-secondary); font-size: 15px; }
+  /* The capability glyphs are decorative; the real value is the adjacent text,
+     which is the only thing a screen reader gets on the page most dependent on
+     being read accurately. */
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 </style>

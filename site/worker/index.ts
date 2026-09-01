@@ -1,11 +1,12 @@
 import { resolveDownloadUrl } from './appcast';
 
-// This project's tsconfig keeps the DOM lib (a later page needs it for a
-// client-side script), which declares its own CacheStorage without the
 // Workers-only default cache. @cloudflare/workers-types declares the same
-// global name, but the two do not merge into one type, so `caches.default`
-// does not typecheck without this. Augmenting is additive and keeps DOM
-// available everywhere else, unlike narrowing the project's `lib`.
+// global name as the DOM lib (which the project keeps for the hero's client
+// script), and the two do not merge, so `caches.default` does not typecheck
+// without this. Augmenting is additive and keeps DOM available everywhere
+// else, unlike narrowing the project's `lib`. The cost is that `caches.default`
+// would also typecheck in browser code, where it does not exist at runtime —
+// inert today, since nothing under src/ touches `caches` at all.
 declare global {
   interface CacheStorage {
     readonly default: Cache;

@@ -1,0 +1,23 @@
+---
+const items = [
+  'Free',
+  'MIT licensed',
+  'Signed with an Apple Developer ID and notarized by Apple',
+  'No account',
+  'No telemetry in the app',
+  'Menu bar only, no Dock icon',
+  'Never steals focus',
+];
+---
+<ul class="trust wrap">
+  {items.map((i) => <li>{i}</li>)}
+</ul>
+
+<style>
+  .trust {
+    display: flex; flex-wrap: wrap; gap: 8px 20px;
+    list-style: none; margin: 0; padding: 20px var(--gutter);
+    border-block: 1px solid var(--separator);
+    color: var(--label-secondary); font-size: 15px;
+  }
+</style>

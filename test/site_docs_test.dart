@@ -71,7 +71,12 @@ void main() {
 
   test('every install command names the real cask', () {
     final text = allSiteText();
-    final commands = RegExp(r'brew install --cask ([^\s`\n]+)').allMatches(text);
+    // `<` is excluded from the capture, not just whitespace and backticks:
+    // inside an .astro file the command sits in `<code>…</code>`, and without
+    // it the closing tag is swallowed into the captured cask token. The
+    // failure looks like a wrong cask name, which sends you hunting in the
+    // page instead of in this regex.
+    final commands = RegExp(r'brew install --cask ([^\s`\n<]+)').allMatches(text);
     expect(commands, isNotEmpty, reason: 'the site must show the install command');
     for (final match in commands) {
       expect(match.group(1), 'orthant-app/tap/orthant');

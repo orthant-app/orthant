@@ -1,0 +1,25 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+
+const pages = (await getCollection('docs')).sort((a, b) => a.data.order - b.data.order);
+---
+<Base title="Documentation — Orthant" description="How to install, use and troubleshoot Orthant." path="/docs/">
+  <div class="wrap prose">
+    <h1>Documentation</h1>
+    <ul>
+      {pages.map((p) => (
+        <li>
+          <a href={`/docs/${p.id}/`}>{p.data.title}</a>
+          <span class="quiet"> — {p.data.description}</span>
+        </li>
+      ))}
+    </ul>
+  </div>
+</Base>
+
+<style>
+  ul { list-style: none; padding: 0; }
+  li { padding: 12px 0; border-bottom: 1px solid var(--separator); }
+  .quiet { color: var(--label-secondary); }
+</style>

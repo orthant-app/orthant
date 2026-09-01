@@ -75,3 +75,16 @@ kbd {
   border-radius: 4px;
   padding: 1px 5px;
 }
+
+/* Shared by the homepage's install command and every docs code block. Was
+   previously scoped inside index.astro's own <style>, which never reached
+   docs pages — an Astro scoped style cannot follow content rendered through
+   another page's <Content />. markdown.syntaxHighlight is off (astro.config.mjs),
+   so there is no Shiki wrapper class to target; a bare tag selector is enough. */
+pre {
+  background: var(--keycap-fill);
+  border: 1px solid var(--separator);
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow-x: auto;
+}

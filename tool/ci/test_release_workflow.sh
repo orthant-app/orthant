@@ -250,9 +250,16 @@ date: 2026-08-31
 
 First stable release.
 ENTRY
-  cat >"$WORKSPACE/site/src/content/changelog/1.1.0-beta.1.md" <<'ENTRY'
+  # Named and declared by BASE version, not the full tag: a beta tag
+  # (v1.1.0-beta.1) and its eventual stable (v1.1.0) share this one entry, so
+  # this fixture is deliberately shaped to match what
+  # test/site_docs_test.dart's own guard requires — frontmatter `version:`
+  # equal to pubspec.yaml's marketing version, which never carries a
+  # "-beta.N" label. A file named 1.1.0-beta.1.md would satisfy this harness
+  # but fail that Dart guard the moment pubspec.yaml read version: 1.1.0.
+  cat >"$WORKSPACE/site/src/content/changelog/1.1.0.md" <<'ENTRY'
 ---
-version: 1.1.0-beta.1
+version: 1.1.0
 build: 2
 channel: beta
 published: false
@@ -384,7 +391,7 @@ assert_fails 'release API transport failure fails closed' \
 
 # This file has no $STDERR fixture, so stderr is captured directly: swap fds so
 # the command substitution collects fd 2 while fd 1 (the metadata output file
-# path is written via --output, not stdout) is discarded.
+# path is a positional argument, not stdout) is discarded.
 reset_fixture
 rm -f "$WORKSPACE/site/src/content/changelog/1.0.0.md"
 stderr="$(run_workflow metadata push tag v1.0.0 orthant-app/orthant "$WORKSPACE/output" 2>&1 1>/dev/null)"
@@ -392,6 +399,39 @@ status=$?
 assert_eq 'metadata rejects a tag with no changelog entry' 1 "$status"
 assert_contains 'metadata names the missing entry' \
   'changelog entry missing: site/src/content/changelog/1.0.0.md' "$stderr"
+
+# A beta tag must resolve against the BASE-version entry (1.1.0.md), not a
+# per-tag filename (1.1.0-beta.1.md) — the fixture only ever provides the
+# former. This is the harness case for the beta-tag path: it fails exactly
+# the way the pre-fix code (which read `site/src/content/changelog/$version.md`,
+# where $version still carried the "-beta.1" suffix) would have looked for a
+# file that can never exist under the one-entry-per-marketing-version rule.
+reset_fixture
+rm -f "$WORKSPACE/site/src/content/changelog/1.1.0.md"
+printf 'version: 1.1.0+2\n' >"$WORKSPACE/pubspec.yaml"
+stderr="$(run_workflow metadata push tag v1.1.0-beta.1 orthant-app/orthant "$WORKSPACE/output" 2>&1 1>/dev/null)"
+status=$?
+assert_eq 'metadata rejects a beta tag with no BASE-version changelog entry' 1 "$status"
+assert_contains 'metadata names the missing base-version entry for a beta tag' \
+  'changelog entry missing: site/src/content/changelog/1.1.0.md' "$stderr"
+
+reset_fixture
+mkdir -p "$WORKSPACE/site/src/content/changelog"
+printf 'version: 1.2.0+3\n' >"$WORKSPACE/pubspec.yaml"
+cat >"$WORKSPACE/site/src/content/changelog/1.2.0.md" <<'ENTRY'
+---
+version: 1.2.0
+build: 3
+channel: beta
+published: false
+date: 2026-08-31
+---
+ENTRY
+stderr="$(run_workflow metadata push tag v1.2.0-beta.1 orthant-app/orthant "$WORKSPACE/output" 2>&1 1>/dev/null)"
+status=$?
+assert_eq 'metadata rejects a beta tag whose base-version entry has no body' 1 "$status"
+assert_contains 'metadata names the empty base-version entry for a beta tag' \
+  'changelog entry has no body: site/src/content/changelog/1.2.0.md' "$stderr"
 
 reset_fixture
 assert_ok 'no release and two missing feeds is first publication' \
@@ -611,6 +651,18 @@ assert_contains 'publication edit carries prerelease latest flags' \
 assert_eq 'publication edit is the final state-changing call' \
   'gh <release> <edit> <v1.1.0-beta.1> <--draft=false> <--prerelease=true> <--latest=false> <--repo> <orthant-app/orthant>' \
   "$(tail -n 1 "$CALL_LOG")"
+assert_contains 'a beta publish reads notes from the shared BASE-version entry, not a per-tag file' \
+  'Beta body.' "$(<"$FIXTURES/actual_notes")"
+
+reset_fixture
+mkdir -p "$WORKSPACE/dist"
+rm -f "$WORKSPACE/site/src/content/changelog/1.1.0.md"
+printf 'dmg\n' >"$WORKSPACE/dist/Orthant-1.1.0-beta.1.dmg"
+stderr="$(run_workflow publish orthant-app/orthant 1.1.0-beta.1 true "$WORKSPACE/dist" 2>&1 1>/dev/null)"
+status=$?
+assert_eq 'publish rejects a beta version with no BASE-version changelog entry' 1 "$status"
+assert_contains 'publish names the missing base-version entry for a beta version' \
+  'changelog entry missing: site/src/content/changelog/1.1.0.md' "$stderr"
 
 if (( FAIL_COUNT > 0 )); then
   printf '%d passed, %d failed\n' "$PASS_COUNT" "$FAIL_COUNT" >&2

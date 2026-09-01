@@ -104,3 +104,9 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
     .window { transition: left .12s ease, top .12s ease, width .12s ease, height .12s ease; }
   }
 </style>
+
+<script>
+  import { attachHero } from '../lib/hero';
+  const root = document.querySelector<HTMLElement>('.hero');
+  if (root) attachHero(root);
+</script>

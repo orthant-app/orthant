@@ -1,0 +1,36 @@
+---
+import { getCollection, render } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import { publishedStable } from '../lib/releases';
+
+const raw = await getCollection('changelog');
+const entries = publishedStable(raw.map((e) => ({ ...e.data, entry: e })));
+const rendered = await Promise.all(
+  entries.map(async (e) => ({ ...e, Content: (await render(e.entry)).Content })),
+);
+---
+<Base
+  title="Changelog — Orthant"
+  description="Every stable release of Orthant, newest first."
+  path="/changelog/"
+>
+  <div class="wrap prose">
+    <h1>Changelog</h1>
+    <p>
+      Pre-releases are not listed here. Publishing a stable replaces the beta update feed,
+      so betas are not archived — see
+      <a href="https://github.com/orthant-app/orthant/releases">GitHub Releases</a> for them.
+    </p>
+    {rendered.map((e) => (
+      <section class="section">
+        <h2>{e.version}</h2>
+        <p class="quiet"><time datetime={e.date.toISOString()}>{e.date.toISOString().slice(0, 10)}</time></p>
+        <e.Content />
+      </section>
+    ))}
+  </div>
+</Base>
+
+<style>
+  .quiet { color: var(--label-secondary); font-size: 0.9em; }
+</style>

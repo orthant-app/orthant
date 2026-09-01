@@ -1,0 +1,90 @@
+---
+import Base from '../layouts/Base.astro';
+
+// Bump this to the date you actually re-verified the rows below (Step 2a).
+const checked = '2026-08-31';
+
+const yes = '●';
+const no = '—';
+
+const rows = [
+  { name: 'macOS built-in tiling', href: null,
+    grid: no, regions: no, rebind: no, price: 'Free' },
+  { name: 'Orthant', href: null, self: true,
+    grid: yes, regions: yes, rebind: yes, price: 'Free' },
+  { name: 'Rectangle', href: 'https://rectangleapp.com',
+    grid: no, regions: no, rebind: yes, price: 'Free' },
+  { name: 'Divvy', href: 'https://mizage.com/divvy/',
+    grid: yes, regions: yes, rebind: yes, price: '$13.99' },
+  { name: 'Magnet', href: 'https://magnet.crowdcafe.com',
+    grid: no, regions: no, rebind: yes, price: '$4.99' },
+  { name: 'Moom', href: 'https://manytricks.com/moom/',
+    grid: yes, regions: yes, rebind: yes, price: '$15' },
+];
+---
+<Base
+  title="How Orthant compares — Orthant"
+  description="macOS already tiles windows. What a grid-based window manager adds on top, and how Orthant compares to Rectangle, Divvy, Magnet and Moom."
+  path="/compare/"
+>
+  <div class="wrap prose">
+    <h1>How Orthant compares</h1>
+
+    <h2>macOS already does halves and quarters. Why add anything?</h2>
+    <p>
+      Since Sequoia, macOS tiles windows in the box: halves, quarters, and drag-to-edge. For a
+      lot of people that is genuinely enough, and if it is enough for you, you do not need
+      Orthant.
+    </p>
+    <p>What it does not do:</p>
+    <ul>
+      <li><strong>No grid.</strong> You get the fractions Apple chose. There is no way to say
+        "left two thirds" or "the middle column of five".</li>
+      <li><strong>No custom regions.</strong> Nothing to name, save, or bind.</li>
+      <li><strong>No rebinding.</strong> The shortcuts are fixed, and they hang off the Globe
+        key.</li>
+    </ul>
+    <p>
+      Orthant adds those three things. Everything else about how macOS behaves is left alone —
+      the two coexist.
+    </p>
+
+    <h2>Against other window managers</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>App</th><th>Grid overlay</th><th>Custom regions</th><th>Rebindable</th><th>Price</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr class={r.self ? 'self' : undefined}>
+            <td>{r.href ? <a href={r.href} rel="noopener">{r.name}</a> : r.name}</td>
+            <td>{r.grid}</td><td>{r.regions}</td><td>{r.rebind}</td><td>{r.price}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    <p class="quiet">Prices and capabilities checked {checked}. Corrections welcome — <a
+      href="https://github.com/orthant-app/orthant/issues">open an issue</a>.</p>
+
+    <h2>Which one should you use?</h2>
+    <p>
+      <strong>Rectangle is excellent, free, and widely used.</strong> If you want reliable
+      halves and quarters on keyboard shortcuts, use it — this is not a pitch to switch.
+    </p>
+    <p>
+      Orthant is for the case Rectangle deliberately does not cover: when you want to
+      <em>draw</em> where a window goes rather than pick from a fixed set, and keep the result
+      as a named shortcut. That is the whole difference.
+    </p>
+  </div>
+</Base>
+
+<style>
+  table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--separator); }
+  th { font-weight: 550; font-size: 15px; color: var(--label-secondary); }
+  tr.self { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+  .quiet { color: var(--label-secondary); font-size: 15px; }
+</style>

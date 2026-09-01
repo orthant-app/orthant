@@ -1,0 +1,27 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base
+  title="Not found — Orthant"
+  description="That page does not exist."
+  path="/404/"
+>
+  <div class="wrap prose">
+    <p class="code">404</p>
+    <h1>That page isn't here.</h1>
+    <p>It may have moved, or the link may be wrong. These are the ones people usually want:</p>
+    <ul>
+      <li><a href="/">Home</a> — what Orthant does, and how to install it</li>
+      <li><a href="/docs/">Documentation</a> — shortcuts, the grid, custom regions, settings</li>
+      <li><a href="/docs/troubleshooting/">Troubleshooting</a> — Accessibility permission problems</li>
+      <li><a href="https://github.com/orthant-app/orthant/issues">GitHub Issues</a> — if something is broken</li>
+    </ul>
+  </div>
+</Base>
+
+<style>
+  .code { font-family: var(--font-mono); color: var(--label-secondary); margin: 48px 0 0; }
+  h1 { margin: 4px 0 16px; }
+  ul { padding-left: 20px; }
+  li { padding: 4px 0; }
+</style>

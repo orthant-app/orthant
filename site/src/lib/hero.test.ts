@@ -172,6 +172,11 @@ describe('attachHero — a cancelled gesture', () => {
     expect(grid().getAttribute('role')).toBeNull();
     expect($('hero-instructions').hasAttribute('hidden')).toBe(true);
     expect(press('ArrowRight').defaultPrevented).toBe(false);
+    // The painted geometry must go back as well. Found by driving a real touch
+    // swipe through CDP: the state restored correctly while the window stayed
+    // where the finger landed, and every other assertion here still passed.
+    expect($('hero-window').style.left).toBe('');
+    expect($('hero-window').style.width).toBe('');
   });
 
   it('restores the selection the press had changed', () => {

@@ -193,8 +193,22 @@ export function attachHero(root: HTMLElement): void {
     selection = snapshot.selection;
     anchor = snapshot.anchor;
     cursor = snapshot.cursor;
-    if (!snapshot.active) exit();
-    else paint();
+    if (!snapshot.active) {
+      exit();
+      // Hand the geometry back to the stylesheet too. exit() strips ARIA but
+      // does not repaint, so without this the page scrolls AND the window
+      // stays where the finger landed — the exact failure this handler exists
+      // to prevent, half-fixed. Removing the inline properties (rather than
+      // repainting) is deliberate: while dormant the position MUST come from
+      // CSS, since that is what a no-JS visitor sees and what
+      // hero-default.test.ts pins to gridBlock.
+      //
+      // Only the CANCEL path clears. Esc is a deliberate exit, so it leaves
+      // the window where the user put it, and `selection` still agrees.
+      for (const property of ['left', 'top', 'width', 'height']) {
+        windowEl!.style.removeProperty(property);
+      }
+    } else paint();
   });
 
   grid.addEventListener('pointermove', (event: PointerEvent) => {

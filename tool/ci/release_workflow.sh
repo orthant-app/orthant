@@ -184,6 +184,13 @@ metadata() {
     else
       mode=stable
     fi
+
+    # Fail here rather than in publish(), which runs after build, sign and
+    # notarize. The changelog entry is a precondition of the release, not a
+    # detail of publishing it.
+    local entry="site/src/content/changelog/$version.md"
+    [[ -f "$entry" ]] ||
+      workflow_error "changelog entry missing: $entry" || return 1
   fi
 
   {
@@ -360,7 +367,29 @@ publish() {
   query_release_state "$repo" "$tag" || return 1
   case "$RELEASE_QUERY_STATE" in
     absent)
-      create_args=(release create "$tag" --draft --verify-tag --generate-notes)
+      # The changelog entry is the single source for both the site and the
+      # GitHub Release. --generate-notes would write the body from commit
+      # history instead, giving one artifact two authors that can disagree.
+      #
+      # gh reads --notes-file VERBATIM, so the YAML frontmatter has to come off
+      # first or every release body starts with `---` and `published: false`.
+      # The output path is fixed rather than mktemp so the harness's call-log
+      # assertions stay deterministic.
+      local notes_source notes_file
+      notes_source="site/src/content/changelog/${tag#v}.md"
+      [[ -f "$notes_source" ]] ||
+        workflow_error "changelog entry missing: $notes_source" || return 1
+      notes_file='build/dist/release-notes.md'
+      mkdir -p "$(dirname "$notes_file")" || return 1
+      awk 'BEGIN { fences = 0 }
+           /^---[[:space:]]*$/ && fences < 2 { fences++; next }
+           fences >= 2 { print }' "$notes_source" >"$notes_file" || return 1
+      # NOT `[[ -s ]]`: the extractor keeps the blank line that follows the
+      # frontmatter, so a body-less entry yields a one-newline file, which is
+      # non-empty and would publish a blank release body.
+      grep -q '[^[:space:]]' "$notes_file" ||
+        workflow_error "changelog entry has no body: $notes_source" || return 1
+      create_args=(release create "$tag" --draft --verify-tag --notes-file "$notes_file")
       if [[ "$prerelease" == true ]]; then
         create_args+=(--prerelease --latest=false)
       fi

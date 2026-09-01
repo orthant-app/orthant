@@ -55,4 +55,24 @@ describe('gapForPlacement', () => {
     const cell = gapForPlacement(tall, { cols: 12, rows: 12, c0: 0, c1: 0, r0: 0, r1: 0, gap: 64 });
     expect(wide).toBeGreaterThan(cell);
   });
+
+  // Pins width-to-cols and height-to-rows. Every other case here uses a frame
+  // and grid generous enough on BOTH axes that swapping them changes nothing —
+  // verified: at 1000x800 on a 2x2 grid, gaps of 10, 30 and 64 all come back
+  // identical either way. This frame is deliberately lopsided so they diverge.
+  it('pairs width with columns and height with rows, not the reverse', () => {
+    const wide = { x: 0, y: 0, width: 1200, height: 400 };
+    const g = gapForPlacement(wide, { cols: 2, rows: 6, c0: 0, c1: 0, r0: 0, r1: 0, gap: 30 });
+    expect(g).toBeCloseTo(22.857142857142858, 9); // swapping the axes yields 30
+  });
+
+  // The `most <= 0` early return: a grid so fine that even a zero gap cannot
+  // reach the 40 pt floor. The cells still divide the frame — 25 pt here — which
+  // is the documented intent, not a failure.
+  it('gives up the gap entirely when even zero cannot reach the floor', () => {
+    const small = { x: 0, y: 0, width: 300, height: 300 };
+    const o = { cols: 12, rows: 12, c0: 0, c1: 0, r0: 0, r1: 0, gap: 20 };
+    expect(gapForPlacement(small, o)).toBe(0);
+    expect(gridBlock(small, o)).toEqual({ x: 0, y: 0, width: 25, height: 25 });
+  });
 });

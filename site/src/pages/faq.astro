@@ -5,7 +5,7 @@ const faqs = [
   {
     q: 'Is it really free? Will it stay free?',
     a: `<p>Yes. Orthant is free and open source under the MIT licence, and everything it does
-        today stays free — that is a commitment, not a launch offer. There is no trial, no
+        today stays free. That is a commitment, not a launch offer. There is no trial, no
         upgrade prompt, and no feature waiting behind a paywall.</p>`,
   },
   {
@@ -19,7 +19,7 @@ const faqs = [
   {
     q: "Why isn't it on the Mac App Store?",
     a: `<p>Moving another app's windows requires the Accessibility API, which does not work
-        inside the App Sandbox — and the App Store requires the sandbox. <strong>Orthant
+        inside the App Sandbox, and the App Store requires the sandbox. <strong>Orthant
         cannot be distributed through the Mac App Store under its current rules.</strong></p>
         <p>Instead each release is signed with an Apple Developer ID and notarized by Apple,
         so it opens without a detour through System Settings.</p>`,
@@ -34,7 +34,7 @@ const faqs = [
     q: 'Does it conflict with macOS tiling, Rectangle, or Moom?',
     a: `<p>No. Orthant acts only on the shortcuts you give it, so it coexists with macOS's
         built-in tiling and with any other window manager. If two apps want the same
-        combination, rebind one of them — Orthant's Shortcuts pane tells you when macOS itself
+        combination, rebind one of them. Orthant's Shortcuts pane tells you when macOS itself
         has already claimed a chord.</p>`,
   },
   {
@@ -52,7 +52,7 @@ const faqs = [
   },
   {
     q: 'How do I get help?',
-    a: `<p>Start with <a href="/docs/troubleshooting/">Troubleshooting</a> — it covers the
+    a: `<p>Start with <a href="/docs/troubleshooting/">Troubleshooting</a>. It covers the
         Accessibility permission problem almost everyone hits eventually. If that does not
         help, <a href="https://github.com/orthant-app/orthant/issues">open an issue</a>.</p>`,
   },
@@ -69,7 +69,7 @@ const jsonLd = {
 };
 ---
 <Base
-  title="FAQ — Orthant"
+  title="FAQ · Orthant"
   description="Is it free, why does it need Accessibility permission, why isn't it on the App Store, and what it collects."
   path="/faq/"
 >

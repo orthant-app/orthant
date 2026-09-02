@@ -18,7 +18,7 @@ const pages = (await getCollection('docs')).sort((a, b) => a.data.order - b.data
 const index = pages.findIndex((p) => p.id === page.id);
 const next = pages[index + 1];
 ---
-<Base title={`${page.data.title} — Orthant`} description={page.data.description} path={`/docs/${page.id}/`}>
+<Base title={`${page.data.title} · Orthant`} description={page.data.description} path={`/docs/${page.id}/`}>
   <div class="wrap docs">
     <nav class="toc" aria-label="Documentation">
       <p class="toc-title">Documentation</p>

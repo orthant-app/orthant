@@ -4,14 +4,14 @@ import Base from '../../layouts/Base.astro';
 
 const pages = (await getCollection('docs')).sort((a, b) => a.data.order - b.data.order);
 ---
-<Base title="Documentation — Orthant" description="How to install, use and troubleshoot Orthant." path="/docs/">
+<Base title="Documentation · Orthant" description="How to install, use and troubleshoot Orthant." path="/docs/">
   <div class="wrap prose">
     <h1>Documentation</h1>
     <ul>
       {pages.map((p) => (
         <li>
           <a href={`/docs/${p.id}/`}>{p.data.title}</a>
-          <span class="quiet"> — {p.data.description}</span>
+          <span class="quiet">{p.data.description}</span>
         </li>
       ))}
     </ul>
@@ -19,7 +19,11 @@ const pages = (await getCollection('docs')).sort((a, b) => a.data.order - b.data
 </Base>
 
 <style>
-  ul { list-style: none; padding: 0; }
+  /* Title above, description below. Joined by a dash on one line, the
+     description wrapped under the LINK rather than under itself, so a phone
+     showed four ragged lines per entry with no visible structure. */
+  ul { list-style: none; padding: 0; margin: 0; }
   li { padding: 12px 0; border-bottom: 1px solid var(--separator); }
-  .quiet { color: var(--label-secondary); }
+  li:last-child { border-bottom: 0; }
+  .quiet { display: block; color: var(--label-secondary); font-size: 15px; }
 </style>

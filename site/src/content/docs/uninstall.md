@@ -10,7 +10,7 @@ brew uninstall --zap orthant
 
 `--zap` is the complete removal. It deletes the app, its preferences, caches and saved
 state, **and revokes its Accessibility grant**. A plain `brew uninstall` leaves those
-behind. If you reinstall after a zap you will be asked for Accessibility again — that is
+behind. If you reinstall after a zap you will be asked for Accessibility again. That is
 the grant having genuinely gone, not a bug.
 
 ## What an uninstall cannot remove
@@ -21,8 +21,8 @@ removal script runs, the app that could have unregistered itself is already dele
 version could unregister itself from a step that runs *before* removal; today it does not.)
 
 To clear it, **turn off "Launch at login" in Settings ▸ General before uninstalling**. If
-you have already removed Orthant, the leftover entry does nothing — there is no app for it
-to launch — and installing Orthant again will pick the setting back up.
+you have already removed Orthant, the leftover entry does nothing, because there is no app for
+it to launch, and installing Orthant again will pick the setting back up.
 
 ## Uninstalling a manual install
 

@@ -8,7 +8,7 @@ order: 8
 
 This is not your mistake, and it has a specific cause. macOS ties the Accessibility grant to
 an app's **code signature**, not to its name or its location. If a differently-signed build of
-Orthant has ever run on this Mac, macOS keeps a separate record for it — and the Accessibility
+Orthant has ever run on this Mac, macOS keeps a separate record for it, and the Accessibility
 list collapses both records into one row with one toggle. The row can show **on** while the copy
 you are running is genuinely ungranted, and toggling it does nothing.
 
@@ -26,7 +26,7 @@ To fix it:
    tccutil reset Accessibility app.orthant.orthant
    ```
 
-3. Make sure the copy of Orthant you want to grant is the one running — quit any other.
+3. Make sure the copy of Orthant you want to grant is the one running. Quit any other.
 4. Reopen System Settings ▸ Privacy & Security ▸ Accessibility and enable Orthant.
 
 ## The row shows a stale name or the wrong icon
@@ -47,7 +47,7 @@ The pane is showing a stale cache. Quit System Settings entirely and reopen it.
 
 ## An app ignores Orthant, or snaps to the wrong size
 
-Some apps enforce their own minimum window size and will not go smaller — TextEdit is one.
+Some apps enforce their own minimum window size and will not go smaller; TextEdit is one.
 Orthant asks for the size you drew; the app is entitled to refuse it. A window that lands
 wider than the region you drew is usually this, not a placement bug.
 

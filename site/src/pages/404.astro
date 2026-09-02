@@ -2,7 +2,7 @@
 import Base from '../layouts/Base.astro';
 ---
 <Base
-  title="Not found — Orthant"
+  title="Not found · Orthant"
   description="That page does not exist."
   path="/404/"
 >
@@ -11,10 +11,22 @@ import Base from '../layouts/Base.astro';
     <h1>That page isn't here.</h1>
     <p>It may have moved, or the link may be wrong. These are the ones people usually want:</p>
     <ul>
-      <li><a href="/">Home</a> — what Orthant does, and how to install it</li>
-      <li><a href="/docs/">Documentation</a> — shortcuts, the grid, custom regions, settings</li>
-      <li><a href="/docs/troubleshooting/">Troubleshooting</a> — Accessibility permission problems</li>
-      <li><a href="https://github.com/orthant-app/orthant/issues">GitHub Issues</a> — if something is broken</li>
+      <li>
+        <a href="/">Home</a>
+        <span>What Orthant does, and how to install it</span>
+      </li>
+      <li>
+        <a href="/docs/">Documentation</a>
+        <span>Shortcuts, the grid, custom regions, settings</span>
+      </li>
+      <li>
+        <a href="/docs/troubleshooting/">Troubleshooting</a>
+        <span>Accessibility permission problems</span>
+      </li>
+      <li>
+        <a href="https://github.com/orthant-app/orthant/issues">GitHub Issues</a>
+        <span>If something is broken</span>
+      </li>
     </ul>
   </div>
 </Base>
@@ -22,6 +34,11 @@ import Base from '../layouts/Base.astro';
 <style>
   .code { font-family: var(--font-mono); color: var(--label-secondary); margin: 48px 0 0; }
   h1 { margin: 4px 0 16px; }
-  ul { padding-left: 20px; }
-  li { padding: 4px 0; }
+  /* Link above, description below, rather than the two joined by a dash. The
+     description then wraps under itself instead of under the link, which is
+     what made these read as one long line on a phone. */
+  ul { list-style: none; padding: 0; margin: 0; }
+  li { padding: 10px 0; border-bottom: 1px solid var(--separator); }
+  li:last-child { border-bottom: 0; }
+  li span { display: block; color: var(--label-secondary); font-size: 15px; }
 </style>

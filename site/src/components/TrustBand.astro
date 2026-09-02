@@ -9,15 +9,42 @@ const items = [
   'Never steals focus',
 ];
 ---
-<ul class="trust wrap">
-  {items.map((i) => <li>{i}</li>)}
-</ul>
+<div class="band">
+  <ul class="trust wrap">
+    {items.map((i) => <li>{i}</li>)}
+  </ul>
+</div>
 
 <style>
+  /*
+   * The band is a separate element from the centred content column.
+   *
+   * Previously `.trust` carried BOTH `wrap` and its own `margin: 0`, and an
+   * Astro-scoped `.trust[data-astro-cid-…]` (0,2,0) outranks `.wrap` (0,1,0) —
+   * so `margin: 0` beat `margin-inline: auto` and the whole band, borders
+   * included, sat flush against the left edge of the viewport while every
+   * other section stayed centred. At 1440px that is a 180px offset; the wider
+   * the display, the more obviously broken it looked.
+   */
+  .band { border-block: 1px solid var(--separator); background: var(--raised); }
   .trust {
-    display: flex; flex-wrap: wrap; gap: 8px 20px;
-    list-style: none; margin: 0; padding: 20px var(--gutter);
-    border-block: 1px solid var(--separator);
-    color: var(--label-secondary); font-size: 15px;
+    display: flex; flex-wrap: wrap;
+    gap: 6px 18px;
+    list-style: none;
+    margin-block: 0;
+    padding-block: 14px;
+    color: var(--label-secondary);
+    font-size: 14px;
+  }
+  li { display: inline-flex; align-items: center; gap: 7px; }
+  /* A tick rather than a bullet: every item is a claim being asserted, and a
+     wrapped row of bare grey phrases read as one run-on sentence. */
+  li::before {
+    content: '';
+    width: 5px; height: 9px;
+    border: solid var(--accent);
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg) translate(-1px, -1px);
+    flex: none;
   }
 </style>

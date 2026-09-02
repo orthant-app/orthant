@@ -54,6 +54,7 @@ const rows = [
     </p>
 
     <h2>Against other window managers</h2>
+    <div class="scroll-x">
     <table>
       <thead>
         <tr>
@@ -72,6 +73,7 @@ const rows = [
         ))}
       </tbody>
     </table>
+    </div>
     <p class="quiet">Prices and capabilities checked {checked}. Corrections welcome — <a
       href="https://github.com/orthant-app/orthant/issues">open an issue</a>. Magnet's own site
       lists no price; the figure above is from its Mac App Store listing.</p>
@@ -97,9 +99,11 @@ const rows = [
 </Base>
 
 <style>
-  table { border-collapse: collapse; width: 100%; margin: 20px 0; }
-  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--separator); }
-  th { font-weight: 550; font-size: 15px; color: var(--label-secondary); }
+  /* Table chrome comes from the shared `.prose table` rules in tokens.css —
+     the docs tables and this one had drifted into two different looks. What
+     stays here is only what is specific to this table. */
+  table { min-width: 480px; }
+  td:first-child, th:first-child { padding-left: 12px; }
   tr.self { background: color-mix(in srgb, var(--accent) 6%, transparent); }
   .quiet { color: var(--label-secondary); font-size: 15px; }
   /* The capability glyphs are decorative; the real value is the adjacent text,

@@ -66,7 +66,7 @@ const rows = [
           <tr class={r.self ? 'self' : undefined}>
             <td>{r.href ? <a href={r.href} rel="noopener">{r.name}</a> : r.name}</td>
             {[r.grid, r.regions, r.rebind].map((c) => (
-              <td><span aria-hidden="true">{c.mark}</span><span class="sr">{c.label}</span></td>
+              <td><span aria-hidden="true">{c.mark}</span><span class="visually-hidden">{c.label}</span></td>
             ))}
             <td>{r.price}</td>
           </tr>
@@ -108,6 +108,12 @@ const rows = [
   .quiet { color: var(--label-secondary); font-size: 15px; }
   /* The capability glyphs are decorative; the real value is the adjacent text,
      which is the only thing a screen reader gets on the page most dependent on
-     being read accurately. */
-  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+     being read accurately. It uses the shared `.visually-hidden` from
+     tokens.css — this file carried a second, identical copy under another
+     name, so a fix to one could never reach the other. */
+
+  /* Standalone links in a table cell are not "inline in a sentence", so the
+     WCAG 2.2 target-size exemption does not cover them; at the row's own font
+     size they were 18px tall. */
+  td a { display: inline-block; padding-block: 4px; }
 </style>

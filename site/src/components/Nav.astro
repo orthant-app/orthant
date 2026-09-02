@@ -47,7 +47,9 @@ const current = (href: string) => href.startsWith('/') && path.startsWith(href);
   }
   .brand img { display: block; border-radius: 6px; }
   ul { display: flex; flex-wrap: wrap; gap: 8px 20px; list-style: none; margin: 0; padding: 0; }
-  ul a { color: var(--label-secondary); text-decoration: none; }
+  /* padding-block, not a height: the target has to grow without moving the
+     text off the baseline the brand and the button share. 20px -> 32px. */
+  ul a { display: inline-block; padding-block: 6px; color: var(--label-secondary); text-decoration: none; }
   ul a:hover { color: var(--label); }
   ul a[aria-current='page'] { color: var(--label); font-weight: 550; }
   .nav-cta { padding: 7px 15px; font-size: 15px; }

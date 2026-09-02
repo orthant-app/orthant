@@ -5,7 +5,7 @@ order: 3
 ---
 
 Press `⌃⌥O` and a translucent grid appears over every display. It takes about 50
-milliseconds, and Orthant never becomes the frontmost app — the window you were using stays
+milliseconds, and Orthant never becomes the frontmost app, so the window you were using stays
 active the whole time.
 
 ## Placing a window
@@ -22,8 +22,8 @@ more cells. `↩` places the window.
 ## Saving what you just drew
 
 `⌘S` on the overlay places the window *and* opens a shortcut picker pre-filled with the
-selection you made. Orthant suggests a name — draw the left two thirds and it offers
-"Left ⅔" — and you can bind it to a shortcut on the spot. See
+selection you made. Orthant suggests a name: draw the left two thirds and it offers
+"Left ⅔". You can bind it to a shortcut on the spot. See
 [custom regions](/docs/custom-regions/).
 
 ## Notes

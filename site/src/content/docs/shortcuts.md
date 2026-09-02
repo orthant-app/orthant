@@ -31,8 +31,8 @@ Click a shortcut in **Settings ▸ Shortcuts** and press the combination you wan
 `Esc` cancels.
 
 If the combination is already used by another Orthant command, the row tells you which
-one and asks. Press the same combination again — or click the button beside the
-question — to take it. The command that lost it becomes *Not set*, and an **Undo**
+one and asks. Press the same combination again, or click the button beside the
+question, to take it. The command that lost it becomes *Not set*, and an **Undo**
 appears for ten seconds.
 
 Some combinations belong to macOS itself. Those are marked in the list rather than

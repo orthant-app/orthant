@@ -9,7 +9,7 @@ Open Settings from the menu bar icon. Everything here survives a relaunch.
 ## General
 
 **Grid size.** How many columns and rows the overlay draws, from 2–12 on each axis. A live
-preview shows the result as you change it. Custom regions are unaffected — they keep their own
+preview shows the result as you change it. Custom regions are unaffected, and keep their own
 proportions.
 
 **Gaps.** Space between placed windows and around the edge of the screen. Also previewed live.

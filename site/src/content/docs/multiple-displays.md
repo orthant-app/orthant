@@ -6,7 +6,7 @@ order: 6
 
 ## A window snaps within its own display
 
-Press `⌃⌥→` and the window fills the right half of **the display it is already on** — not the
+Press `⌃⌥→` and the window fills the right half of **the display it is already on**, not the
 one your pointer happens to be over.
 
 This is deliberate, and it is the behaviour most people expect once they have both. Using the

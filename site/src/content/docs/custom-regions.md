@@ -21,7 +21,7 @@ Name it, click the shortcut field, and press the combination you want.
 ## A region remembers its own proportions
 
 This is the part worth knowing. A region does not store "cells 0 to 7 of 12" as a position on
-your current grid — it stores the **fraction** it covers. Change the overlay's grid size
+your current grid. It stores the **fraction** it covers. Change the overlay's grid size
 afterwards and your regions land in exactly the same place.
 
 So you can set the grid to 6 columns to draw a precise third, set it back to 4, and the region

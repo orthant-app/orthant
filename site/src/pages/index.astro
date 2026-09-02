@@ -3,6 +3,7 @@ import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
 import Hero from '../components/Hero.astro';
 import TrustBand from '../components/TrustBand.astro';
+import Command from '../components/Command.astro';
 import { currentVersion } from '../lib/releases';
 
 // The newest PUBLISHED STABLE entry. An unpublished release (written at release
@@ -39,6 +40,10 @@ const jsonLd = {
   <TrustBand />
 
   <section class="section wrap">
+    <h2 class="lead">Ninety seconds of it working</h2>
+    <p class="lead-sub">
+      Shortcuts, then the grid overlay, then drawing a region and binding it to a key.
+    </p>
     <video
       controls muted playsinline loop
       preload="none"
@@ -112,7 +117,7 @@ const jsonLd = {
 
   <section class="section wrap prose">
     <h2>Install</h2>
-    <pre><code>brew install --cask orthant-app/tap/orthant</code></pre>
+    <Command value="brew install --cask orthant-app/tap/orthant" />
     <p>
       Or <a href="/download">download the disk image</a> and drag Orthant to Applications.
       Either way you get the same build. Requires <strong>macOS 13+</strong>.
@@ -135,5 +140,13 @@ const jsonLd = {
 
 <style>
   .quiet { color: var(--label-secondary); }
-  video { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--separator); }
+  .lead { margin-bottom: 6px; }
+  /* An unlabelled black rectangle with a poster is indistinguishable from a
+     broken embed until you click it. */
+  .lead-sub { color: var(--label-secondary); margin: 0 0 24px; max-width: var(--measure); }
+  video {
+    display: block; width: 100%; height: auto;
+    border-radius: var(--radius); border: 1px solid var(--separator);
+    background: var(--raised);
+  }
 </style>

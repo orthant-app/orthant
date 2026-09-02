@@ -71,12 +71,15 @@ void main() {
 
   test('every install command names the real cask', () {
     final text = allSiteText();
-    // `<` is excluded from the capture, not just whitespace and backticks:
-    // inside an .astro file the command sits in `<code>…</code>`, and without
-    // it the closing tag is swallowed into the captured cask token. The
-    // failure looks like a wrong cask name, which sends you hunting in the
-    // page instead of in this regex.
-    final commands = RegExp(r'brew install --cask ([^\s`\n<]+)').allMatches(text);
+    // `<` and `"` are excluded from the capture, not just whitespace and
+    // backticks. The command appears three ways on the site — in a markdown
+    // fence, inside `<code>…</code>`, and as a component prop
+    // (`<Command value="brew install --cask …" />`) — and in the last two the
+    // delimiter would otherwise be swallowed into the captured cask token.
+    // The failure looks like a wrong cask name, which sends you hunting in the
+    // page instead of in this regex. Neither character can occur in a real
+    // cask token, so excluding them costs the assertion nothing.
+    final commands = RegExp(r'brew install --cask ([^\s`\n<"]+)').allMatches(text);
     expect(commands, isNotEmpty, reason: 'the site must show the install command');
     for (final match in commands) {
       expect(match.group(1), 'orthant-app/tap/orthant');

@@ -47,12 +47,31 @@ const next = pages[index + 1];
 </Base>
 
 <style>
-  .docs { padding-block: 32px 72px; display: grid; gap: 32px; }
+  /* `minmax(0, 1fr)`, not the default `auto`: an auto track is floored at its
+     min-content width, and a wide table inside would push the page out. */
+  .docs {
+    padding-block: 32px 72px;
+    display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px;
+  }
+
+  /*
+   * On a phone the sidebar comes AFTER the article. In source order it is
+   * first — which is right for a screen reader and for the desktop layout —
+   * but rendered first on a narrow screen it puts nine links between the
+   * reader and the page they just asked for.
+   */
+  article { order: 1; }
+  .toc { order: 2; border-top: 1px solid var(--separator); padding-top: 24px; }
+
   @media (min-width: 900px) {
     .docs { grid-template-columns: 216px minmax(0, 1fr); gap: 48px; }
-    /* Long pages scroll past the whole list otherwise, which is most of what a
-       sidebar is for. */
-    .toc { position: sticky; top: 24px; align-self: start; }
+    article { order: 0; }
+    .toc {
+      order: 0; border-top: 0; padding-top: 0;
+      /* Long pages scroll past the whole list otherwise, which is most of what
+         a sidebar is for. */
+      position: sticky; top: 24px; align-self: start;
+    }
   }
 
   .toc-title {

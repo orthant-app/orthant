@@ -9,11 +9,81 @@ export async function getStaticPaths() {
 
 const { page } = Astro.props;
 const { Content } = await render(page);
+
+// Every doc, in reading order, so a page can offer the next one and the
+// sidebar can show where you are. A back link to the index was the only
+// navigation between nine pages: finding the page after this one meant going
+// up and coming back down.
+const pages = (await getCollection('docs')).sort((a, b) => a.data.order - b.data.order);
+const index = pages.findIndex((p) => p.id === page.id);
+const next = pages[index + 1];
 ---
 <Base title={`${page.data.title} — Orthant`} description={page.data.description} path={`/docs/${page.id}/`}>
-  <article class="wrap prose">
-    <p><a href="/docs/">← Documentation</a></p>
-    <h1>{page.data.title}</h1>
-    <Content />
-  </article>
+  <div class="wrap docs">
+    <nav class="toc" aria-label="Documentation">
+      <p class="toc-title">Documentation</p>
+      <ul>
+        {pages.map((p) => (
+          <li>
+            <a href={`/docs/${p.id}/`} aria-current={p.id === page.id ? 'page' : undefined}>
+              {p.data.title}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+
+    <article class="prose">
+      <h1>{page.data.title}</h1>
+      <Content />
+      {next && (
+        <a class="next" href={`/docs/${next.id}/`}>
+          <span class="next-label">Next</span>
+          <span class="next-title">{next.data.title} →</span>
+        </a>
+      )}
+    </article>
+  </div>
 </Base>
+
+<style>
+  .docs { padding-block: 32px 72px; display: grid; gap: 32px; }
+  @media (min-width: 900px) {
+    .docs { grid-template-columns: 216px minmax(0, 1fr); gap: 48px; }
+    /* Long pages scroll past the whole list otherwise, which is most of what a
+       sidebar is for. */
+    .toc { position: sticky; top: 24px; align-self: start; }
+  }
+
+  .toc-title {
+    margin: 0 0 10px;
+    font-size: 12px; font-weight: 590; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--label-secondary);
+  }
+  .toc ul { list-style: none; margin: 0; padding: 0; }
+  .toc li { margin-bottom: 2px; }
+  .toc a {
+    display: block;
+    padding: 5px 10px;
+    margin-inline: -10px;
+    border-radius: 6px;
+    font-size: 15px;
+    color: var(--label-secondary);
+    text-decoration: none;
+  }
+  .toc a:hover { background: var(--raised); color: var(--label); }
+  .toc a[aria-current='page'] {
+    background: var(--raised-strong);
+    color: var(--label);
+    font-weight: 550;
+  }
+
+  .next {
+    display: block;
+    margin-top: 48px; padding-top: 20px;
+    border-top: 1px solid var(--separator);
+    text-decoration: none;
+  }
+  .next-label { display: block; font-size: 13px; color: var(--label-secondary); }
+  .next-title { font-weight: 550; }
+</style>

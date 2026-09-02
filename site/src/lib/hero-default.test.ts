@@ -31,3 +31,16 @@ describe('the hero\'s dormant selection', () => {
     expect(source).not.toMatch(/id="hero-window"[^>]*style=/);
   });
 });
+
+describe('the hero\'s demo does not move the page under the reader', () => {
+  // The reveal-on-activate instructions line pushed everything below the hero
+  // down the moment the grid was touched. Nothing in the demo may start
+  // hidden: with the controller absent the markup has to be a complete,
+  // readable figure, and with it present the same words are already in place.
+  it('ships no hidden element in the figure', () => {
+    const source = readFileSync('src/components/Hero.astro', 'utf8');
+    const figure = /<figure class="demo">([\s\S]*?)<\/figure>/.exec(source);
+    expect(figure, '<figure class="demo"> not found in Hero.astro').not.toBeNull();
+    expect(figure![1]).not.toMatch(/\shidden(\s|>|=)/);
+  });
+});

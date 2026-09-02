@@ -23,21 +23,41 @@ function describe(s: Selection, cols: number, rows: number): string {
   return `${w} of ${cols} columns, ${h} of ${rows} rows`;
 }
 
+/**
+ * Make the hero grid work.
+ *
+ * There is deliberately no activation step. An earlier version gated every
+ * interaction behind a "Try the grid" button placed BELOW the grid, so
+ * pressing it threw focus backwards to the element above, revealed an
+ * instructions line that shoved the rest of the page down, and — because a
+ * pointer press on the grid ran the same transition anyway — did nothing a
+ * mouse user had not already been able to do. Blur tore all of it down again.
+ *
+ * What the gate was actually protecting is kept, and none of it needs a button:
+ *
+ *   - The twelve cells stay out of the tab order. The grid is ONE tab stop and
+ *     moves its cursor with `aria-activedescendant`, which is the WAI-ARIA grid
+ *     pattern; a roving tabindex is what would have added twelve stops.
+ *   - A vertical swipe still scrolls the page. That is `touch-action: pan-y`
+ *     plus the `pointercancel` restore below, not the button.
+ *   - Without JavaScript nothing here runs, so the markup stays an ordinary
+ *     figure with a caption. `role`/`tabindex` are added here, never authored.
+ */
 export function attachHero(root: HTMLElement): void {
   const grid = root.querySelector<HTMLElement>('#hero-grid');
   const windowEl = root.querySelector<HTMLElement>('#hero-window');
-  const activate = root.querySelector<HTMLButtonElement>('#hero-activate');
-  const instructions = root.querySelector<HTMLElement>('#hero-instructions');
   const status = root.querySelector<HTMLElement>('#hero-status');
-  if (!grid || !windowEl || !activate || !instructions || !status) return;
+  if (!grid || !windowEl || !status) return;
 
   const cols = Number(grid.dataset.cols);
   const rows = Number(grid.dataset.rows);
-  let selection: Selection = { c0: 0, c1: 1, r0: 0, r1: rows - 1 };
-  let active = false;
+
+  const DEFAULT: Selection = { c0: 0, c1: 1, r0: 0, r1: rows - 1 };
+  let selection: Selection = { ...DEFAULT };
   let anchor = { col: 0, row: 0 };
   let cursor = { col: 1, row: rows - 1 };
   let dragging = false;
+  let placedTimer = 0;
 
   /**
    * State captured at pointerdown so a cancelled gesture can be undone.
@@ -45,10 +65,14 @@ export function attachHero(root: HTMLElement): void {
    * `touch-action: pan-y` means the browser may decide mid-gesture that a
    * vertical swipe is a page scroll. It takes the gesture over and fires
    * `pointercancel` — but pointerdown has already run by then, so without this
-   * a swipe past the hero would leave the selection changed and the widget
-   * activated. Restoring here is what makes the touch promise true.
+   * a swipe past the hero would leave the selection changed. Restoring here is
+   * what makes the touch promise true.
    */
-  let beforeDrag: { selection: Selection; anchor: typeof anchor; cursor: typeof cursor; active: boolean; style: string } | null = null;
+  let beforeDrag: {
+    selection: Selection;
+    anchor: typeof anchor;
+    cursor: typeof cursor;
+  } | null = null;
 
   const rowEls = Array.from(grid.querySelectorAll<HTMLElement>('.row'));
   const cellEls = Array.from(grid.querySelectorAll<HTMLElement>('.cell'));
@@ -59,7 +83,6 @@ export function attachHero(root: HTMLElement): void {
     windowEl!.style.top = `${(rect.y / FRAME.height) * 100}%`;
     windowEl!.style.width = `${(rect.width / FRAME.width) * 100}%`;
     windowEl!.style.height = `${(rect.height / FRAME.height) * 100}%`;
-    if (!active) return;
     // Selection state is part of the grid pattern, not decoration: a screen
     // reader has no other way to know what the blue rectangle covers.
     for (const cell of cellEls) {
@@ -81,70 +104,42 @@ export function attachHero(root: HTMLElement): void {
     };
   }
 
-  /**
-   * Apply the WAI-ARIA grid pattern — but only while active.
-   *
-   * The roles go on at activation rather than at rest for the same reason
-   * role="application" is never used at all: announcing an interactive grid to
-   * a screen reader before the gate has run contradicts the promise that this
-   * is an ordinary piece of page content until asked otherwise.
-   *
-   * Focus is managed with aria-activedescendant rather than roving tabindex, so
-   * the twelve cells never enter the tab order.
-   */
-  function enter() {
-    if (active) return;
-    active = true;
-    grid!.setAttribute('role', 'grid');
-    grid!.setAttribute('tabindex', '0');
-    grid!.setAttribute('aria-label', 'Window placement grid');
-    grid!.setAttribute('aria-multiselectable', 'true');
-    for (const row of rowEls) row.setAttribute('role', 'row');
-    for (const cell of cellEls) cell.setAttribute('role', 'gridcell');
-    instructions!.removeAttribute('hidden');
-    grid!.focus();
-    paint();
+  /** Brief visual confirmation that Return/pointer-release did something. */
+  function announcePlacement() {
+    status!.textContent = `Window placed: ${describe(selection, cols, rows)}.`;
+    windowEl!.setAttribute('data-placed', '');
+    clearTimeout(placedTimer);
+    placedTimer = window.setTimeout(() => windowEl!.removeAttribute('data-placed'), 260);
   }
 
-  function exit() {
-    if (!active) return;
-    active = false;
-    // Otherwise Esc during a mouse drag leaves `dragging` true, and the
-    // pointerup that follows announces a placement for a widget that is no
-    // longer active.
-    dragging = false;
-    beforeDrag = null;
-    for (const attribute of [
-      'role', 'tabindex', 'aria-label', 'aria-multiselectable', 'aria-activedescendant',
-    ]) {
-      grid!.removeAttribute(attribute);
-    }
-    for (const row of rowEls) row.removeAttribute('role');
-    for (const cell of cellEls) {
-      cell.removeAttribute('role');
-      cell.removeAttribute('aria-selected');
-    }
-    instructions!.setAttribute('hidden', '');
-  }
-
-  activate.removeAttribute('hidden'); // the control exists only once it works
-  activate.addEventListener('click', enter);
-
-  grid.addEventListener('blur', exit);
+  // The WAI-ARIA grid pattern, applied once. `data-ready` is the hook the
+  // stylesheet uses for the cursor and hover tint, so those appear only when
+  // something is listening for them.
+  grid.setAttribute('role', 'grid');
+  grid.setAttribute('tabindex', '0');
+  grid.setAttribute('aria-label', 'Window placement demo');
+  grid.setAttribute('aria-multiselectable', 'true');
+  grid.setAttribute('data-ready', '');
+  for (const row of rowEls) row.setAttribute('role', 'row');
+  for (const cell of cellEls) cell.setAttribute('role', 'gridcell');
+  paint();
 
   grid.addEventListener('keydown', (event: KeyboardEvent) => {
-    if (!active) return;
-
     if (event.key === 'Escape') {
+      // Nothing to dismiss on a page, so Esc means "put it back" — which the
+      // hint promises, and which is the only undo a demo can offer.
       event.preventDefault();
-      exit();
-      activate.focus();
+      selection = { ...DEFAULT };
+      anchor = { col: DEFAULT.c0, row: DEFAULT.r0 };
+      cursor = { col: DEFAULT.c1, row: DEFAULT.r1 };
+      paint();
+      status.textContent = 'Reset to the left half.';
       return;
     }
 
-    if (event.key === 'Enter') {
+    if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      status.textContent = `Window placed: ${describe(selection, cols, rows)}.`;
+      announcePlacement();
       return;
     }
 
@@ -168,12 +163,7 @@ export function attachHero(root: HTMLElement): void {
     const cell = (event.target as HTMLElement).closest<HTMLElement>('.cell');
     if (!cell) return;
     // Snapshot BEFORE anything changes, so pointercancel can put it all back.
-    beforeDrag = { selection: { ...selection }, anchor: { ...anchor }, cursor: { ...cursor }, active, style: windowEl!.style.cssText };
-    // A pointer press is as deliberate as pressing the button, so it performs
-    // the SAME transition. Mutating the grid without it would leave a state
-    // that is interactive by mouse while still claiming to be dormant —
-    // no instructions, no grid semantics, no Esc route out.
-    enter();
+    beforeDrag = { selection: { ...selection }, anchor: { ...anchor }, cursor: { ...cursor } };
     dragging = true;
     grid.setPointerCapture?.(event.pointerId);
     anchor = { col: Number(cell.dataset.col), row: Number(cell.dataset.row) };
@@ -193,24 +183,17 @@ export function attachHero(root: HTMLElement): void {
     selection = snapshot.selection;
     anchor = snapshot.anchor;
     cursor = snapshot.cursor;
-    // Put back exactly what was on the element, rather than assuming a
-    // cancelled gesture means "return to the CSS default". That assumption
-    // holds only until the first deliberate exit: `exit()` never touches
-    // `selection`, so after activate -> move -> Esc the widget parks at a
-    // non-default position with `selection` agreeing. Clearing there would
-    // desync them and make the NEXT activation jump.
-    //
-    // At rest for the first time this snapshot is '', so the inline styles
-    // painted by pointerdown are still cleared — which is the case that
-    // matters on touch: without it, a swipe reclaimed as a page scroll leaves
-    // the window wherever the finger landed.
-    windowEl!.style.cssText = snapshot.style;
-    if (!snapshot.active) exit();
-    else paint();
+    // Restoring the three state values and repainting is the whole undo: the
+    // rectangle is a pure function of `selection`, so there is nothing else to
+    // put back. An earlier version also re-assigned the element's saved
+    // `style.cssText`, which was load-bearing while a cancel could leave the
+    // widget unpainted — it cannot now, and a mutation deleting that line
+    // survived every test because it genuinely does nothing.
+    paint();
   });
 
   grid.addEventListener('pointermove', (event: PointerEvent) => {
-    if (!dragging || !active) return;
+    if (!dragging) return;
     const cell = document
       .elementFromPoint(event.clientX, event.clientY)
       ?.closest<HTMLElement>('.cell');
@@ -227,11 +210,6 @@ export function attachHero(root: HTMLElement): void {
     dragging = false;
     beforeDrag = null;
     grid.releasePointerCapture?.(event.pointerId);
-    status.textContent = `Window placed: ${describe(selection, cols, rows)}.`;
+    announcePlacement();
   });
-
-  // No paint() here. While dormant the window's position comes from the
-  // stylesheet (see Hero.astro's .window rule and hero-default.test.ts), and
-  // painting would write aria state onto a grid that is not yet a grid.
-  // enter() paints.
 }

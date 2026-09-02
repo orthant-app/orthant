@@ -1,0 +1,42 @@
+---
+interface Props { value: string }
+const { value } = Astro.props;
+---
+<div class="command" data-command={value}>
+  <code>{value}</code>
+</div>
+
+<style>
+  .command {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--raised);
+    border: 1px solid var(--separator);
+    border-radius: 8px;
+    padding: 9px 10px 9px 14px;
+    max-width: 100%;
+  }
+  /* `pre-wrap`, not `pre`: on a phone the command is wider than the screen,
+     and wrapping it at its own spaces reads better than hiding half of it in a
+     scroll region with no scrollbar. The Copy button is what guarantees an
+     unbroken command reaches the clipboard. */
+  code { font-size: 13px; white-space: pre-wrap; flex: 1; min-width: 0; }
+  /* The button is created by src/lib/copy.ts, so it is styled here rather than
+     inline — the site's CSP sets `style-src 'self'` and drops style
+     attributes, which is also why the script sets classes and never `.style`. */
+  .command :global(.copy) {
+    flex: none;
+    font: inherit; font-size: 13px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--separator);
+    background: var(--surface);
+    color: var(--label-secondary);
+    cursor: pointer;
+  }
+  .command :global(.copy:hover) { color: var(--label); }
+</style>
+
+<script>
+  import { attachCopy } from '../lib/copy';
+  attachCopy(document);
+</script>

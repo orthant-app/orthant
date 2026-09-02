@@ -11,12 +11,11 @@ function mount(): HTMLElement {
     }</div>`;
   document.body.innerHTML = `
     <section id="root">
-      <div id="hero-grid" data-cols="4" data-rows="3">
+      <div id="hero-grid" data-cols="4" data-rows="3" aria-describedby="hero-hint">
         ${[0, 1, 2].map(row).join('')}
         <div id="hero-window"></div>
       </div>
-      <button id="hero-activate" type="button" hidden>Try the grid</button>
-      <p id="hero-instructions" hidden></p>
+      <p id="hero-hint"></p>
       <p id="hero-status" role="status" aria-live="polite"></p>
     </section>`;
   const root = document.getElementById('root') as HTMLElement;
@@ -26,12 +25,12 @@ function mount(): HTMLElement {
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const grid = () => $('hero-grid');
-const activate = () => ($('hero-activate') as HTMLButtonElement).click();
+const win = () => $('hero-window');
 
 // NOTE: dispatched on the GRID, never on `document`. The listener is attached
 // to the grid, so a document-level dispatch never reaches it and the assertion
 // passes no matter what the handler does — a vacuous test that would score a
-// removed activation guard as "caught".
+// deleted key handler as "caught".
 const press = (k: string, shift = false) => {
   const event = new KeyboardEvent('keydown', {
     key: k, shiftKey: shift, bubbles: true, cancelable: true,
@@ -49,199 +48,195 @@ const at = (col: number, row: number) => {
   document.elementFromPoint = () => document.getElementById(`hero-cell-${col}-${row}`);
 };
 
-describe('attachHero — dormant', () => {
+const selected = () => document.querySelectorAll('[aria-selected="true"]').length;
+
+describe('attachHero — the widget it presents', () => {
   beforeEach(() => mount());
 
-  it('reveals the activate button, since the controller is now present', () => {
-    expect($('hero-activate').hasAttribute('hidden')).toBe(false);
-  });
+  /*
+   * There is no activation step. The gate this replaces put a "Try the grid"
+   * button BELOW the grid, which threw focus backwards, revealed an
+   * instructions line that shoved the page down, and was redundant for anyone
+   * with a pointer — pointerdown ran the same transition anyway.
+   *
+   * These four assertions are what the gate was actually protecting, none of
+   * which needs a button. Losing any one of them is the reason it existed.
+   */
 
-  it('leaves the grid out of the tab order and unlabelled', () => {
-    expect(grid().getAttribute('role')).toBeNull();
-    expect(grid().getAttribute('tabindex')).toBeNull();
-    expect(grid().getAttribute('aria-label')).toBeNull();
-  });
-
-  it('leaves rows and cells without grid semantics', () => {
-    expect(document.querySelectorAll('[role="row"]')).toHaveLength(0);
-    expect(document.querySelectorAll('[role="gridcell"]')).toHaveLength(0);
-  });
-
-  it('does not consume arrow keys', () => {
-    expect(press('ArrowRight').defaultPrevented).toBe(false);
-  });
-});
-
-describe('attachHero — activation', () => {
-  beforeEach(() => mount());
-
-  it('focuses the grid and shows instructions', () => {
-    activate();
-    expect(document.activeElement).toBe(grid());
-    expect($('hero-instructions').hasAttribute('hidden')).toBe(false);
+  it('is exactly one tab stop, never twelve', () => {
+    expect(grid().getAttribute('tabindex')).toBe('0');
+    expect(document.querySelectorAll('.cell[tabindex]')).toHaveLength(0);
   });
 
   it('never uses role="application"', () => {
-    activate();
     expect(grid().getAttribute('role')).toBe('grid');
     expect(document.querySelector('[role="application"]')).toBeNull();
   });
 
   it('applies the full WAI grid structure', () => {
-    activate();
     expect(document.querySelectorAll('[role="row"]')).toHaveLength(3);
     expect(document.querySelectorAll('[role="gridcell"]')).toHaveLength(12);
   });
 
-  it('tracks the active cell with aria-activedescendant', () => {
-    activate();
+  it('names itself, so a reader reaching it is told what it is', () => {
+    expect(grid().getAttribute('aria-label')).toBeTruthy();
+    expect(grid().getAttribute('aria-describedby')).toBe('hero-hint');
+  });
+
+  it('marks the resting selection and cursor without being touched', () => {
+    // The gate painted nothing until activation, so a reader tabbing in met a
+    // grid with no selection state at all.
+    expect(selected()).toBe(6); // the left half: 2 columns x 3 rows
     const id = grid().getAttribute('aria-activedescendant');
-    expect(id).toBeTruthy();
     expect(document.getElementById(id!)).not.toBeNull();
   });
 
-  it('marks selected cells with aria-selected', () => {
-    activate();
-    const selected = document.querySelectorAll('[aria-selected="true"]');
-    expect(selected).toHaveLength(6); // the left half: 2 columns x 3 rows
-  });
-
-  // A pointer press is as deliberate as pressing the button, so it performs the
-  // same transition rather than being ignored. Without this the grid could be
-  // driven by mouse while still claiming to be dormant.
-  it('a pointer press on a cell activates, rather than silently mutating', () => {
-    pointer('pointerdown', $('hero-cell-2-1'));
-    expect(grid().getAttribute('role')).toBe('grid');
-    expect($('hero-instructions').hasAttribute('hidden')).toBe(false);
+  it('flags itself ready, which is what turns on the pointer affordance', () => {
+    // The stylesheet hangs `cursor: crosshair` and the hover tint off this, so
+    // an inert grid never claims to be draggable.
+    expect(grid().hasAttribute('data-ready')).toBe(true);
   });
 });
 
-describe('attachHero — interaction', () => {
-  beforeEach(() => { mount(); activate(); });
+describe('attachHero — keyboard', () => {
+  beforeEach(() => mount());
 
-  it('consumes arrow keys once active', () => {
+  it('consumes the arrow keys', () => {
     expect(press('ArrowRight').defaultPrevented).toBe(true);
   });
 
   it('moves the selection with an arrow', () => {
-    const before = $('hero-window').style.left;
+    const before = win().style.left;
     press('ArrowRight');
-    expect($('hero-window').style.left).not.toBe(before);
+    expect(win().style.left).not.toBe(before);
   });
 
   it('extends the selection with shift-arrow', () => {
-    const before = parseFloat($('hero-window').style.width);
+    const before = parseFloat(win().style.width);
     press('ArrowRight', true);
-    expect(parseFloat($('hero-window').style.width)).toBeGreaterThan(before);
+    expect(parseFloat(win().style.width)).toBeGreaterThan(before);
   });
 
   it('updates aria-selected as the selection changes', () => {
     press('ArrowRight', true);
-    expect(document.querySelectorAll('[aria-selected="true"]')).toHaveLength(9);
+    expect(selected()).toBe(9);
   });
 
-  it('announces a placement to screen readers', () => {
+  it('announces a placement on Return', () => {
     press('Enter');
     expect($('hero-status').textContent).toMatch(/placed/i);
   });
 
-  it('a pointer drag selects the cells it crosses', () => {
+  it('marks the window placed, so Return does something visible too', () => {
+    // The live region alone left Return looking broken to anyone who can see
+    // the grid — the hint promises "↩ places".
+    expect(win().hasAttribute('data-placed')).toBe(false);
+    press('Enter');
+    expect(win().hasAttribute('data-placed')).toBe(true);
+  });
+
+  it('Esc restores the default selection rather than merely changing it', () => {
+    const pristine = win().style.cssText;
+    press('ArrowRight');
+    press('ArrowDown', true);
+    expect(win().style.cssText).not.toBe(pristine);
+
+    press('Escape');
+    // Asserting equality with the PRISTINE geometry, not just "it moved":
+    // resetting to any other cell would satisfy a looser check while breaking
+    // the only undo the demo offers.
+    expect(win().style.cssText).toBe(pristine);
+    expect(selected()).toBe(6);
+    expect($('hero-status').textContent).toMatch(/reset/i);
+  });
+
+  it('keeps focus on the grid through Esc, with nowhere else to send it', () => {
+    grid().focus();
+    press('Escape');
+    expect(document.activeElement).toBe(grid());
+    // Still live: the old design tore the widget down here, so the next arrow
+    // press did nothing at all.
+    expect(press('ArrowRight').defaultPrevented).toBe(true);
+  });
+});
+
+describe('attachHero — pointer', () => {
+  beforeEach(() => mount());
+
+  it('a drag selects the cells it crosses', () => {
     // pointermove reads document.elementFromPoint, which happy-dom does not
     // implement — a drag test that only sends pointerdown proves nothing about
     // dragging.
     at(1, 1);
     pointer('pointerdown', $('hero-cell-0-0'));
-    expect(document.querySelectorAll('[aria-selected="true"]')).toHaveLength(1);
+    expect(selected()).toBe(1);
     pointer('pointermove', grid());
-    expect(document.querySelectorAll('[aria-selected="true"]')).toHaveLength(4); // 0..1 x 0..1
+    expect(selected()).toBe(4); // 0..1 x 0..1
     pointer('pointerup', grid());
     expect($('hero-status').textContent).toMatch(/placed/i);
+  });
+
+  it('a press alone does not announce a placement', () => {
+    pointer('pointerdown', $('hero-cell-2-1'));
+    expect($('hero-status').textContent).toBe('');
   });
 });
 
 describe('attachHero — a cancelled gesture', () => {
   beforeEach(() => mount());
 
-  // touch-action: pan-y lets the browser reclaim a vertical swipe mid-gesture.
-  // pointerdown has already run by then, so without a pointercancel handler the
-  // page scrolls AND the window moves — which is exactly the promise broken.
-  it('returns a swiped-past dormant grid to dormant', () => {
-    pointer('pointerdown', $('hero-cell-2-1'));
-    expect(grid().getAttribute('role')).toBe('grid');
+  /*
+   * touch-action: pan-y lets the browser reclaim a vertical swipe mid-gesture.
+   * pointerdown has already run by then, so without a pointercancel handler the
+   * page scrolls AND the window moves — exactly the promise broken. Confirmed
+   * against a real CDP touch swipe, which is how the original defect surfaced
+   * while every unit assertion of the day still passed.
+   */
+
+  it('restores the resting geometry a swipe had disturbed', () => {
+    const resting = win().style.cssText;
+    expect(resting).not.toBe('');
+
+    pointer('pointerdown', $('hero-cell-3-2'));
+    expect(win().style.cssText).not.toBe(resting);
+
     pointer('pointercancel', grid());
-    expect(grid().getAttribute('role')).toBeNull();
-    expect($('hero-instructions').hasAttribute('hidden')).toBe(true);
-    expect(press('ArrowRight').defaultPrevented).toBe(false);
-    // The painted geometry must go back as well. Found by driving a real touch
-    // swipe through CDP: the state restored correctly while the window stayed
-    // where the finger landed, and every other assertion here still passed.
-    expect($('hero-window').style.left).toBe('');
-    expect($('hero-window').style.width).toBe('');
+    expect(win().style.cssText).toBe(resting);
+    expect(selected()).toBe(6);
   });
 
-  // The compound sequence: activate, move, exit deliberately, THEN have a later
-  // gesture cancelled. `exit()` never resets `selection`, so the widget parks at
-  // a non-default position with the two agreeing — and a cancel that restored
-  // "the CSS default" instead of "what was there" would desync them, making the
-  // next activation jump. Every other cancellation test starts from a fresh
-  // mount, so none of them reach this state.
-  it('restores a parked position, not the CSS default', () => {
-    activate();
+  it('restores a parked position, not the default', () => {
+    // The compound case: interact first, so "what was there" and "the default"
+    // are different strings. A handler that reset to the default instead of the
+    // snapshot passes every other test here and desyncs this one.
     press('ArrowRight');
-    const parked = $('hero-window').style.cssText;
-    expect(parked).not.toBe('');
-
-    press('Escape');
-    expect($('hero-window').style.cssText).toBe(parked);
+    press('ArrowDown', true);
+    const parked = win().style.cssText;
 
     pointer('pointerdown', $('hero-cell-0-0'));
     pointer('pointercancel', grid());
-    expect($('hero-window').style.cssText).toBe(parked);
+    expect(win().style.cssText).toBe(parked);
   });
 
-  it('restores the selection the press had changed', () => {
-    activate();
-    const before = $('hero-window').style.width;
-    pointer('pointerdown', $('hero-cell-3-2'));
-    expect($('hero-window').style.width).not.toBe(before);
+  it('leaves the cursor where the cancelled press found it', () => {
+    press('ArrowRight');
+    const cursor = grid().getAttribute('aria-activedescendant');
+    pointer('pointerdown', $('hero-cell-3-0'));
     pointer('pointercancel', grid());
-    expect($('hero-window').style.width).toBe(before);
+    expect(grid().getAttribute('aria-activedescendant')).toBe(cursor);
   });
 
-  it('leaves an already-active grid active', () => {
-    activate();
-    pointer('pointerdown', $('hero-cell-3-2'));
-    pointer('pointercancel', grid());
-    expect(grid().getAttribute('role')).toBe('grid');
-  });
-});
-
-describe('attachHero — exit', () => {
-  beforeEach(() => { mount(); activate(); });
-
-  it('Esc returns focus to the button and stops consuming arrows', () => {
-    press('Escape');
-    expect(document.activeElement).toBe($('hero-activate'));
-    expect(press('ArrowRight').defaultPrevented).toBe(false);
-  });
-
-  it('Esc strips the grid semantics again', () => {
-    press('Escape');
-    expect(grid().getAttribute('role')).toBeNull();
-    expect(document.querySelectorAll('[role="gridcell"]')).toHaveLength(0);
-    expect(grid().getAttribute('aria-activedescendant')).toBeNull();
-  });
-
-  it('blur exits too, so focus never leaves an armed grid behind', () => {
-    grid().dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-    expect(press('ArrowRight').defaultPrevented).toBe(false);
-  });
-
-  it('Esc mid-drag stops a later pointerup announcing a placement', () => {
+  it('stops a later pointerup announcing a placement that was cancelled', () => {
     pointer('pointerdown', $('hero-cell-1-1'));
-    press('Escape');
-    $('hero-status').textContent = '';
+    pointer('pointercancel', grid());
     pointer('pointerup', grid());
     expect($('hero-status').textContent).toBe('');
+  });
+
+  it('leaves the grid usable afterwards', () => {
+    pointer('pointerdown', $('hero-cell-1-1'));
+    pointer('pointercancel', grid());
+    expect(grid().getAttribute('role')).toBe('grid');
+    expect(press('ArrowRight').defaultPrevented).toBe(true);
   });
 });

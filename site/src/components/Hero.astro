@@ -1,4 +1,6 @@
 ---
+import Command from './Command.astro';
+
 // No gridBlock call here: the dormant selection is a constant, and CSP forbids
 // interpolating it into a style attribute (see the .window rule below).
 const COLS = 4;
@@ -7,67 +9,134 @@ const rows = Array.from({ length: ROWS }, (_, r) => r);
 const cols = Array.from({ length: COLS }, (_, c) => c);
 ---
 <section class="hero wrap">
-  <h1>Snap windows. Or draw exactly where they go.</h1>
-  <p class="lede">
-    A grid-based window manager for macOS. Free and open source.
-  </p>
+  <div class="copy">
+    <h1>Snap windows. Or draw exactly where they go.</h1>
+    <p class="lede">
+      A grid-based window manager for macOS. Free and open source.
+    </p>
 
-  <div class="cta">
-    <a class="button" href="/download">Download for macOS 13+</a>
-    <code>brew install --cask orthant-app/tap/orthant</code>
+    <div class="cta">
+      <a class="btn btn-primary" href="/download">Download for macOS 13+</a>
+      <Command value="brew install --cask orthant-app/tap/orthant" />
+    </div>
+    <p class="quiet">
+      Windows support is planned. Linux is not possible — Wayland does not let one app
+      move another's windows.
+    </p>
   </div>
-  <p class="quiet">Windows support is planned. Linux is not possible — Wayland does not let one app move another's windows.</p>
 
-  <div id="hero-grid" class="grid" data-cols={COLS} data-rows={ROWS}>
-    {rows.map((r) => (
-      <div class="row" data-row={r}>
-        {cols.map((c) => (
-          <div class="cell" id={`hero-cell-${c}-${r}`} data-col={c} data-row={r}></div>
+  <figure class="demo">
+    <!-- A display, not a floating diagram. The bar is what makes the blue
+         block read as "a window on a screen" rather than an abstract shape,
+         and it is where Orthant actually lives: the menu bar, no Dock icon. -->
+    <div class="screen">
+      <div class="bar" aria-hidden="true"><img src="/icon.svg" width="12" height="12" alt="" /></div>
+      <div
+        id="hero-grid"
+        class="grid"
+        data-cols={COLS}
+        data-rows={ROWS}
+        aria-describedby="hero-hint"
+      >
+        {rows.map((r) => (
+          <div class="row" data-row={r}>
+            {cols.map((c) => (
+              <div class="cell" id={`hero-cell-${c}-${r}`} data-col={c} data-row={r}></div>
+            ))}
+          </div>
         ))}
+        <div id="hero-window" class="window"></div>
       </div>
-    ))}
-    <div id="hero-window" class="window"></div>
-  </div>
+    </div>
 
-  <p id="hero-caption" class="caption">
-    Press <kbd>⌃⌥O</kbd> and the grid appears over every display in about 50 milliseconds.
-    Drag across cells to place the frontmost window.
-  </p>
-
-  <!-- Hidden until the controller loads: a button that does nothing is worse
-       than no button. Task 10's script removes `hidden`. -->
-  <button id="hero-activate" type="button" hidden>Try the grid</button>
-  <p id="hero-instructions" class="instructions" hidden>
-    Arrows move · <kbd>⇧</kbd> extends · <kbd>↩</kbd> places · <kbd>Esc</kbd> exits
-  </p>
-  <p id="hero-status" class="visually-hidden" role="status" aria-live="polite"></p>
+    <figcaption>
+      <p class="caption">
+        Press <kbd>⌃⌥O</kbd> and this grid appears over every display, in about
+        50 milliseconds.
+      </p>
+      <!--
+        One line, always the same words, present with or without JavaScript.
+        The previous version hid an instructions line and revealed it on
+        activation, which moved everything below it the moment you interacted.
+      -->
+      <p id="hero-hint" class="hint">
+        Try it: drag across the cells. Or focus the grid and press the arrows —
+        <kbd>⇧</kbd> extends, <kbd>↩</kbd> places, <kbd>Esc</kbd> resets.
+      </p>
+    </figcaption>
+    <p id="hero-status" class="visually-hidden" role="status" aria-live="polite"></p>
+  </figure>
 </section>
 
 <style>
-  .hero { padding: 56px 0 72px; }
-  h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 16px; max-width: 18ch; }
-  .lede { font-size: 20px; color: var(--label-secondary); margin: 0 0 28px; }
-  .cta { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-  .button { background: var(--accent); color: #fff; padding: 11px 20px; border-radius: 8px; text-decoration: none; font-weight: 550; }
-  .quiet { color: var(--label-secondary); font-size: 15px; margin-top: 12px; }
+  /*
+   * `minmax(0, 1fr)` on the single-column case too, not just the two-column
+   * one. A bare `auto` grid track is floored at its min-content width, and the
+   * install command cannot wrap below ~400px — so at 390px the track pushed
+   * the whole PAGE to 450px wide and every section inherited a horizontal
+   * scrollbar. The floor has to be removed wherever the track exists.
+   */
+  .hero {
+    padding-block: 40px 64px;
+    display: grid; grid-template-columns: minmax(0, 1fr);
+    gap: 40px; align-items: center;
+  }
+  /* Equal columns, and not before 980px: the install command is 41 monospace
+     characters plus a Copy button, and a narrower column clips it — which
+     reads as a broken command rather than a narrow box. */
+  @media (min-width: 980px) {
+    .hero { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; }
+  }
+
+  h1 {
+    font-size: clamp(32px, 3.2vw, 44px);
+    line-height: 1.08; letter-spacing: -0.025em;
+    margin: 0 0 14px; max-width: 16ch;
+  }
+  .lede { font-size: 19px; color: var(--label-secondary); margin: 0 0 24px; max-width: 34ch; }
+  .cta { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+  .quiet { color: var(--label-secondary); font-size: 14px; margin: 20px 0 0; max-width: 44ch; }
+
+  .demo { margin: 0; }
+  .screen {
+    border: 1px solid var(--separator);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.06), 0 8px 28px rgb(0 0 0 / 0.06);
+  }
+  .bar {
+    height: 22px;
+    border-bottom: 1px solid var(--separator);
+    background: var(--raised);
+    display: flex; align-items: center; justify-content: flex-end;
+    padding-inline: 9px;
+  }
+  /* The app's own icon, at menu-bar size, in the menu bar. Says "this is where
+     Orthant lives" more directly than any abstract mark could. */
+  .bar img { display: block; border-radius: 3px; opacity: 0.85; }
 
   .grid {
     position: relative;
     aspect-ratio: 16 / 10;
-    margin: 40px 0 16px;
     display: flex;
     flex-direction: column;
     gap: 1px;
     background: var(--separator);
-    border: 1px solid var(--separator);
-    border-radius: 10px;
-    overflow: hidden;
     touch-action: pan-y; /* vertical swipes scroll the page; only drags select */
   }
-  .grid:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .grid:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .row { display: flex; flex: 1; gap: 1px; }
   .cell { flex: 1; background: var(--surface); }
   .cell[aria-selected='true'] { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+
+  /*
+   * The affordance the demo was missing entirely: nothing said the grid could
+   * be touched, so it read as a static diagram. Only applied once the
+   * controller has attached — a crosshair over an inert box is a lie.
+   */
+  .grid[data-ready] .cell { cursor: crosshair; }
+  .grid[data-ready] .cell:hover { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
 
   /*
    * The dormant selection is a CONSTANT, so it lives in CSS.
@@ -94,14 +163,19 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
     border-radius: 6px;
     pointer-events: none;
   }
-  .caption { color: var(--label-secondary); font-size: 15px; }
-  .instructions { color: var(--label-secondary); font-size: 15px; }
-  .visually-hidden {
-    position: absolute; width: 1px; height: 1px; overflow: hidden;
-    clip-path: inset(50%); white-space: nowrap;
+  /* Return says "places it", so pressing it has to do something a sighted user
+     can see; the live region alone left the key looking broken. */
+  .window[data-placed] { background: color-mix(in srgb, var(--accent) 38%, transparent); }
+
+  figcaption { margin-top: 14px; }
+  .caption, .hint { color: var(--label-secondary); font-size: 14px; margin: 0; }
+  .hint { margin-top: 4px; }
+
+  @media (prefers-color-scheme: dark) {
+    .screen { box-shadow: none; }
   }
   @media (prefers-reduced-motion: no-preference) {
-    .window { transition: left .12s ease, top .12s ease, width .12s ease, height .12s ease; }
+    .window { transition: left .12s ease, top .12s ease, width .12s ease, height .12s ease, background .2s ease; }
   }
 </style>
 

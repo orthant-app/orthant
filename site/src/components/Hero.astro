@@ -20,15 +20,15 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
       <Command value="brew install --cask orthant-app/tap/orthant" />
     </div>
     <p class="quiet">
-      Windows support is planned. Linux is not possible — Wayland does not let one app
-      move another's windows.
+      Windows support is planned. Linux is not possible, because Wayland does not let one
+      app move another's windows.
     </p>
   </div>
 
   <figure class="demo">
-    <!-- A display, not a floating diagram. The bar is what makes the blue
-         block read as "a window on a screen" rather than an abstract shape,
-         and it is where Orthant actually lives: the menu bar, no Dock icon. -->
+    {/* A display, not a floating diagram. The bar is what makes the blue
+        block read as "a window on a screen" rather than an abstract shape,
+        and it is where Orthant actually lives: the menu bar, no Dock icon. */}
     <div class="screen">
       <div class="bar" aria-hidden="true"><img src="/icon.svg" width="12" height="12" alt="" /></div>
       <div
@@ -54,15 +54,26 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
         Press <kbd>⌃⌥O</kbd> and this grid appears over every display, in about
         50 milliseconds.
       </p>
-      <!--
-        One line, always the same words, present with or without JavaScript.
-        The previous version hid an instructions line and revealed it on
-        activation, which moved everything below it the moment you interacted.
-      -->
-      <p id="hero-hint" class="hint">
-        Try it: drag across the cells. Or focus the grid and press the arrows —{' '}
-        <kbd>⇧</kbd> extends, <kbd>↩</kbd> places, <kbd>Esc</kbd> resets.
-      </p>
+      {/*
+        Always present, with or without JavaScript. An earlier version hid an
+        instructions line and revealed it on activation, which moved everything
+        below it the moment you interacted.
+
+        The keys are a LIST, not a run of inline kbd elements in a sentence.
+        Written as prose the line wrapped wherever it happened to fit and
+        stranded a keycap at the end of a line, away from the word saying what
+        it does: "...press the arrows" then a break, then "extends". Each key
+        and its verb is now one unbreakable item, so they wrap as whole units
+        and line up.
+      */}
+      <div id="hero-hint">
+        <p class="hint">Try it: drag across the cells, or focus the grid and use the arrow keys.</p>
+        <ul class="keys">
+          <li><kbd>⇧</kbd> extends</li>
+          <li><kbd>↩</kbd> places</li>
+          <li><kbd>Esc</kbd> resets</li>
+        </ul>
+      </div>
     </figcaption>
     <p id="hero-status" class="visually-hidden" role="status" aria-live="polite"></p>
   </figure>
@@ -169,7 +180,15 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
 
   figcaption { margin-top: 14px; }
   .caption, .hint { color: var(--label-secondary); font-size: 14px; margin: 0; }
-  .hint { margin-top: 4px; }
+  .hint { margin-top: 6px; }
+  .keys {
+    display: flex; flex-wrap: wrap; gap: 6px 18px;
+    list-style: none; margin: 8px 0 0; padding: 0;
+    color: var(--label-secondary); font-size: 14px;
+  }
+  /* nowrap is the whole point: a keycap must never end a line with its verb on
+     the next one. */
+  .keys li { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 
   @media (prefers-color-scheme: dark) {
     .screen { box-shadow: none; }

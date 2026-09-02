@@ -143,6 +143,10 @@ const jsonLd = {
 
 <style>
   .quiet { color: var(--label-secondary); }
+  /* A "read more" link alone in its own paragraph is a standalone target, not a
+     link inside a sentence, so WCAG 2.2's inline exemption does not cover it.
+     20px tall before. */
+  p > a:only-child { display: inline-block; padding-block: 3px; }
   .lead { margin-bottom: 6px; }
   /* An unlabelled black rectangle with a poster is indistinguishable from a
      broken embed until you click it. */

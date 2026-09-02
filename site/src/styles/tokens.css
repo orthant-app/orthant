@@ -95,8 +95,16 @@ body {
 
 /* A table wider than the phone reading it. Scrolling the table beats scrolling
    the page: a page-level horizontal scrollbar drags the nav and every
-   paragraph sideways with it. */
-.scroll-x { overflow-x: auto; }
+   paragraph sideways with it.
+
+   `position: relative` is load-bearing, not tidiness. A `position: absolute`
+   descendant with no positioned ancestor resolves against the initial
+   containing block, so it is laid out against the PAGE and never clipped by
+   this scroller — the visually-hidden "Yes"/"No" spans in the comparison
+   table sat at the table's own x, up to 15px past a 320px viewport, and gave
+   the whole document a horizontal scrollbar while every visible element fitted.
+   Making the scroller the containing block brings them back inside it. */
+.scroll-x { overflow-x: auto; position: relative; }
 
 .section { border-top: 1px solid var(--separator); padding-block: var(--space-section); }
 /* The trust band closes with its own rule, so the next section's opening rule

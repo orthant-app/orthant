@@ -22,12 +22,24 @@
   --keycap-fill: #FDFDFD;
   --keycap-border: rgb(0 0 0 / 0.14);
 
+  /* A surface that sits *on* --surface: code blocks, the demo's screen bezel,
+     hovered rows. Deliberately a tint of the label colour rather than a fixed
+     grey, so it tracks both themes without a second constant. */
+  --raised: rgb(0 0 0 / 0.035);
+  --raised-strong: rgb(0 0 0 / 0.07);
+
   --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --col: 1fr;
   --gutter: 24px;
   --measure: 68ch;
+  --page: 1080px;
+  --radius: 10px;
+
+  /* One vertical rhythm for the whole site. Sections were 72px top AND bottom
+     around a hairline, which put 144px of dead air between two paragraphs and
+     left the rule floating in the middle of nothing. */
+  --space-section: 64px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -39,6 +51,8 @@
     --separator: rgb(255 255 255 / 0.10);
     --keycap-fill: #3A3A3C;
     --keycap-border: rgb(255 255 255 / 0.20);
+    --raised: rgb(255 255 255 / 0.05);
+    --raised-strong: rgb(255 255 255 / 0.10);
   }
 }
 
@@ -60,12 +74,56 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.wrap { max-width: 1080px; margin: 0 auto; padding: 0 var(--gutter); }
-.prose { max-width: var(--measure); }
+/*
+ * THE CONTENT COLUMN — one left edge for the whole site.
+ *
+ * `.wrap` is the page container. `.prose` is the reading measure INSIDE it,
+ * and constrains its children rather than itself: every page applies both
+ * classes to the same element, so narrowing that element would also re-centre
+ * it (`.wrap` sets `margin-inline: auto`) and park the text ~176px to the
+ * right of the nav, hero and footer stacked above it. That mismatch was
+ * visible on every page of the site.
+ */
+.wrap { max-width: var(--page); margin-inline: auto; padding-inline: var(--gutter); }
+.prose > * { max-width: var(--measure); }
+/* Tabular and preformatted content is not prose and does not read better at
+   68ch — a five-column comparison table at that width wraps every cell. */
+.prose > table,
+.prose > pre,
+.prose > .scroll-x,
+.prose > .wide { max-width: none; }
 
-/* The grid is structure: sections begin on cell boundaries and are separated
-   by a hairline. It becomes explicit only in the hero and the regions section. */
-.section { border-top: 1px solid var(--separator); padding: 72px 0; }
+/* A table wider than the phone reading it. Scrolling the table beats scrolling
+   the page: a page-level horizontal scrollbar drags the nav and every
+   paragraph sideways with it. */
+.scroll-x { overflow-x: auto; }
+
+.section { border-top: 1px solid var(--separator); padding-block: var(--space-section); }
+/* The trust band closes with its own rule, so the next section's opening rule
+   lands one pixel below it and draws a doubled hairline. */
+.band + .section { border-top: 0; }
+
+h1, h2, h3 { line-height: 1.2; letter-spacing: -0.015em; }
+h2 { font-size: 27px; margin-block: 0 16px; }
+h3 { font-size: 20px; margin-block: 28px 8px; }
+
+/* The browser default is #0000EE, which clashes with --accent in light mode
+   and is close to unreadable on #1E1E1F in dark mode. Every link on the site
+   was rendering in it. */
+a { color: var(--accent); text-underline-offset: 2px; text-decoration-thickness: 1px; }
+a:hover { text-decoration-thickness: 2px; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+/* Keyboard users land here first; it is off-screen until focused. */
+.skip {
+  position: absolute; left: var(--gutter); top: 8px; z-index: 10;
+  padding: 8px 14px; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--separator);
+  color: var(--label); text-decoration: none;
+  transform: translateY(-200%);
+}
+.skip:focus { transform: none; }
 
 code, kbd, pre { font-family: var(--font-mono); font-size: 0.9em; }
 
@@ -74,6 +132,7 @@ kbd {
   border: 1px solid var(--keycap-border);
   border-radius: 4px;
   padding: 1px 5px;
+  white-space: nowrap;
 }
 
 /* Shared by the homepage's install command and every docs code block. Was
@@ -82,9 +141,58 @@ kbd {
    another page's <Content />. markdown.syntaxHighlight is off (astro.config.mjs),
    so there is no Shiki wrapper class to target; a bare tag selector is enough. */
 pre {
-  background: var(--keycap-fill);
+  background: var(--raised);
   border: 1px solid var(--separator);
   border-radius: 8px;
   padding: 14px 16px;
   overflow-x: auto;
+}
+
+/* Markdown tables arrive from the content collection with no classes to hook,
+   so they are styled by tag. Without this the shortcuts table renders as bare
+   text whose columns collide — "Bottom-right quarter" ran into its own combo. */
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-block: 20px;
+  font-size: 16px;
+}
+.prose th, .prose td {
+  text-align: left;
+  padding: 9px 16px 9px 0;
+  border-bottom: 1px solid var(--separator);
+  vertical-align: baseline;
+}
+.prose th {
+  font-weight: 590;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--label-secondary);
+}
+.prose tbody tr:last-child td { border-bottom: 0; }
+
+/* Buttons. The hero's demo control was a bare <button> rendering in the
+   browser's default chrome next to a styled download link. */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 11px 20px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font: inherit; font-weight: 550;
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-secondary {
+  background: var(--raised);
+  border-color: var(--separator);
+  color: var(--label);
+}
+.btn-secondary:hover { background: var(--raised-strong); }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
 }

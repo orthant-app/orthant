@@ -1,4 +1,7 @@
 ---
+interface Props { path: string }
+const { path } = Astro.props;
+
 const links = [
   { href: '/docs/', label: 'Docs' },
   { href: '/changelog/', label: 'Changelog' },
@@ -6,18 +9,52 @@ const links = [
   { href: '/compare/', label: 'Compare' },
   { href: 'https://github.com/orthant-app/orthant', label: 'GitHub' },
 ];
+
+// A section, not an exact page: /docs/shortcuts/ should mark "Docs".
+const current = (href: string) => href.startsWith('/') && path.startsWith(href);
 ---
 <nav class="wrap nav" aria-label="Primary">
-  <a class="brand" href="/">Orthant</a>
+  <a class="brand" href="/">
+    <img src="/icon.svg" width="26" height="26" alt="" />
+    <span>Orthant</span>
+  </a>
   <ul>
-    {links.map((l) => <li><a href={l.href}>{l.label}</a></li>)}
+    {links.map((l) => (
+      <li>
+        <a href={l.href} aria-current={current(l.href) ? 'page' : undefined}>{l.label}</a>
+      </li>
+    ))}
   </ul>
+  <a class="btn btn-primary nav-cta" href="/download">Download</a>
 </nav>
 
 <style>
-  .nav { display: flex; align-items: center; justify-content: space-between; padding-block: 20px; }
-  .brand { font-weight: 600; text-decoration: none; color: var(--label); }
-  ul { display: flex; gap: 20px; list-style: none; margin: 0; padding: 0; }
-  a { color: var(--label-secondary); text-decoration: none; }
-  a:hover, a:focus-visible { color: var(--label); }
+  /*
+   * Three flex items — brand, links, download — that reflow rather than
+   * overflow. At 390px the previous single row measured 442px wide, which gave
+   * the WHOLE PAGE a horizontal scrollbar and pushed "GitHub" off-screen.
+   */
+  .nav {
+    display: flex; align-items: center; flex-wrap: wrap;
+    gap: 10px 24px;
+    padding-block: 18px;
+  }
+  .brand {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-weight: 600; font-size: 17px;
+    text-decoration: none; color: var(--label);
+    margin-right: auto;
+  }
+  .brand img { display: block; border-radius: 6px; }
+  ul { display: flex; flex-wrap: wrap; gap: 8px 20px; list-style: none; margin: 0; padding: 0; }
+  ul a { color: var(--label-secondary); text-decoration: none; }
+  ul a:hover { color: var(--label); }
+  ul a[aria-current='page'] { color: var(--label); font-weight: 550; }
+  .nav-cta { padding: 7px 15px; font-size: 15px; }
+
+  /* Below this the three items cannot share a line without crowding, so the
+     links take their own row under the brand and the download button. */
+  @media (max-width: 719px) {
+    ul { order: 3; width: 100%; }
+  }
 </style>

@@ -15,6 +15,10 @@ const canonical = new URL(path, 'https://orthant.app').href;
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="alternate icon" href="/icon-256.png" sizes="256x256" />
+    <link rel="apple-touch-icon" href="/icon-256.png" />
+    <meta name="theme-color" content="#007AFF" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
@@ -24,8 +28,9 @@ const canonical = new URL(path, 'https://orthant.app').href;
     <slot name="head" />
   </head>
   <body>
-    <Nav />
-    <main>
+    <a class="skip" href="#main">Skip to content</a>
+    <Nav path={path} />
+    <main id="main" tabindex="-1">
       <slot />
     </main>
     <Footer />

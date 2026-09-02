@@ -1,14 +1,31 @@
+---
+const links = [
+  { href: 'https://github.com/orthant-app/orthant', label: 'GitHub' },
+  { href: 'https://github.com/orthant-app/orthant/issues', label: 'Report an issue' },
+  { href: '/docs/', label: 'Docs' },
+  { href: '/privacy/', label: 'Privacy' },
+  { href: 'https://github.com/orthant-app/orthant/blob/main/LICENSE', label: 'MIT licence' },
+];
+---
 <footer class="wrap section">
-  <p>
-    <a href="https://github.com/orthant-app/orthant/issues">Report an issue</a> ·
-    <a href="/privacy/">Privacy</a> ·
-    <a href="https://github.com/orthant-app/orthant/blob/main/LICENSE">MIT</a>
+  <ul>
+    {links.map((l) => <li><a href={l.href}>{l.label}</a></li>)}
+  </ul>
+  <p class="quiet">
+    © Optimal One · Orthant is free and open source. There is no account, no
+    tracking in the app, and no paid tier.
   </p>
-  <p class="quiet">© Optimal One</p>
 </footer>
 
 <style>
-  p { margin: 4px 0; }
-  .quiet { color: var(--label-secondary); }
-  a { color: var(--label-secondary); }
+  footer { padding-block: 40px 56px; }
+  /*
+   * A list, not a "·"-joined sentence. The separators were literal middots in
+   * the markup, and the newline before each one collapsed to a space while the
+   * one after it did not — the footer rendered "Report an issue ·Privacy ·MIT".
+   */
+  ul { display: flex; flex-wrap: wrap; gap: 8px 22px; list-style: none; margin: 0 0 14px; padding: 0; }
+  a { color: var(--label-secondary); text-decoration: none; font-size: 15px; }
+  a:hover { color: var(--label); text-decoration: underline; }
+  .quiet { color: var(--label-secondary); font-size: 14px; margin: 0; max-width: 62ch; }
 </style>

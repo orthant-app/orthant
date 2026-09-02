@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Orthant">
+  <!--
+    The app icon's motif, re-expressed for the web: same proportions as
+    tool/make_app_icon.py (grid 52% of the plate, 8.5% gutter, 16% cell radius,
+    three cells at 110/255 alpha and one "placed" at full), but the plate fills
+    the canvas instead of sitting inside macOS's 80.5% padding — that padding
+    exists for the system's own shadowing and only makes a favicon look small.
+  -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0A84FF"/>
+      <stop offset="1" stop-color="#0060D6"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="229" fill="url(#g)"/>
+  <g fill="#fff">
+    <rect x="245.8" y="245.8" width="243.6" height="243.6" rx="39" opacity=".431"/>
+    <rect x="534.7" y="245.8" width="243.6" height="243.6" rx="39" opacity=".431"/>
+    <rect x="245.8" y="534.7" width="243.6" height="243.6" rx="39" opacity=".431"/>
+    <rect x="534.7" y="534.7" width="243.6" height="243.6" rx="39"/>
+  </g>
+</svg>

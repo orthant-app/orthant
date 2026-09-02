@@ -1,8 +1,18 @@
 ---
+/*
+ * Eight short claims, not seven of wildly unequal length.
+ *
+ * "Signed with an Apple Developer ID and notarized by Apple" was three times
+ * the width of its neighbours, which is what made a wrapped row of these look
+ * ragged however it was spaced — one item dictated where every line broke.
+ * Splitting it in two is also more accurate about who does what: the developer
+ * signs with an Apple-issued Developer ID, and Apple notarizes.
+ */
 const items = [
   'Free',
   'MIT licensed',
-  'Signed with an Apple Developer ID and notarized by Apple',
+  'Signed with a Developer ID',
+  'Notarized by Apple',
   'No account',
   'No telemetry in the app',
   'Menu bar only, no Dock icon',
@@ -22,23 +32,33 @@ const items = [
    * Previously `.trust` carried BOTH `wrap` and its own `margin: 0`, and an
    * Astro-scoped `.trust[data-astro-cid-…]` (0,2,0) outranks `.wrap` (0,1,0) —
    * so `margin: 0` beat `margin-inline: auto` and the whole band, borders
-   * included, sat flush against the left edge of the viewport while every
-   * other section stayed centred. At 1440px that is a 180px offset; the wider
-   * the display, the more obviously broken it looked.
+   * included, sat flush against the left edge of the viewport.
    */
   .band { border-block: 1px solid var(--separator); background: var(--raised); }
+
+  /*
+   * A grid, not a wrapping flex row. `flex-wrap` packs each line as full as it
+   * will go, so the ticks start at a different x on every line and the whole
+   * band reads as a run-on sentence. Equal tracks put every claim in a column
+   * with its tick aligned to the one above it.
+   *
+   * 210px is chosen so the longest item ("Menu bar only, no Dock icon", ~197px
+   * with its tick at 14px) never wraps: an item on two lines would break the
+   * row rhythm the grid exists to create. Four columns at the full page width,
+   * three at tablet, one on a phone.
+   */
   .trust {
-    display: flex; flex-wrap: wrap;
-    gap: 6px 18px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 10px 24px;
     list-style: none;
     margin-block: 0;
-    padding-block: 14px;
+    padding-block: 18px;
     color: var(--label-secondary);
     font-size: 14px;
   }
-  li { display: inline-flex; align-items: center; gap: 7px; }
-  /* A tick rather than a bullet: every item is a claim being asserted, and a
-     wrapped row of bare grey phrases read as one run-on sentence. */
+  li { display: flex; align-items: center; gap: 8px; }
+  /* A tick rather than a bullet: every item is a claim being asserted. */
   li::before {
     content: '';
     width: 5px; height: 9px;

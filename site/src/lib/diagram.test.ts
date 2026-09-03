@@ -53,4 +53,23 @@ describe('regionSvg', () => {
     expect(svg).toContain('aria-label="&quot; onload=&quot;x"');
     expect(svg).not.toContain('onload="x"');
   });
+
+  // Unlike title, label and combo land ONLY in element text
+  // (`<text class="label">…</text>` / `<text class="combo">…</text>`) — never
+  // in an attribute — so the defect that applies to them is the same one the
+  // "escapes text" test above covers for title (markup injection via <, > or
+  // &), not the quote/attribute-breakout defect the test above this one
+  // covers. There is no attribute for a quote to break out of here; the
+  // relevant risk is a caller-supplied label or combo injecting a tag.
+  it('escapes label and combo, which only ever land in element text', () => {
+    const svg = regionSvg({
+      cols: 2, rows: 2, c0: 0, c1: 0, r0: 0, r1: 0, title: 'x',
+      label: 'a<b>&c',
+      combo: 'd<e>&f',
+    });
+    expect(svg).toContain('<text class="label" x="50" y="50">a&lt;b&gt;&amp;c</text>');
+    expect(svg).not.toContain('<b>');
+    expect(svg).toContain('<text class="combo" x="50" y="101">d&lt;e&gt;&amp;f</text>');
+    expect(svg).not.toContain('<e>');
+  });
 });

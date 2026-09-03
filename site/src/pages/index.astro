@@ -2,9 +2,11 @@
 import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
 import Hero from '../components/Hero.astro';
-import TrustBand from '../components/TrustBand.astro';
+import SpecStrip from '../components/SpecStrip.astro';
 import Command from '../components/Command.astro';
+import RegionDiagram from '../components/RegionDiagram.astro';
 import { currentVersion } from '../lib/releases';
+import { BINDINGS } from '../lib/commands';
 
 // The newest PUBLISHED STABLE entry. An unpublished release (written at release
 // prep, before the tag is approved) and a beta can therefore never become the
@@ -37,13 +39,10 @@ const jsonLd = {
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </Fragment>
   <Hero />
-  <TrustBand />
+  <SpecStrip />
 
-  <section class="section wrap">
-    {/* No duration in the heading. The first version claimed ninety seconds
-        against a 46-second file, and any number here goes stale the next time
-        the demo is re-recorded; the player shows its own length anyway. */}
-    <h2 class="lead">See it working</h2>
+  <section class="section wrap" id="see-it-work">
+    <h2>See it working</h2>
     <p class="lead-sub">
       Shortcuts, then the grid overlay, then drawing a region and binding it to a key.
     </p>
@@ -52,7 +51,7 @@ const jsonLd = {
       preload="none"
       poster="/demo-poster.png"
       width="1280"
-      height="705"
+      height="706"
       aria-label="Windows snap to halves and quarters with keyboard shortcuts; the grid overlay places a window on a drawn selection; a left-two-thirds region is drawn, saved, bound to a shortcut, and used."
     >
       <source src="/demo.webm" type="video/webm" />
@@ -60,83 +59,93 @@ const jsonLd = {
     </video>
   </section>
 
-  <section class="section wrap prose">
-    <h2>Two ways to place a window</h2>
-    <p>
-      <strong>Direct shortcuts.</strong> Halves, quarters, maximize and center, each on its
-      own chord. Press <kbd>⌃⌥→</kbd> and the window fills the right half of its display.
-      Instant.
+  <section class="section wrap">
+    <h2>Draw any region</h2>
+    <p class="lead-sub">
+      A region stores the fraction it covers, not the cells you drew it on, so changing your grid
+      later never moves your windows.
     </p>
-    <p>
-      <strong>The grid overlay.</strong> Press <kbd>⌃⌥O</kbd> and a translucent grid appears
-      over every display in about 50 milliseconds. Drag across cells, or arrow around
-      with <kbd>⇧</kbd> to extend, and the selection previews exactly where the window will
-      land. Release or <kbd>↩</kbd> places it, <kbd>Esc</kbd> cancels.
+    <ol class="steps">
+      <li>
+        <RegionDiagram cols={3} rows={1} c0={0} c1={1} r0={0} r1={0}
+          title="Two thirds of a three-column grid" label="2/3" />
+        <p><strong>Draw it.</strong> Drag across the grid.</p>
+      </li>
+      <li>
+        <RegionDiagram cols={12} rows={1} c0={0} c1={7} r0={0} r1={0}
+          title="The same two thirds on a twelve-column grid" label="8/12" />
+        <p><strong>It keeps its proportions.</strong> The same region on a finer grid.</p>
+      </li>
+      <li>
+        <RegionDiagram cols={3} rows={1} c0={0} c1={1} r0={0} r1={0}
+          title="Left two thirds, bound to a shortcut" label="2/3" combo="⌃⌥2" />
+        <p><strong>Bind it.</strong> Press <kbd>⌘S</kbd> on the overlay, name it, give it a key.</p>
+      </li>
+    </ol>
+    <p><a href="/docs/custom-regions/">How custom regions work →</a></p>
+  </section>
+
+  <section class="section wrap">
+    <h2>Or just press a key</h2>
+    <p class="lead-sub">Eleven shortcuts out of the box. Every one is rebindable.</p>
+    <ul class="keymap">
+      {BINDINGS.map((b) => (
+        <li>
+          {b.kind === 'block'
+            ? <RegionDiagram cols={2} rows={2} {...b.block} title={b.label} />
+            : <div class="no-glyph" aria-hidden="true">{b.kind === 'summon' ? 'grid' : 'as-is'}</div>}
+          <span class="key-label">{b.label}</span>
+          <kbd>{b.combo}</kbd>
+        </li>
+      ))}
+    </ul>
+    <p class="lead-sub">
+      Center keeps the window at its current size, and Open grid places nothing at all, so neither
+      has a shape to draw.
     </p>
     <p><a href="/docs/shortcuts/">Every default shortcut →</a></p>
   </section>
 
   <section class="section wrap prose">
-    <h2>Custom regions</h2>
+    <h2>It stays out of the way</h2>
     <p>
-      Draw any block on a grid of your own choosing, name it, and give it a shortcut.
-      "Left two-thirds" is the usual first one. A region remembers its own proportions, so
-      changing the overlay's grid size later never moves your windows.
+      Orthant never becomes the frontmost app, so the window you are arranging stays active while
+      you arrange it. It has no Dock icon, and it idles at <strong>0.0% CPU</strong> with
+      0 wake-ups.
     </p>
     <p>
-      <kbd>⌘S</kbd> on the overlay saves the selection you just made as a region, pre-named
-      and ready to bind.
-    </p>
-    <p><a href="/docs/custom-regions/">How custom regions work →</a></p>
-  </section>
-
-  <section class="section wrap prose">
-    <h2>Why it needs Accessibility permission</h2>
-    <p>
-      Orthant positions other apps' windows through the macOS Accessibility API. That is the
-      same mechanism every window manager in this category uses, and macOS gates it
-      behind <strong>System Settings ▸ Privacy &amp; Security ▸ Accessibility</strong>.
-    </p>
-    <p>
-      It is the only permission Orthant asks for. On first launch it walks you through
-      granting it, and gets out of the way the moment it is on. Orthant has no account, sends
-      no telemetry, and its only network access is checking for updates, which you can turn
-      off.
-    </p>
-    <p><a href="/privacy/">What the app and this site collect →</a></p>
-  </section>
-
-  <section class="section wrap prose">
-    <h2>Built for more than one display</h2>
-    <p>
-      A window snaps within <em>its own</em> display, not the one your pointer happens to be
-      on. Mixed-DPI arrangements included. The overlay puts a grid on every screen at once.
-    </p>
-    <p>
-      It idles at 0% CPU with zero wake-ups while hidden, and never becomes the frontmost
-      app, so the window you are arranging stays active throughout.
+      A window snaps within its own display, not the one your pointer happens to be on. The
+      overlay appears on every screen at once.
     </p>
   </section>
 
   <section class="section wrap prose">
     <h2>Install</h2>
     <Command value="brew install --cask orthant-app/tap/orthant" />
-    <p>
-      Or <a href="/download">download the disk image</a> and drag Orthant to Applications.
-      Either way you get the same build. Requires <strong>macOS 13+</strong>.
+    <p class="trust">
+      Free and open source. Signed by the developer and notarized by Apple. No account, no
+      telemetry in the app.
     </p>
     <p>
-      Orthant updates itself in place. Homebrew knows this, so <code>brew upgrade</code> deliberately
-      skips it rather than fighting over the same app.
+      Or <a href="/download">download the disk image</a> and drag Orthant to Applications. Either
+      way you get the same build. Requires <strong>macOS 13+</strong>.
+    </p>
+    <p>
+      Orthant moves other apps' windows through the macOS Accessibility API, which macOS gates
+      behind <strong>System Settings ▸ Privacy &amp; Security ▸ Accessibility</strong>. It is the
+      only permission Orthant asks for, and first launch walks you through granting it.{' '}
+      <a href="/docs/getting-started/">The full walkthrough →</a>
+    </p>
+    <p>
+      Orthant updates itself in place, so <code>brew upgrade</code> deliberately skips it rather
+      than fighting the built-in updater.
     </p>
     {version && (
-      <p class="quiet">
-        Latest release: <a href="/changelog/">{version}</a>.
-      </p>
+      <p class="quiet">Latest release: <a href="/changelog/">{version}</a>.</p>
     )}
     <p class="quiet">
-      Windows support is planned, behind the same interface. Linux is not possible: Wayland
-      does not let one app move another's windows, by design.
+      Windows support is planned, behind the same interface. Linux is not possible: Wayland does
+      not let one app move another's windows, by design.
     </p>
   </section>
 </Base>
@@ -147,13 +156,43 @@ const jsonLd = {
      link inside a sentence, so WCAG 2.2's inline exemption does not cover it.
      20px tall before. */
   p > a:only-child { display: inline-block; padding-block: 3px; }
-  .lead { margin-bottom: 6px; }
-  /* An unlabelled black rectangle with a poster is indistinguishable from a
-     broken embed until you click it. */
   .lead-sub { color: var(--label-secondary); margin: 0 0 24px; max-width: var(--measure); }
+  .trust { color: var(--label-secondary); font-size: 15px; }
   video {
     display: block; width: 100%; height: auto;
     border-radius: var(--radius); border: 1px solid var(--separator);
     background: var(--raised);
+  }
+
+  .steps { display: grid; gap: 28px; list-style: none; margin: 0; padding: 0; }
+  @media (min-width: 760px) { .steps { grid-template-columns: repeat(3, 1fr); } }
+  /*
+   * 28px, not the site's usual 10px: RegionDiagram's combo label is drawn with
+   * a hanging baseline just past the SVG's own viewBox, and the SVG is
+   * `overflow: visible` (needed so the label isn't clipped) — so on the one
+   * diagram here with a `combo`, the glyph render past the element's own box
+   * into whatever sits below it. Measured at 1440px: an unpadded caption
+   * overlapped the combo label by 18.6px at the widest column (1440px+,
+   * where `.wrap`'s 1080px cap holds the column at 325px). 32px clears that
+   * worst case with a few pixels to spare for cross-browser glyph-metric
+   * variance; a component-level fix belongs in diagram.ts's viewBox math,
+   * not here, but that risks the geometry diagram.test.ts pins.
+   */
+  .steps p { margin: 32px 0 0; color: var(--label-secondary); font-size: 15px; }
+
+  .keymap {
+    display: grid; gap: 20px 24px; list-style: none; margin: 0 0 20px; padding: 0;
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  }
+  .keymap li { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .keymap :global(.diagram) { width: 100%; max-width: 84px; }
+  .key-label { font-size: 14px; }
+  /* Center and the summon have no shape. The slot keeps its place in the grid
+     so the map does not reflow, and says why rather than looking broken. */
+  .no-glyph {
+    width: 100%; max-width: 84px; aspect-ratio: 1;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px dashed var(--rule); border-radius: 4px;
+    font-family: var(--font-mono); font-size: 10px; color: var(--label-secondary);
   }
 </style>

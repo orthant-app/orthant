@@ -207,13 +207,22 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
   .cell { flex: 1; background: rgb(16 22 34 / 0.55); }
   .cell[aria-selected='true'] { background: color-mix(in srgb, var(--accent) 72%, transparent); }
 
+  /* The resting selection, for the no-JS case. paint() takes over the moment
+     the controller attaches, so this retires itself on `data-ready` rather
+     than fighting the live state. At cols=4 the left half is the first two
+     cells of every row; hero-default.test.ts ties that count to gridBlock's
+     own default so the two cannot drift. */
+  .grid:not([data-ready]) .row .cell:nth-child(-n + 2) {
+    background: color-mix(in srgb, var(--accent) 72%, transparent);
+  }
+
   /*
    * The affordance the demo was missing entirely: nothing said the grid could
    * be touched, so it read as a static diagram. Only applied once the
    * controller has attached — a crosshair over an inert box is a lie.
    */
   .grid[data-ready] .cell { cursor: crosshair; }
-  .grid[data-ready] .cell:hover { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
+  .grid[data-ready] .cell:hover { background: color-mix(in srgb, var(--accent) 34%, rgb(16 22 34 / 0.55)); }
 
   /* The landed state. Return says "places it", so pressing it has to do
      something a sighted visitor can see; the live region alone left the key

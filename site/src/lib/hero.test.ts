@@ -16,6 +16,8 @@ function mount(): HTMLElement {
         <div id="hero-window"></div>
       </div>
       <p id="hero-hint"></p>
+      <div id="hero-placed"></div>
+      <p id="hero-readout"></p>
       <p id="hero-status" role="status" aria-live="polite"></p>
     </section>`;
   const root = document.getElementById('root') as HTMLElement;
@@ -130,9 +132,9 @@ describe('attachHero — keyboard', () => {
   it('marks the window placed, so Return does something visible too', () => {
     // The live region alone left Return looking broken to anyone who can see
     // the grid — the hint promises "↩ places".
-    expect(win().hasAttribute('data-placed')).toBe(false);
+    expect($('hero-placed').hasAttribute('data-placed')).toBe(false);
     press('Enter');
-    expect(win().hasAttribute('data-placed')).toBe(true);
+    expect($('hero-placed').hasAttribute('data-placed')).toBe(true);
   });
 
   it('Esc restores the default selection rather than merely changing it', () => {
@@ -238,5 +240,62 @@ describe('attachHero — a cancelled gesture', () => {
     pointer('pointercancel', grid());
     expect(grid().getAttribute('role')).toBe('grid');
     expect(press('ArrowRight').defaultPrevented).toBe(true);
+  });
+});
+
+describe('attachHero — the readout', () => {
+  beforeEach(() => mount());
+
+  it('describes the resting selection without being touched', () => {
+    expect($('hero-readout').textContent).toMatch(/left half/i);
+  });
+
+  it('updates as the selection changes', () => {
+    press('ArrowRight');
+    expect($('hero-readout').textContent).not.toMatch(/left half/i);
+  });
+
+  it('names a fraction, since that is what the annotation is for', () => {
+    // The resting selection is 2 of 4 columns by 3 of 3 rows.
+    expect($('hero-readout').textContent).toMatch(/1\/2|½/);
+  });
+});
+
+describe('attachHero — the window lands', () => {
+  beforeEach(() => mount());
+
+  /*
+   * The whole point of the hero (spec §4.1): a recognisable window has to
+   * VISIBLY LAND. A translucent preview sliding around is a diagram. The
+   * preview follows the selection; the window moves only on commit, which is
+   * what the app does on release or Return.
+   */
+  it('leaves the window alone while the selection moves', () => {
+    const before = $('hero-placed').style.cssText;
+    press('ArrowRight');
+    press('ArrowDown', true);
+    expect($('hero-window').style.left).not.toBe('');
+    expect($('hero-placed').style.cssText).toBe(before);
+  });
+
+  it('moves the window onto the selection when Return commits', () => {
+    press('ArrowRight');
+    press('Enter');
+    expect($('hero-placed').style.left).toBe($('hero-window').style.left);
+    expect($('hero-placed').style.width).toBe($('hero-window').style.width);
+  });
+
+  it('moves the window on pointer release too', () => {
+    at(3, 2);
+    pointer('pointerdown', $('hero-cell-2-0'));
+    pointer('pointermove', grid());
+    pointer('pointerup', grid());
+    expect($('hero-placed').style.left).toBe($('hero-window').style.left);
+  });
+
+  it('marks the landed window so Return does something visible', () => {
+    expect($('hero-placed').hasAttribute('data-placed')).toBe(false);
+    press('Enter');
+    expect($('hero-placed').hasAttribute('data-placed')).toBe(true);
   });
 });

@@ -1,8 +1,6 @@
 ---
-import Command from './Command.astro';
-
-// No gridBlock call here: the dormant selection is a constant, and CSP forbids
-// interpolating it into a style attribute (see the .window rule below).
+// No gridBlock call here: the resting selection is a constant, and CSP forbids
+// interpolating it into a style attribute (see the .preview rule below).
 const COLS = 4;
 const ROWS = 3;
 const rows = Array.from({ length: ROWS }, (_, r) => r);
@@ -10,70 +8,74 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
 ---
 <section class="hero wrap">
   <div class="copy">
-    <h1>Snap windows. Or draw exactly where they go.</h1>
+    <p class="eyebrow">A window manager for macOS</p>
+    <h1>Draw where a window should go. Give it a shortcut.</h1>
     <p class="lede">
-      A grid-based window manager for macOS. Free and open source.
+      Halves and quarters on keys, like everything else. Then draw any region you
+      want, name it, and bind it. Free and open source.
     </p>
 
     <div class="cta">
       <a class="btn btn-primary" href="/download">Download for macOS 13+</a>
-      <Command value="brew install --cask orthant-app/tap/orthant" />
+      <a class="btn btn-secondary" href="#see-it-work">See it work</a>
     </div>
-    <p class="quiet">
-      Windows support is planned. Linux is not possible, because Wayland does not let one
-      app move another's windows.
-    </p>
   </div>
 
   <figure class="demo">
-    {/* A display, not a floating diagram. The bar is what makes the blue
-        block read as "a window on a screen" rather than an abstract shape,
-        and it is where Orthant actually lives: the menu bar, no Dock icon. */}
-    <div class="screen">
-      <div class="bar" aria-hidden="true"><img src="/icon.svg" width="12" height="12" alt="" /></div>
-      <div
-        id="hero-grid"
-        class="grid"
-        data-cols={COLS}
-        data-rows={ROWS}
-        aria-describedby="hero-hint"
-      >
-        {rows.map((r) => (
-          <div class="row" data-row={r}>
-            {cols.map((c) => (
-              <div class="cell" id={`hero-cell-${c}-${r}`} data-col={c} data-row={r}></div>
+    {/* A macOS screen, drawn in CSS. No screenshot: nothing to go stale, and
+        nothing that could carry a real menu bar, wallpaper or third-party app. */}
+    <div class="scene">
+      <div class="bar" aria-hidden="true">
+        <span class="bar-app">Safari</span>
+        <img src="/icon.svg" width="12" height="12" alt="" />
+      </div>
+      <div class="desktop">
+        <div class="win win-back win-b" aria-hidden="true"><span>Terminal</span></div>
+        <div class="win win-back win-c" aria-hidden="true"><span>Notes</span></div>
+
+        {/* The window that actually LANDS. It sits where it currently is and
+            moves only on commit, which is what the app does: the overlay
+            previews, the window moves when you release or press Return. */}
+        <div id="hero-placed" class="win win-front" aria-hidden="true"><span>Safari</span></div>
+
+        {/* The true-scale preview: where the window WILL land, at real size and
+            position. Its resting geometry is a CSS constant, asserted against
+            gridBlock by hero-default.test.ts. */}
+        <div id="hero-window" class="preview" aria-hidden="true"></div>
+
+        {/* The compact panel: a scale model of the display, centred, with the
+            captured app's name above the cells. This is `_panelRect`. */}
+        <div class="panel">
+          <div class="chip" aria-hidden="true">Safari</div>
+          <div
+            id="hero-grid"
+            class="grid"
+            data-cols={COLS}
+            data-rows={ROWS}
+            aria-describedby="hero-hint"
+          >
+            {rows.map((r) => (
+              <div class="row" data-row={r}>
+                {cols.map((c) => (
+                  <div class="cell" id={`hero-cell-${c}-${r}`} data-col={c} data-row={r}></div>
+                ))}
+              </div>
             ))}
           </div>
-        ))}
-        <div id="hero-window" class="window"></div>
+        </div>
       </div>
     </div>
 
     <figcaption>
-      <p class="caption">
-        Press <kbd>⌃⌥O</kbd> and this grid appears over every display, in about
-        50 milliseconds.
+      <p id="hero-readout" class="annot">left half · 1/2 × 1 of the screen</p>
+      <p id="hero-hint" class="hint">
+        Drag across the grid, or focus it and use the arrow keys.
       </p>
-      {/*
-        Always present, with or without JavaScript. An earlier version hid an
-        instructions line and revealed it on activation, which moved everything
-        below it the moment you interacted.
-
-        The keys are a LIST, not a run of inline kbd elements in a sentence.
-        Written as prose the line wrapped wherever it happened to fit and
-        stranded a keycap at the end of a line, away from the word saying what
-        it does: "...press the arrows" then a break, then "extends". Each key
-        and its verb is now one unbreakable item, so they wrap as whole units
-        and line up.
-      */}
-      <div id="hero-hint">
-        <p class="hint">Try it: drag across the cells, or focus the grid and use the arrow keys.</p>
-        <ul class="keys">
-          <li><kbd>⇧</kbd> extends</li>
-          <li><kbd>↩</kbd> places</li>
-          <li><kbd>Esc</kbd> resets</li>
-        </ul>
-      </div>
+      <ul class="keys">
+        <li><kbd>⇧</kbd> extends</li>
+        <li><kbd>↩</kbd> places</li>
+        <li><kbd>Esc</kbd> resets</li>
+      </ul>
     </figcaption>
     <p id="hero-status" class="visually-hidden" role="status" aria-live="polite"></p>
   </figure>
@@ -106,40 +108,104 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
   }
   .lede { font-size: 19px; color: var(--label-secondary); margin: 0 0 24px; max-width: 34ch; }
   .cta { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
-  .quiet { color: var(--label-secondary); font-size: 14px; margin: 20px 0 0; max-width: 44ch; }
 
   .demo { margin: 0; }
-  .screen {
-    border: 1px solid var(--separator);
-    border-radius: 12px;
-    overflow: hidden;
-    background: var(--surface);
-    box-shadow: 0 1px 3px rgb(0 0 0 / 0.06), 0 8px 28px rgb(0 0 0 / 0.06);
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--label-secondary); margin: 0 0 10px;
+  }
+
+  .scene {
+    border: 1px solid var(--rule);
+    border-radius: 12px; overflow: hidden;
+    background: var(--raised);
   }
   .bar {
-    height: 22px;
-    border-bottom: 1px solid var(--separator);
-    background: var(--raised);
-    display: flex; align-items: center; justify-content: flex-end;
-    padding-inline: 9px;
+    height: 24px; display: flex; align-items: center; justify-content: space-between;
+    padding-inline: 10px; border-bottom: 1px solid var(--separator);
+    background: var(--surface); font-size: 11px; color: var(--label-secondary);
   }
-  /* The app's own icon, at menu-bar size, in the menu bar. Says "this is where
-     Orthant lives" more directly than any abstract mark could. */
-  .bar img { display: block; border-radius: 3px; opacity: 0.85; }
+  .bar-app { font-weight: 600; color: var(--label); }
+  .bar img { display: block; opacity: 0.85; }
+
+  .desktop { position: relative; aspect-ratio: 16 / 10; }
+
+  .win {
+    position: absolute;
+    border: 1px solid var(--separator); border-radius: 6px;
+    background: var(--surface); overflow: hidden;
+  }
+  .win span {
+    display: block; height: 18px; line-height: 18px; padding-inline: 8px;
+    border-bottom: 1px solid var(--separator); background: var(--raised);
+    font-size: 10.5px; color: var(--label-secondary);
+  }
+  .win-back { opacity: 0.5; }
+  .win-b { left: 56%; top: 8%; width: 38%; height: 42%; }
+  .win-c { left: 62%; top: 54%; width: 32%; height: 38%; }
+  /* The window as it is now, before the placement lands. */
+  .win-front { left: 12%; top: 18%; width: 44%; height: 58%; }
+
+  /*
+   * The true-scale preview: real size, real position, which is what the app
+   * draws while you drag. Its resting geometry is a CONSTANT in CSS, not an
+   * inline style attribute — `style-src 'self'` drops style attributes, so an
+   * authored one would collapse the preview to nothing with JavaScript off.
+   * The JS path writes .style through the CSSOM, which CSP does not block.
+   *
+   * hero-default.test.ts asserts these four numbers are gridBlock's output for
+   * the left half at cols 4, rows 3, gap 12 on a 1600x1000 frame.
+   */
+  .preview {
+    position: absolute;
+    left: 0.75%;
+    top: 1.2%;
+    width: 48.875%;
+    height: 97.6%;
+    border: 1.5px solid var(--accent);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  /*
+   * The panel: a compact scale model of the display, centred, chip above the
+   * cells. Not a grid over the whole screen — see grid_overlay.dart:10.
+   * The proportions mirror the app's own chrome constants: 9pt padding,
+   * a 16pt chip row and an 8pt gap, expressed here as a share of the panel.
+   */
+  .panel {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 46%;
+    padding: 6px;
+    border-radius: 10px;
+    background: rgb(16 22 34 / 0.78);
+    z-index: 2;
+  }
+  .chip {
+    height: 15px; line-height: 15px;
+    margin-bottom: 5px;
+    text-align: center;
+    color: #fff; font-size: 10.5px; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
 
   .grid {
-    position: relative;
-    aspect-ratio: 16 / 10;
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    background: var(--separator);
-    touch-action: pan-y; /* vertical swipes scroll the page; only drags select */
+    position: relative; aspect-ratio: 16 / 10;
+    display: flex; flex-direction: column; gap: 1px;
+    background: rgb(255 255 255 / 0.22);
+    border-radius: 4px; overflow: hidden;
+    /* ⚠️ Load-bearing, and easy to drop while rewriting this rule: a vertical
+       swipe must scroll the page rather than drag a selection. Verified once
+       with a real CDP touch swipe (page scrolled 360px, grid untouched); the
+       pointercancel handler in hero.ts is the other half. */
+    touch-action: pan-y;
   }
   .grid:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .row { display: flex; flex: 1; gap: 1px; }
-  .cell { flex: 1; background: var(--surface); }
-  .cell[aria-selected='true'] { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+  .cell { flex: 1; background: rgb(16 22 34 / 0.55); }
+  .cell[aria-selected='true'] { background: color-mix(in srgb, var(--accent) 72%, transparent); }
 
   /*
    * The affordance the demo was missing entirely: nothing said the grid could
@@ -149,38 +215,14 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
   .grid[data-ready] .cell { cursor: crosshair; }
   .grid[data-ready] .cell:hover { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
 
-  /*
-   * The dormant selection is a CONSTANT, so it lives in CSS.
-   *
-   * It cannot be an inline `style` attribute: the site's CSP sets
-   * `style-src 'self'`, and CSP governs style ATTRIBUTES as well as <style>
-   * elements — the browser is required to ignore a disallowed one. The window
-   * would collapse to zero size with JavaScript disabled, which is precisely
-   * the guarantee this component exists to make. Worse, the JS path sets
-   * `.style` through the CSSOM, which CSP does NOT block, so the interactive
-   * hero would look fine while the no-JS hero was silently broken.
-   *
-   * hero-default.test.ts asserts these four numbers are gridBlock's output for
-   * the left half at cols 4, rows 3, gap 12 on a 1600x1000 frame.
-   */
-  .window {
-    position: absolute;
-    left: 0.75%;
-    top: 1.2%;
-    width: 48.875%;
-    height: 97.6%;
-    background: color-mix(in srgb, var(--accent) 22%, transparent);
-    border: 1.5px solid var(--accent);
-    border-radius: 6px;
-    pointer-events: none;
-  }
-  /* Return says "places it", so pressing it has to do something a sighted user
-     can see; the live region alone left the key looking broken. */
-  .window[data-placed] { background: color-mix(in srgb, var(--accent) 38%, transparent); }
+  /* The landed state. Return says "places it", so pressing it has to do
+     something a sighted visitor can see; the live region alone left the key
+     looking broken. */
+  .win-front[data-placed] { border-color: var(--accent); }
+  .win-front[data-placed] span { background: color-mix(in srgb, var(--accent) 22%, var(--surface)); }
 
   figcaption { margin-top: 14px; }
-  .caption, .hint { color: var(--label-secondary); font-size: 14px; margin: 0; }
-  .hint { margin-top: 6px; }
+  .hint { color: var(--label-secondary); font-size: 14px; margin: 6px 0 0; }
   .keys {
     display: flex; flex-wrap: wrap; gap: 6px 18px;
     list-style: none; margin: 8px 0 0; padding: 0;
@@ -190,11 +232,9 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
      the next one. */
   .keys li { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 
-  @media (prefers-color-scheme: dark) {
-    .screen { box-shadow: none; }
-  }
   @media (prefers-reduced-motion: no-preference) {
-    .window { transition: left .12s ease, top .12s ease, width .12s ease, height .12s ease, background .2s ease; }
+    .preview { transition: left .16s ease, top .16s ease, width .16s ease, height .16s ease; }
+    .win-front { transition: left .2s ease, top .2s ease, width .2s ease, height .2s ease; }
   }
 </style>
 

@@ -29,15 +29,11 @@ const current = (href: string) => href.startsWith('/') && path.startsWith(href);
 </nav>
 
 <style>
-  /*
-   * Three flex items — brand, links, download — that reflow rather than
-   * overflow. At 390px the previous single row measured 442px wide, which gave
-   * the WHOLE PAGE a horizontal scrollbar and pushed "GitHub" off-screen.
-   */
   .nav {
     display: flex; align-items: center; flex-wrap: wrap;
     gap: 10px 24px;
     padding-block: 18px;
+    border-bottom: 1px solid var(--separator);
   }
   .brand {
     display: inline-flex; align-items: center; gap: 9px;
@@ -46,17 +42,42 @@ const current = (href: string) => href.startsWith('/') && path.startsWith(href);
     margin-right: auto;
   }
   .brand img { display: block; border-radius: 6px; }
-  ul { display: flex; flex-wrap: wrap; gap: 8px 20px; list-style: none; margin: 0; padding: 0; }
-  /* padding-block, not a height: the target has to grow without moving the
-     text off the baseline the brand and the button share. 20px -> 32px. */
-  ul a { display: inline-block; padding-block: 6px; color: var(--label-secondary); text-decoration: none; }
+
+  ul { display: flex; list-style: none; margin: 0; padding: 0; gap: 8px 20px; }
+  ul a {
+    display: inline-block; padding-block: 6px;
+    color: var(--label-secondary); text-decoration: none;
+  }
   ul a:hover { color: var(--label); }
   ul a[aria-current='page'] { color: var(--label); font-weight: 550; }
   .nav-cta { padding: 7px 15px; font-size: 15px; }
 
-  /* Below this the three items cannot share a line without crowding, so the
-     links take their own row under the brand and the download button. */
+  /*
+   * A designed small-screen state, not flex-wrap's leftovers.
+   *
+   * Below 720px the links take their own full-width row under the brand and
+   * the download button, and that row is an EVEN GRID rather than a wrapping
+   * flex line. The wrapping version stranded "GitHub" alone on a third row at
+   * 390px and got worse at 320px: five items of unequal width packed greedily
+   * always orphan the last one. Five equal columns cannot orphan anything.
+   */
   @media (max-width: 719px) {
-    ul { order: 3; width: 100%; }
+    ul {
+      order: 3; width: 100%;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0;
+      border-top: 1px solid var(--separator);
+      padding-top: 6px;
+    }
+    ul li { display: flex; justify-content: center; }
+    ul a { padding: 7px 2px; font-size: 13px; text-align: center; }
+  }
+
+  /* At 320px five columns of 13px text still fit (the longest label,
+     "Changelog", measures under 56px), but there is no slack left, so the
+     labels lose their letter-spacing rather than the row losing a column. */
+  @media (max-width: 359px) {
+    ul a { font-size: 12px; letter-spacing: -0.01em; }
   }
 </style>

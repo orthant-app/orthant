@@ -1,32 +1,30 @@
-/*
- * Ported from lib/settings/mac_theme.dart:47-77.
- *
- * `--surface` maps asymmetrically on purpose: light is `contentBackground`
- * (#FFFFFF), dark is `windowBackground`'s dark value (#1E1E1F) rather than
- * `contentBackground` dark (#2C2C2E). A page wants near-black in dark mode —
- * #2C2C2E reads as a raised card, not a background — and #1E1E1F also
- * measures better: --label scores 13.71:1 on it against 11.62:1, and
- * --label-secondary 5.89:1 against 5.32:1.
- *
- * What is never used is `windowBackground`'s LIGHT value (#ECECEE): system
- * chrome in an app, dead grey on a page.
- */
 :root {
   color-scheme: light dark;
 
-  --accent: #007AFF;
-  --surface: #FFFFFF;
-  --label: rgb(0 0 0 / 0.90);
-  --label-secondary: rgb(0 0 0 / 0.55);
-  --separator: rgb(0 0 0 / 0.08);
-  --keycap-fill: #FDFDFD;
-  --keycap-border: rgb(0 0 0 / 0.14);
+  /* Drafting paper. Warm enough to read as paper rather than a default white,
+     not so warm it reads as sepia. */
+  --surface: #FBFAF7;
+  /* Blue-black ink, not neutral black: it is what makes the page read as a
+     drawing rather than a document. Alphas are load-bearing and are asserted
+     by contrast.test.ts — 0.58 on secondary measures 4.39:1 and fails AA. */
+  --label: rgb(16 22 34 / 0.92);
+  --label-secondary: rgb(16 22 34 / 0.62);
+  --separator: rgb(16 22 34 / 0.12);
+  /* Stronger than a separator: this is the visible measure, and a hairline at
+     separator weight disappears against it. */
+  --rule: rgb(16 22 34 / 0.22);
 
-  /* A surface that sits *on* --surface: code blocks, the demo's screen bezel,
-     hovered rows. Deliberately a tint of the label colour rather than a fixed
-     grey, so it tracks both themes without a second constant. */
-  --raised: rgb(0 0 0 / 0.035);
-  --raised-strong: rgb(0 0 0 / 0.07);
+  /* Two accents, not one. --accent fills glyphs and buttons, where it sits
+     against white or a tint. --accent-text is for LINK TEXT, which must clear
+     4.5:1: #007AFF measures 4.02:1 on white and 3.85:1 on this paper. #0060D6
+     measures 5.52:1 and is already the app icon's gradient end. */
+  --accent: #007AFF;
+  --accent-text: #0060D6;
+
+  --raised: rgb(16 22 34 / 0.04);
+  --raised-strong: rgb(16 22 34 / 0.08);
+  --keycap-fill: #FFFFFF;
+  --keycap-border: rgb(16 22 34 / 0.18);
 
   --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -35,24 +33,26 @@
   --measure: 68ch;
   --page: 1080px;
   --radius: 10px;
-
-  /* One vertical rhythm for the whole site. Sections were 72px top AND bottom
-     around a hairline, which put 144px of dead air between two paragraphs and
-     left the rule floating in the middle of nothing. */
   --space-section: 64px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
+    /* Blueprint: a blue-black ground, not a neutral one. */
+    --surface: #0E1524;
+    --label: rgb(226 236 255 / 0.92);
+    --label-secondary: rgb(226 236 255 / 0.62);
+    --separator: rgb(226 236 255 / 0.14);
+    --rule: rgb(226 236 255 / 0.24);
+
     --accent: #0A84FF;
-    --surface: #1E1E1F;
-    --label: rgb(255 255 255 / 0.90);
-    --label-secondary: rgb(255 255 255 / 0.55);
-    --separator: rgb(255 255 255 / 0.10);
-    --keycap-fill: #3A3A3C;
-    --keycap-border: rgb(255 255 255 / 0.20);
-    --raised: rgb(255 255 255 / 0.05);
-    --raised-strong: rgb(255 255 255 / 0.10);
+    /* Measures 5.00:1 on #0E1524, so dark mode needs no separate link colour. */
+    --accent-text: #0A84FF;
+
+    --raised: rgb(226 236 255 / 0.05);
+    --raised-strong: rgb(226 236 255 / 0.10);
+    --keycap-fill: rgb(226 236 255 / 0.10);
+    --keycap-border: rgb(226 236 255 / 0.22);
   }
 }
 
@@ -118,7 +118,7 @@ h3 { font-size: 20px; margin-block: 28px 8px; }
 /* The browser default is #0000EE, which clashes with --accent in light mode
    and is close to unreadable on #1E1E1F in dark mode. Every link on the site
    was rendering in it. */
-a { color: var(--accent); text-underline-offset: 2px; text-decoration-thickness: 1px; }
+a { color: var(--accent-text); text-underline-offset: 2px; text-decoration-thickness: 1px; }
 a:hover { text-decoration-thickness: 2px; }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
@@ -203,4 +203,29 @@ pre {
 .visually-hidden {
   position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip-path: inset(50%); white-space: nowrap;
+}
+
+/*
+ * The visible measure. `.ticks` draws the fraction scale a diagram or section
+ * sits on. It is only honest if the content lines up with it — spec §3.3: if
+ * ticks and content disagree, delete the ticks rather than tuning them.
+ */
+.ticks {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--label-secondary);
+}
+.ticks span { border-left: 1px solid var(--rule); padding: 4px 0 0 5px; }
+.ticks span:first-child { border-left: 0; }
+
+/* Annotation: monospace, quiet, and always OUTSIDE a simulated app surface. */
+.annot {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--label-secondary);
+  letter-spacing: 0.01em;
 }

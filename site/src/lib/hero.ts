@@ -23,6 +23,15 @@ function describe(s: Selection, cols: number, rows: number): string {
   return `${w} of ${cols} columns, ${h} of ${rows} rows`;
 }
 
+/** A span as a reduced fraction, for annotation: 2 of 4 -> "1/2". */
+function fraction(span: number, of: number): string {
+  const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+  const d = gcd(span, of);
+  const n = span / d;
+  const q = of / d;
+  return q === 1 ? '1' : `${n}/${q}`;
+}
+
 /**
  * Make the hero grid work.
  *
@@ -48,6 +57,10 @@ export function attachHero(root: HTMLElement): void {
   const windowEl = root.querySelector<HTMLElement>('#hero-window');
   const status = root.querySelector<HTMLElement>('#hero-status');
   if (!grid || !windowEl || !status) return;
+
+  const readout = root.querySelector<HTMLElement>('#hero-readout');
+  /** The window that lands. Distinct from `windowEl`, which is the preview. */
+  const placedEl = root.querySelector<HTMLElement>('#hero-placed');
 
   const cols = Number(grid.dataset.cols);
   const rows = Number(grid.dataset.rows);
@@ -77,12 +90,23 @@ export function attachHero(root: HTMLElement): void {
   const rowEls = Array.from(grid.querySelectorAll<HTMLElement>('.row'));
   const cellEls = Array.from(grid.querySelectorAll<HTMLElement>('.cell'));
 
+  /** The selection's rect, as CSS percentages of the scene. */
+  function rectStyle(): { left: string; top: string; width: string; height: string } {
+    const r = gridBlock(FRAME, { cols, rows, ...selection, gap: GAP });
+    return {
+      left: `${(r.x / FRAME.width) * 100}%`,
+      top: `${(r.y / FRAME.height) * 100}%`,
+      width: `${(r.width / FRAME.width) * 100}%`,
+      height: `${(r.height / FRAME.height) * 100}%`,
+    };
+  }
+
   function paint() {
-    const rect = gridBlock(FRAME, { cols, rows, ...selection, gap: GAP });
-    windowEl!.style.left = `${(rect.x / FRAME.width) * 100}%`;
-    windowEl!.style.top = `${(rect.y / FRAME.height) * 100}%`;
-    windowEl!.style.width = `${(rect.width / FRAME.width) * 100}%`;
-    windowEl!.style.height = `${(rect.height / FRAME.height) * 100}%`;
+    const box = rectStyle();
+    windowEl!.style.left = box.left;
+    windowEl!.style.top = box.top;
+    windowEl!.style.width = box.width;
+    windowEl!.style.height = box.height;
     // Selection state is part of the grid pattern, not decoration: a screen
     // reader has no other way to know what the blue rectangle covers.
     for (const cell of cellEls) {
@@ -93,6 +117,16 @@ export function attachHero(root: HTMLElement): void {
       cell.setAttribute('aria-selected', String(inside));
     }
     grid!.setAttribute('aria-activedescendant', `hero-cell-${cursor.col}-${cursor.row}`);
+
+    // Annotation, deliberately outside the simulated screen. The real overlay
+    // shows no measurements (grid_overlay.dart renders only the ⌘S hint and an
+    // app-name chip), so putting numbers inside it would depict a feature
+    // Orthant does not have. See spec §3.5.
+    if (readout) {
+      const w = fraction(selection.c1 - selection.c0 + 1, cols);
+      const h = fraction(selection.r1 - selection.r0 + 1, rows);
+      readout.textContent = `${describe(selection, cols, rows)} · ${w} × ${h} of the screen`;
+    }
   }
 
   function normalise() {
@@ -104,12 +138,23 @@ export function attachHero(root: HTMLElement): void {
     };
   }
 
-  /** Brief visual confirmation that Return/pointer-release did something. */
+  /**
+   * The commit the app itself performs on release or Return: `windowEl` is
+   * only ever the preview that follows the selection, so it is `placedEl` —
+   * the Safari window in the scene — that has to move here, or the hero is a
+   * diagram instead of a demonstration (spec §4.1).
+   */
   function announcePlacement() {
     status!.textContent = `Window placed: ${describe(selection, cols, rows)}.`;
-    windowEl!.setAttribute('data-placed', '');
+    if (!placedEl) return;
+    const box = rectStyle();
+    placedEl.style.left = box.left;
+    placedEl.style.top = box.top;
+    placedEl.style.width = box.width;
+    placedEl.style.height = box.height;
+    placedEl.setAttribute('data-placed', '');
     clearTimeout(placedTimer);
-    placedTimer = window.setTimeout(() => windowEl!.removeAttribute('data-placed'), 260);
+    placedTimer = window.setTimeout(() => placedEl!.removeAttribute('data-placed'), 260);
   }
 
   // The WAI-ARIA grid pattern, applied once. `data-ready` is the hook the

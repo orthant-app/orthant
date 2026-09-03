@@ -44,3 +44,25 @@ describe('the hero\'s demo does not move the page under the reader', () => {
     expect(figure![1]).not.toMatch(/\shidden(\s|>|=)/);
   });
 });
+
+describe('the hero\'s resting selection is visible without JavaScript', () => {
+  /*
+   * `aria-selected` is written only by paint(), so with the controller absent
+   * every cell renders at the same unselected tint while the preview — whose
+   * geometry IS a CSS constant — shows a left-half placement. The scene
+   * contradicts itself. This asserts the CSS carries the selection too.
+   */
+  it('tints the resting selection from CSS, retiring once the controller attaches', () => {
+    const css = readFileSync('src/components/Hero.astro', 'utf8');
+    const rule = /\.grid:not\(\[data-ready\]\)[^{]*\.cell:nth-child\(-n \+ (\d+)\)\s*\{([^}]*)\}/.exec(css);
+    expect(rule, 'no no-JS resting-selection rule found in Hero.astro').not.toBeNull();
+    expect(rule![2]).toContain('--accent');
+
+    // The count must equal the default selection's width, or the CSS and the
+    // controller disagree about what "resting" means.
+    const COLS = 4;
+    const r = gridBlock(FRAME, { cols: COLS, rows: 3, c0: 0, c1: 1, r0: 0, r1: 2, gap: 12 });
+    const columnsCovered = Math.round((r.width / FRAME.width) * COLS);
+    expect(Number(rule![1])).toBe(columnsCovered);
+  });
+});

@@ -49,7 +49,7 @@ const jsonLd = {
     <video
       controls muted playsinline loop
       preload="none"
-      poster="/demo-poster.png"
+      poster="/demo-poster.webp"
       width="1280"
       height="706"
       aria-label="Windows snap to halves and quarters with keyboard shortcuts; the grid overlay places a window on a drawn selection; a left-two-thirds region is drawn, saved, bound to a shortcut, and used."
@@ -166,19 +166,7 @@ const jsonLd = {
 
   .steps { display: grid; gap: 28px; list-style: none; margin: 0; padding: 0; }
   @media (min-width: 760px) { .steps { grid-template-columns: repeat(3, 1fr); } }
-  /*
-   * 28px, not the site's usual 10px: RegionDiagram's combo label is drawn with
-   * a hanging baseline just past the SVG's own viewBox, and the SVG is
-   * `overflow: visible` (needed so the label isn't clipped) — so on the one
-   * diagram here with a `combo`, the glyph render past the element's own box
-   * into whatever sits below it. Measured at 1440px: an unpadded caption
-   * overlapped the combo label by 18.6px at the widest column (1440px+,
-   * where `.wrap`'s 1080px cap holds the column at 325px). 32px clears that
-   * worst case with a few pixels to spare for cross-browser glyph-metric
-   * variance; a component-level fix belongs in diagram.ts's viewBox math,
-   * not here, but that risks the geometry diagram.test.ts pins.
-   */
-  .steps p { margin: 32px 0 0; color: var(--label-secondary); font-size: 15px; }
+  .steps p { margin: 10px 0 0; color: var(--label-secondary); font-size: 15px; }
 
   .keymap {
     display: grid; gap: 20px 24px; list-style: none; margin: 0 0 20px; padding: 0;

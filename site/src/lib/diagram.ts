@@ -31,6 +31,24 @@ const FRAME: Rect = { x: 0, y: 0, width: 100, height: 100 };
 const PAD = 1;
 
 /**
+ * Extra room below the frame, reserved ONLY when a combo label is drawn.
+ *
+ * The combo `<text>` sits at y = FRAME.height + PAD (101) with a hanging
+ * baseline, so its glyphs extend DOWN from that point rather than up: a
+ * hanging baseline is near the top of the em box, so almost the whole
+ * 9px font-size renders below y=101 (measured ~9 units of actual ink).
+ * `COMBO_ROOM` extends the viewBox to actually CONTAIN that ink, rather than
+ * relying on `overflow: visible` to let it spill into whatever sits below
+ * the element in the page -- which scales with the diagram's own rendered
+ * width and cannot be compensated by a fixed-px CSS margin at the call site.
+ *
+ * Gated on `o.combo` in `regionSvg`, not applied unconditionally: the nine
+ * keymap diagrams carry no combo, and `width: 100%; height: auto` means a
+ * taller viewBox is a visible reshape for them, not just a bigger box.
+ */
+const COMBO_ROOM = 11;
+
+/**
  * Escape for both element text and attribute values.
  *
  * The quote matters: `title` is interpolated into `aria-label="…"` as well as
@@ -60,8 +78,9 @@ export function regionSvg(o: DiagramOptions): string {
   }
 
   const fill = gridBlock(FRAME, { cols: o.cols, rows: o.rows, c0: o.c0, c1: o.c1, r0: o.r0, r1: o.r1 });
+  const viewBoxHeight = FRAME.height + PAD * 2 + (o.combo ? COMBO_ROOM : 0);
   const parts = [
-    `<svg class="region" viewBox="${-PAD} ${-PAD} ${FRAME.width + PAD * 2} ${FRAME.height + PAD * 2}" role="img" aria-label="${escape(o.title)}">`,
+    `<svg class="region" viewBox="${-PAD} ${-PAD} ${FRAME.width + PAD * 2} ${viewBoxHeight}" role="img" aria-label="${escape(o.title)}">`,
     `<title>${escape(o.title)}</title>`,
     ...cells,
     `<rect class="fill" x="${n(fill.x)}" y="${n(fill.y)}" width="${n(fill.width)}" height="${n(fill.height)}" />`,

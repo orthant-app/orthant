@@ -72,4 +72,36 @@ describe('regionSvg', () => {
     expect(svg).toContain('<text class="combo" x="50" y="101">d&lt;e&gt;&amp;f</text>');
     expect(svg).not.toContain('<e>');
   });
+
+  // A hanging-baseline combo label renders BELOW its y coordinate, and
+  // `overflow: visible` used to let that ink spill into whatever the page put
+  // below the element -- an overlap that scales with the diagram's own
+  // rendered width and cannot be compensated by a fixed-px CSS margin at the
+  // call site (measured on the real page: 18.6px at 1440px, but -29.41px --
+  // WORSE -- at 759px, where the single-column layout renders the diagram at
+  // its widest). The viewBox itself must contain the label instead.
+  it('extends the viewBox to actually contain the combo label, not merely avoid clipping it via overflow', () => {
+    const withCombo = regionSvg({ cols: 2, rows: 2, c0: 0, c1: 0, r0: 0, r1: 0, title: 'x', combo: '⌃⌥←' });
+    const withoutCombo = regionSvg({ cols: 2, rows: 2, c0: 0, c1: 0, r0: 0, r1: 0, title: 'x' });
+    const bottomOf = (svg: string) => {
+      const [, minY, , height] = /viewBox="([^"]+)"/.exec(svg)![1].split(' ').map(Number);
+      return minY + height;
+    };
+    const comboBottom = bottomOf(withCombo);
+    const plainBottom = bottomOf(withoutCombo);
+    expect(comboBottom).toBeGreaterThan(plainBottom);
+    // The label sits at y=101 with a hanging baseline, so its glyphs extend
+    // DOWN from there by close to the font's own size (9). The box must
+    // reach past that point, not merely be taller than before.
+    expect(comboBottom).toBeGreaterThanOrEqual(101 + 9);
+  });
+
+  // The nine keymap diagrams never pass `combo`, and the SVG is
+  // `width: 100%; height: auto` -- a taller viewBox for them would be a
+  // visible reshape, not just a bigger box, so this must be an EXACT match to
+  // today's square viewBox rather than merely "not taller".
+  it('keeps the exact viewBox when no combo is given, so the nine keymap glyphs never reshape', () => {
+    const svg = regionSvg({ cols: 2, rows: 2, c0: 0, c1: 0, r0: 0, r1: 0, title: 'x' });
+    expect(/viewBox="([^"]+)"/.exec(svg)![1]).toBe('-1 -1 102 102');
+  });
 });

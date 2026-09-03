@@ -1,10 +1,12 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:orthant/core/geometry.dart';
 import 'package:orthant/settings/settings.dart';
 import 'package:orthant/settings/shortcuts_screen.dart';
 import 'package:orthant/shortcuts/bindings.dart';
 import 'package:orthant/shortcuts/command_ref.dart';
+import 'package:orthant/shortcuts/region_commands.dart';
 
 /// The site documents behaviour, and behaviour lives in Dart. These assertions
 /// are the reason the site shares this repo: a separate repo could not have
@@ -150,6 +152,60 @@ void main() {
     if (unpublished.length == 1) {
       expect(unpublished.single.key, matching.single.key,
           reason: 'the only unpublished entry must be the current version');
+    }
+  });
+
+  // The site keeps a TypeScript copy of the default bindings so it can render
+  // diagrams at build time. A copy of Dart data in another language drifts the
+  // moment a default changes, and nothing else here would notice: the
+  // markdown-table test above reads the shortcuts page, not this file.
+  test("the site's command catalogue matches the default bindings", () {
+    final ts = read('site/src/lib/commands.ts');
+    final entry = RegExp(
+        r"kind:\s*'(\w+)',\s*id:\s*'(\w+)',\s*label:\s*'([^']+)',\s*combo:\s*'([^']+)'");
+    final found = <String, List<String>>{};
+    for (final m in entry.allMatches(ts)) {
+      found[m.group(2)!] = [m.group(3)!, m.group(4)!];
+    }
+    expect(found, isNotEmpty, reason: 'commands.ts parsed to nothing - has its shape changed?');
+
+    // Label AND combo. An earlier draft captured the label and then discarded
+    // it, so the catalogue could have advertised "Left half" for the RIGHT half
+    // and the guard would have passed.
+    final expected = {
+      for (final b in kDefaultBindings)
+        (b.command as BuiltIn).command.name: [
+          kCommandLabels[(b.command as BuiltIn).command]!,
+          formatCombo(b.keyCode, b.modifiers),
+        ],
+    };
+    expect(found, expected);
+  });
+
+  // Ids and combos matching still leaves the geometry unchecked: a catalogue
+  // can name `leftHalf` correctly and map it to the right half's indices. This
+  // asserts the block each entry declares produces the rect the app produces.
+  test("the site's block indices produce the app's own rects", () {
+    final ts = read('site/src/lib/commands.ts');
+    final entry = RegExp(
+        r"kind:\s*'block',\s*id:\s*'(\w+)',[^}]*?block:\s*\{\s*"
+        r'c0:\s*(\d+),\s*c1:\s*(\d+),\s*r0:\s*(\d+),\s*r1:\s*(\d+)\s*\}');
+    final blocks = {
+      for (final m in entry.allMatches(ts))
+        m.group(1)!: [int.parse(m.group(2)!), int.parse(m.group(3)!),
+                      int.parse(m.group(4)!), int.parse(m.group(5)!)],
+    };
+    expect(blocks, hasLength(9),
+        reason: 'expected nine block placements in commands.ts, found ${blocks.length}');
+
+    const frame = WinRect(0, 0, 1600, 1000);
+    for (final e in blocks.entries) {
+      final command =
+          RegionCommand.values.firstWhere((c) => c.name == e.key);
+      final fromApp = rectForCommand(command, frame, current: frame);
+      final fromSite = gridBlock(frame,
+          cols: 2, rows: 2, c0: e.value[0], c1: e.value[1], r0: e.value[2], r1: e.value[3]);
+      expect(fromSite, fromApp, reason: 'commands.ts block for ${e.key} is not the app\'s rect');
     }
   });
 }

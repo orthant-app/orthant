@@ -1,0 +1,25 @@
+---
+import { regionSvg, type DiagramOptions } from '../lib/diagram';
+type Props = DiagramOptions;
+const svg = regionSvg(Astro.props);
+---
+<div class="diagram" set:html={svg}></div>
+
+<style>
+  /* Styled by class, never by attribute: `style-src 'self'` drops style
+     attributes, so an inline-styled SVG renders as a bare outline. */
+  .diagram { display: block; }
+  .diagram :global(svg.region) { display: block; width: 100%; height: auto; overflow: visible; }
+  .diagram :global(.cell) { fill: none; stroke: var(--rule); stroke-width: 0.6; }
+  .diagram :global(.fill) {
+    fill: color-mix(in srgb, var(--accent) 18%, transparent);
+    stroke: var(--accent); stroke-width: 1.2;
+  }
+  .diagram :global(.label),
+  .diagram :global(.combo) {
+    font-family: var(--font-mono); font-size: 9px;
+    fill: var(--label-secondary); text-anchor: middle;
+  }
+  .diagram :global(.label) { dominant-baseline: middle; fill: var(--label); }
+  .diagram :global(.combo) { dominant-baseline: hanging; }
+</style>

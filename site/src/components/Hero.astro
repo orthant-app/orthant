@@ -208,15 +208,22 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
   }
   /*
    * WCAG 2.2 SC 2.5.8 requires BOTH cell dimensions to reach 24px; at 46% the
-   * height fell short (measured 27.3 x 22.7 at a 320px viewport, hero-cell-
-   * size.test.ts derives the same numbers from these constants). The height
-   * is the tighter axis — the grid's own aspect-ratio is 16/10 across 4
-   * columns and only 3 rows — so 60% (comfortably over the ~48.3% that just
-   * clears it) is scoped to phone widths only, leaving the panel the gate
-   * already approved untouched everywhere else.
+   * height fell short (measured 27.3 x 22.7 at a 320px viewport;
+   * hero-default.test.ts derives the same numbers from these constants). The
+   * height is the tighter axis — the grid's own aspect-ratio is 16/10 across
+   * 4 columns and only 3 rows.
+   *
+   * The breakeven is f ~= 0.483 (gives exactly 24.0px height, zero margin —
+   * fragile against any later font or layout change). 52% was chosen over
+   * that floor for margin (measured ~26.1px height), NOT by eye: widening
+   * further has a real cost, since the panel sits over the scene it is
+   * meant to be a compact overlay ON — at 60% it covered enough of the
+   * simulated Safari/Terminal/Notes windows to hide their own labels, which
+   * is the payoff the scene exists to show. Scoped to phone widths only;
+   * the panel the gate already approved is untouched everywhere else.
    */
   @media (max-width: 428px) {
-    .panel { width: 60%; }
+    .panel { width: 52%; }
   }
   .chip {
     height: 15px; line-height: 15px;

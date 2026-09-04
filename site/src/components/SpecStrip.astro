@@ -21,9 +21,16 @@ import { FACTS } from '../lib/facts';
    */
   .strip {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 14px 24px;
+    /* Two columns below 500px: auto-fit alone gives ONE column at 320px (two
+       150px tracks plus the gap do not fit a 272px content box), which is the
+       single-column wall the design gate flagged. minmax(0, …), not a bare
+       auto-fit floor — see the identical note in Hero.astro's .hero rule. */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 16px;
     list-style: none; margin-block: 0; padding-block: 18px;
+  }
+  @media (min-width: 500px) {
+    .strip { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px 24px; }
   }
   li { display: flex; flex-direction: column; gap: 1px; }
   .value {

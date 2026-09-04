@@ -6,6 +6,16 @@ import { gridBlock, type Rect } from './grid';
 const FRAME: Rect = { x: 0, y: 0, width: 1600, height: 1000 };
 const GAP = 12;
 
+/**
+ * How long the panel stays faded after a commit before it returns (item 3a of
+ * the design gate: the panel was hiding the placement it had just made).
+ * Chosen to read as a deliberate reveal — long enough to register the moved
+ * window, short enough not to feel stuck — and independent of the 260ms
+ * landed-border flash below, which is a different signal on a different
+ * element.
+ */
+const PANEL_FADE_MS = 900;
+
 interface Selection { c0: number; c1: number; r0: number; r1: number }
 
 const NAMES: Record<string, string> = {
@@ -61,6 +71,10 @@ export function attachHero(root: HTMLElement): void {
   const readout = root.querySelector<HTMLElement>('#hero-readout');
   /** The window that lands. Distinct from `windowEl`, which is the preview. */
   const placedEl = root.querySelector<HTMLElement>('#hero-placed');
+  /** The scale-model panel itself — faded briefly on commit so its own
+   *  placement is visible underneath. Distinct from `grid`, which is the
+   *  cell surface inside it. */
+  const panelEl = root.querySelector<HTMLElement>('.panel');
 
   const cols = Number(grid.dataset.cols);
   const rows = Number(grid.dataset.rows);
@@ -71,6 +85,7 @@ export function attachHero(root: HTMLElement): void {
   let cursor = { col: 1, row: rows - 1 };
   let dragging = false;
   let placedTimer = 0;
+  let panelTimer = 0;
 
   /**
    * State captured at pointerdown so a cancelled gesture can be undone.
@@ -146,15 +161,30 @@ export function attachHero(root: HTMLElement): void {
    */
   function announcePlacement() {
     status!.textContent = `Window placed: ${describe(selection, cols, rows)}.`;
-    if (!placedEl) return;
-    const box = rectStyle();
-    placedEl.style.left = box.left;
-    placedEl.style.top = box.top;
-    placedEl.style.width = box.width;
-    placedEl.style.height = box.height;
-    placedEl.setAttribute('data-placed', '');
-    clearTimeout(placedTimer);
-    placedTimer = window.setTimeout(() => placedEl!.removeAttribute('data-placed'), 260);
+
+    if (placedEl) {
+      const box = rectStyle();
+      placedEl.style.left = box.left;
+      placedEl.style.top = box.top;
+      placedEl.style.width = box.width;
+      placedEl.style.height = box.height;
+      placedEl.setAttribute('data-placed', '');
+      clearTimeout(placedTimer);
+      placedTimer = window.setTimeout(() => placedEl!.removeAttribute('data-placed'), 260);
+    }
+
+    // Fade the panel out so the placement it just made is visible, then
+    // restore it so a second interaction is still possible: dismissOverlay()
+    // removes the real app's overlay on this same commit, so a panel that
+    // never moves is the LESS faithful depiction (spec §3.5 forbids depicting
+    // UI the app lacks, not behaviour it has). The CSS transition this
+    // attribute drives is itself gated on `prefers-reduced-motion` — under
+    // `reduce` the state still changes, just without animating.
+    if (panelEl) {
+      panelEl.setAttribute('data-reveal', '');
+      clearTimeout(panelTimer);
+      panelTimer = window.setTimeout(() => panelEl!.removeAttribute('data-reveal'), PANEL_FADE_MS);
+    }
   }
 
   // The WAI-ARIA grid pattern, applied once. `data-ready` is the hook the

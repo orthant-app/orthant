@@ -7,18 +7,15 @@ const rows = Array.from({ length: ROWS }, (_, r) => r);
 const cols = Array.from({ length: COLS }, (_, c) => c);
 ---
 <section class="hero wrap">
-  <div class="copy">
+  {/* Split from one .copy block so the DOM order can put the figure right
+      after the headline: category -> headline -> compact scene -> supporting
+      copy and actions on small screens, with NEITHER `order:` NOR
+      `column-reverse` (both would desync focus order from visual order).
+      grid-template-areas below reunites the two copy blocks in one column
+      on the desktop two-column layout, without moving either in the DOM. */}
+  <div class="copy-lead">
     <p class="eyebrow">A window manager for macOS</p>
     <h1>Draw where a window should go. Give it a shortcut.</h1>
-    <p class="lede">
-      Halves and quarters on keys, like everything else. Then draw any region you
-      want, name it, and bind it. Free and open source.
-    </p>
-
-    <div class="cta">
-      <a class="btn btn-primary" href="/download">Download for macOS 13+</a>
-      <a class="btn btn-secondary" href="#see-it-work">See it work</a>
-    </div>
   </div>
 
   <figure class="demo">
@@ -79,6 +76,18 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
     </figcaption>
     <p id="hero-status" class="visually-hidden" role="status" aria-live="polite"></p>
   </figure>
+
+  <div class="copy-trail">
+    <p class="lede">
+      Halves and quarters on keys, like everything else. Then draw any region you
+      want, name it, and bind it. Free and open source.
+    </p>
+
+    <div class="cta">
+      <a class="btn btn-primary" href="/download">Download for macOS 13+</a>
+      <a class="btn btn-secondary" href="#see-it-work">See it work</a>
+    </div>
+  </div>
 </section>
 
 <style>
@@ -92,14 +101,28 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
   .hero {
     padding-block: 40px 64px;
     display: grid; grid-template-columns: minmax(0, 1fr);
-    gap: 40px; align-items: center;
+    /* Source order already matches this: lead, then figure, then trail. The
+       named areas exist so the desktop rule below can reunite the copy
+       without moving anything in the DOM — see `.copy-lead`/`.copy-trail`. */
+    grid-template-areas: "lead" "figure" "trail";
+    gap: 24px; align-items: center;
   }
   /* Equal columns, and not before 980px: the install command is 41 monospace
      characters plus a Copy button, and a narrower column clips it — which
      reads as a broken command rather than a narrow box. */
   @media (min-width: 980px) {
-    .hero { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; }
+    .hero {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-areas: "lead figure" "trail figure";
+      /* Row-gap 0: h1's own 14px margin-bottom is the only space between the
+         two copy blocks, exactly reproducing the single-.copy-block spacing
+         this replaced — the desktop layout the gate already approved is
+         pixel-for-pixel unchanged. */
+      gap: 0 56px;
+    }
   }
+  .copy-lead { grid-area: lead; }
+  .copy-trail { grid-area: trail; }
 
   h1 {
     font-size: clamp(32px, 3.2vw, 44px);
@@ -109,7 +132,7 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
   .lede { font-size: 19px; color: var(--label-secondary); margin: 0 0 24px; max-width: 34ch; }
   .cta { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
 
-  .demo { margin: 0; }
+  .demo { margin: 0; grid-area: figure; }
   .eyebrow {
     font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.04em;
     text-transform: uppercase; color: var(--label-secondary); margin: 0 0 10px;
@@ -183,6 +206,18 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
     background: rgb(16 22 34 / 0.78);
     z-index: 2;
   }
+  /*
+   * WCAG 2.2 SC 2.5.8 requires BOTH cell dimensions to reach 24px; at 46% the
+   * height fell short (measured 27.3 x 22.7 at a 320px viewport, hero-cell-
+   * size.test.ts derives the same numbers from these constants). The height
+   * is the tighter axis — the grid's own aspect-ratio is 16/10 across 4
+   * columns and only 3 rows — so 60% (comfortably over the ~48.3% that just
+   * clears it) is scoped to phone widths only, leaving the panel the gate
+   * already approved untouched everywhere else.
+   */
+  @media (max-width: 428px) {
+    .panel { width: 60%; }
+  }
   .chip {
     height: 15px; line-height: 15px;
     margin-bottom: 5px;
@@ -230,6 +265,19 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
   .win-front[data-placed] { border-color: var(--accent); }
   .win-front[data-placed] span { background: color-mix(in srgb, var(--accent) 22%, var(--surface)); }
 
+  /*
+   * The panel obscured its own payoff: selecting a region moves the Safari
+   * window, but the persistent panel covered most of it. announcePlacement()
+   * in hero.ts sets this attribute on commit and clears it after
+   * PANEL_FADE_MS, so the panel steps out of the way and then comes back —
+   * this is MORE faithful than a panel that never moves, since the real app
+   * calls dismissOverlay() on the same commit (spec §3.5 forbids depicting UI
+   * the app lacks; it does not forbid depicting behaviour the app has).
+   * pointer-events: none is not gated on reduced motion: whether or not the
+   * transition animates, the panel is genuinely out of the way for that span.
+   */
+  .panel[data-reveal] { opacity: 0; pointer-events: none; }
+
   figcaption { margin-top: 14px; }
   .hint { color: var(--label-secondary); font-size: 14px; margin: 6px 0 0; }
   .keys {
@@ -244,6 +292,11 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
   @media (prefers-reduced-motion: no-preference) {
     .preview { transition: left .16s ease, top .16s ease, width .16s ease, height .16s ease; }
     .win-front { transition: left .2s ease, top .2s ease, width .2s ease, height .2s ease; }
+    /* Under `reduce`, .panel[data-reveal] above still applies with no
+       transition property — the attribute flip changes opacity instantly
+       instead of animating it, exactly the existing pattern for the two
+       rules above. */
+    .panel { transition: opacity .2s ease; }
   }
 </style>
 

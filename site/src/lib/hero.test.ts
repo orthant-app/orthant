@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { attachHero } from './hero';
 
 function mount(): HTMLElement {
@@ -11,9 +11,11 @@ function mount(): HTMLElement {
     }</div>`;
   document.body.innerHTML = `
     <section id="root">
-      <div id="hero-grid" data-cols="4" data-rows="3" aria-describedby="hero-hint">
-        ${[0, 1, 2].map(row).join('')}
-        <div id="hero-window"></div>
+      <div id="hero-window"></div>
+      <div class="panel">
+        <div id="hero-grid" data-cols="4" data-rows="3" aria-describedby="hero-hint">
+          ${[0, 1, 2].map(row).join('')}
+        </div>
       </div>
       <p id="hero-hint"></p>
       <div id="hero-placed"></div>
@@ -28,6 +30,7 @@ function mount(): HTMLElement {
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const grid = () => $('hero-grid');
 const win = () => $('hero-window');
+const panel = () => document.querySelector('.panel') as HTMLElement;
 
 // NOTE: dispatched on the GRID, never on `document`. The listener is attached
 // to the grid, so a document-level dispatch never reaches it and the assertion
@@ -297,5 +300,71 @@ describe('attachHero — the window lands', () => {
     expect($('hero-placed').hasAttribute('data-placed')).toBe(false);
     press('Enter');
     expect($('hero-placed').hasAttribute('data-placed')).toBe(true);
+  });
+});
+
+describe('attachHero — the panel fade', () => {
+  /*
+   * Item 3a of the design gate: selecting a region moves the Safari window,
+   * but the persistent panel covered most of it. announcePlacement() — the
+   * one function both commit paths already share — is the hook.
+   */
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mount();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('fades the panel when Return commits', () => {
+    expect(panel().hasAttribute('data-reveal')).toBe(false);
+    press('Enter');
+    expect(panel().hasAttribute('data-reveal')).toBe(true);
+  });
+
+  it('fades the panel when a pointer release commits too', () => {
+    pointer('pointerdown', $('hero-cell-1-1'));
+    pointer('pointerup', grid());
+    expect(panel().hasAttribute('data-reveal')).toBe(true);
+  });
+
+  it('does not fade on a mere selection change', () => {
+    press('ArrowRight');
+    expect(panel().hasAttribute('data-reveal')).toBe(false);
+  });
+
+  it('restores the panel after the fade duration, so a second interaction is possible', () => {
+    press('Enter');
+    expect(panel().hasAttribute('data-reveal')).toBe(true);
+    vi.advanceTimersByTime(899);
+    expect(panel().hasAttribute('data-reveal')).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(panel().hasAttribute('data-reveal')).toBe(false);
+  });
+
+  it('resets the fade timer on a second commit instead of racing two timers', () => {
+    press('Enter');
+    vi.advanceTimersByTime(700);
+    press('Enter'); // must clear and reschedule, not leave the first timer running
+    vi.advanceTimersByTime(700); // 1400ms since commit 1, only 700ms since commit 2
+    expect(panel().hasAttribute('data-reveal')).toBe(true);
+    vi.advanceTimersByTime(200); // 900ms since commit 2
+    expect(panel().hasAttribute('data-reveal')).toBe(false);
+  });
+
+  it('does not throw when the markup has no .panel to fade', () => {
+    document.body.innerHTML = `
+      <section id="root">
+        <div id="hero-grid" data-cols="4" data-rows="3">
+          <div class="row" data-row="0"><div class="cell" id="hero-cell-0-0" data-col="0" data-row="0"></div></div>
+        </div>
+        <div id="hero-window"></div>
+        <p id="hero-status" role="status" aria-live="polite"></p>
+      </section>`;
+    const root = document.getElementById('root') as HTMLElement;
+    expect(() => attachHero(root)).not.toThrow();
+    expect(() => press('Enter')).not.toThrow();
   });
 });

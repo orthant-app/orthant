@@ -169,8 +169,16 @@ const jsonLd = {
   .steps p { margin: 10px 0 0; color: var(--label-secondary); font-size: 15px; }
 
   .keymap {
-    display: grid; gap: 20px 24px; list-style: none; margin: 0 0 20px; padding: 0;
-    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+    display: grid; gap: 20px 16px; list-style: none; margin: 0 0 20px; padding: 0;
+    /* Two columns below 500px: eleven rows of one column each was a 2,250px
+       wall on a 320px screen (measured before this change). auto-fit alone
+       gives one column that narrow (two 128px tracks plus the gap exceed a
+       272px content box) — minmax(0, …) so the forced 2-up track cannot be
+       floored at its min-content width the way a bare `auto` track can. */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  @media (min-width: 500px) {
+    .keymap { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 20px 24px; }
   }
   .keymap li { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
   .keymap :global(.diagram) { width: 100%; max-width: 84px; }

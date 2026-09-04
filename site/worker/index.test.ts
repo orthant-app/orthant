@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import handler, { FALLBACK_URL, handleDownload, type CacheLike } from './index';
+import handler from './index';
+import { FALLBACK_URL, handleDownload, type CacheLike } from './download';
 
 const GOOD = 'https://github.com/orthant-app/orthant/releases/download/v1.0.1/Orthant-1.0.1.dmg';
 

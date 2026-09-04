@@ -6,7 +6,8 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "test": "vitest run"
+    "test": "vitest run && npm run test:worker-smoke",
+    "test:worker-smoke": "node worker/smoke-test.mjs"
   },
   "dependencies": {
     "astro": "7.2.10",

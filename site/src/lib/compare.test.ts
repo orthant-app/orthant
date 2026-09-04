@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { existsSync, readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { attachScrollHint } from './compare';
 
@@ -28,7 +29,14 @@ function stub(el: HTMLElement, props: { scrollWidth: number; clientWidth: number
   Object.defineProperty(el, 'scrollLeft', { value: props.scrollLeft, configurable: true, writable: true });
 }
 
-const wrapAttr = (wrap: HTMLElement) => wrap.hasAttribute('data-can-scroll');
+// The attribute is a literal "true"/"false" string, never mere presence —
+// see compare.ts's own doc comment for why (the CSS-only no-JS baseline
+// needs to tell "JavaScript decided false" apart from "JavaScript never
+// ran"). This helper reads the boolean the CSS-visible-toggle rules key
+// off; a separate assertion below checks the attribute is always SET once
+// attachScrollHint has run at all, which the old presence-based version
+// could not have distinguished from "false".
+const wrapAttr = (wrap: HTMLElement) => wrap.getAttribute('data-can-scroll') === 'true';
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -61,6 +69,24 @@ describe('attachScrollHint — the comparison table\'s scroll affordance', () =>
     attachScrollHint(wrap);
 
     expect(wrapAttr(wrap)).toBe(false);
+  });
+
+  it('writes an explicit "false", not mere absence, once it has run and decided false', () => {
+    // The property the CSS no-JS baseline depends on: compare.astro's
+    // stylesheet must be able to tell "JavaScript ran and said false" apart
+    // from "JavaScript never ran at all" (attribute absent), because those
+    // two cases resolve to opposite CSS defaults below the overflow
+    // threshold. `toggleAttribute` — the previous implementation — cannot
+    // make this distinction; it leaves the attribute equally absent either
+    // way.
+    const wrap = mount();
+    const scroller = wrap.querySelector('.scroll-x') as HTMLElement;
+    stub(scroller, { scrollWidth: 900, clientWidth: 900, scrollLeft: 0 });
+
+    attachScrollHint(wrap);
+
+    expect(wrap.hasAttribute('data-can-scroll')).toBe(true);
+    expect(wrap.getAttribute('data-can-scroll')).toBe('false');
   });
 
   it('does not show the affordance when already scrolled to the end', () => {
@@ -113,4 +139,76 @@ describe('attachScrollHint — the comparison table\'s scroll affordance', () =>
 
     expect(wrapAttr(wrap)).toBe(false);
   });
+});
+
+/**
+ * Guards the no-JavaScript baseline itself, against the actual BUILT output
+ * — not the .astro source, and not attachScrollHint, which never runs at
+ * all for the visitor this section is about. `dist/` must already exist
+ * (`npm run build` first; this suite does not build for itself, matching
+ * dist-csp.test.ts's own reasoning: a full build on every `vitest watch`
+ * save would be a bad trade).
+ *
+ * A prior version of the affordance had `.scroll-fade`/`.swipe-hint`
+ * default to `visibility: hidden` unconditionally, revealed only by
+ * compare.ts setting `data-can-scroll`. That is invisible to plain
+ * assertions against attachScrollHint, because attachScrollHint IS the
+ * thing that would be missing — the only way to catch a regression back to
+ * that shape is to read the CSS a real no-JS browser would apply, which is
+ * what ships in dist/_astro/compare.*.css, referenced from
+ * dist/compare/index.html.
+ */
+describe('the comparison table\'s scroll cue has a safe CSS-only baseline', () => {
+  const DIST = 'dist';
+  const PAGE = `${DIST}/compare/index.html`;
+
+  it('has a build to check', () => {
+    expect(existsSync(PAGE), `${PAGE} is missing — run \`npm run build\` first`).toBe(true);
+  });
+
+  if (existsSync(PAGE)) {
+    // Concatenate every stylesheet compare/index.html actually links —
+    // matching how a real browser assembles the cascade for this page,
+    // rather than guessing which hashed file holds the relevant rule.
+    const html = readFileSync(PAGE, 'utf8');
+    const hrefs = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
+    const css = hrefs
+      .map((href) => readFileSync(`${DIST}${href}`, 'utf8'))
+      .join('\n');
+
+    it('found the page\'s own stylesheets to check', () => {
+      expect(hrefs.length, 'no <link rel="stylesheet"> found on the compare page').toBeGreaterThan(0);
+      expect(css, 'none of the linked stylesheets mention .scroll-fade').toMatch(/\.scroll-fade/);
+    });
+
+    it('defaults the fade and hint to visible OUTSIDE any media query', () => {
+      // Anchored to start with `.scroll-fade[` specifically: the
+      // JS-attribute-driven rules further down always mention
+      // `.table-scroll-wrap` and `[data-can-scroll=…]` BEFORE `.scroll-fade`
+      // ever appears, so this cannot accidentally match one of those.
+      const beforeMedia = css.slice(0, css.indexOf('@media'));
+      const base = /\.scroll-fade\[[^\]]*\],\.swipe-hint\[[^\]]*\]\{([^}]*)\}/.exec(beforeMedia);
+      expect(base, 'no unconditional .scroll-fade/.swipe-hint rule found before the first @media').not.toBeNull();
+      expect(base![1]).toBe('visibility:visible');
+    });
+
+    it('hides the fade and hint inside a media query gated on the measured 528px breakpoint', () => {
+      const media = /@media[^{]*528[^{]*\{([^}]+)\}/.exec(css);
+      expect(media, 'no @media block mentioning 528 found').not.toBeNull();
+      expect(media![1]).toContain('.scroll-fade');
+      expect(media![1]).toContain('.swipe-hint');
+      expect(media![1]).toContain('visibility:hidden');
+    });
+
+    it('still lets compare.ts\'s own measurement override the CSS baseline at any width', () => {
+      // The two rules keyed on the explicit "true"/"false" string compare.ts
+      // writes — kept working alongside the new baseline, not replaced by it.
+      const trueRule = /\[data-can-scroll=true\][^{]*\{([^}]*)\}/.exec(css);
+      const falseRule = /\[data-can-scroll=false\][^{]*\{([^}]*)\}/.exec(css);
+      expect(trueRule, 'no [data-can-scroll=true] rule found').not.toBeNull();
+      expect(falseRule, 'no [data-can-scroll=false] rule found').not.toBeNull();
+      expect(trueRule![1]).toBe('visibility:visible');
+      expect(falseRule![1]).toBe('visibility:hidden');
+    });
+  }
 });

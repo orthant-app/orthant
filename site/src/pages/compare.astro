@@ -54,29 +54,46 @@ const rows = [
     </p>
 
     <h2>Against other window managers</h2>
-    <div class="scroll-x">
-    <table>
-      <thead>
-        <tr>
-          <th>App</th><th>Grid overlay</th><th>Custom regions</th><th>Rebindable</th><th>Price</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr class={r.self ? 'self' : undefined}>
-            <td>{r.href ? <a href={r.href} rel="noopener">{r.name}</a> : r.name}</td>
-            {[r.grid, r.regions, r.rebind].map((c) => (
-              <td><span aria-hidden="true">{c.mark}</span><span class="visually-hidden">{c.label}</span></td>
-            ))}
-            <td>{r.price}</td>
+    <div class="table-scroll-wrap">
+      <div
+        class="scroll-x"
+        tabindex="0"
+        role="region"
+        aria-label="Comparison table. Five columns: App, Grid overlay, Custom regions, Rebindable, Price. Scrolls horizontally."
+      >
+      <table>
+        <thead>
+          <tr>
+            <th>App</th><th>Grid overlay</th><th>Custom regions</th><th>Rebindable</th><th>Price</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr class={r.self ? 'self' : undefined}>
+              <td>{r.href ? <a href={r.href} rel="noopener">{r.name}</a> : r.name}</td>
+              {[r.grid, r.regions, r.rebind].map((c) => (
+                <td><span aria-hidden="true">{c.mark}</span><span class="visually-hidden">{c.label}</span></td>
+              ))}
+              <td>{r.price}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      </div>
+      <div class="scroll-fade" aria-hidden="true"></div>
     </div>
+    {/* A fade alone would be invisible to a screen-reader user and to
+        anyone already scrolled to the end (spec-equivalent finding from the
+        design gate) — this is real, non-hidden text, so it reaches both,
+        and compare.ts hides it together with the fade the moment there is
+        nothing left to scroll to. A plain line under the table rather than
+        a badge floating over it, so it can never overlap the last column's
+        own text. */}
+    <p class="swipe-hint">Swipe to compare →</p>
     <p class="quiet">Prices and capabilities checked {checked}. Corrections welcome: <a
       href="https://github.com/orthant-app/orthant/issues">open an issue</a>. Magnet's own site
       lists no price; the figure above is from its Mac App Store listing.</p>
+    <p class="cta"><a class="btn btn-primary" href="/download">Download for macOS 13+</a></p>
 
     <h2>Which one should you use?</h2>
     <p>
@@ -116,4 +133,73 @@ const rows = [
      WCAG 2.2 target-size exemption does not cover them; at the row's own font
      size they were 18px tall. */
   td a { display: inline-block; padding-block: 4px; }
+
+  /*
+   * The scroll affordance the design gate asked for: a right-edge fade AND
+   * an explicit "Swipe to compare" label, so a screen-reader user (who gets
+   * nothing from a fade) and a sighted user who has already scrolled to the
+   * end (who should not be told there is more) are both covered. Visibility
+   * is driven by compare.ts's `data-can-scroll` attribute, not CSS alone —
+   * a gradient cannot know on its own whether the scroller has reached its
+   * last column.
+   */
+  .table-scroll-wrap {
+    position: relative;
+    /*
+     * tokens.css exempts `.prose > .scroll-x` from the 68ch reading measure
+     * because a comparison table should not wrap at reading width. Wrapping
+     * `.scroll-x` one level deeper — required below — moves it out from
+     * being a direct child of `.prose`, so that exemption has to be
+     * restated for the new wrapper. Astro scopes this selector with a
+     * per-component attribute, which gives it higher specificity than
+     * `.prose > *`, so this wins without editing the shared file.
+     */
+    max-width: none;
+  }
+  /*
+   * Positioned in this OUTER, non-scrolling wrapper, not as children of
+   * `.scroll-x` itself: an absolutely positioned descendant of a scrolling
+   * element is still part of that element's own scrollable content — its
+   * offsets are resolved against the container's padding box, but it moves
+   * WITH the content exactly like the table does, so a fade authored inside
+   * `.scroll-x` would scroll out of view before the columns it is meant to
+   * hint at. Being a sibling of `.scroll-x` keeps both pinned to the wrap's
+   * edge regardless of scroll position.
+   */
+  .scroll-fade {
+    position: absolute; top: 0; right: 0; bottom: 0;
+    width: 40px;
+    background: linear-gradient(to right, transparent, var(--surface));
+    pointer-events: none;
+  }
+  /* A plain line under the table, not a badge floating over it — it can
+     never overlap the last column's own text this way, at any width. */
+  .swipe-hint {
+    margin: 8px 0 0;
+    font-size: 13px;
+    color: var(--label-secondary);
+    text-align: right;
+  }
+  /* `visibility`, not `opacity`/`display`: it removes the fade from
+     hit-testing and removes the hint from the accessibility tree once
+     hidden, which is the other half of "hide it once scrolled to the end"
+     — a label a screen reader can still reach after there is nothing left
+     to scroll to is its own small version of the gate's original
+     complaint. `visibility: hidden` still reserves the hint's line height,
+     which is deliberate: showing or hiding it never shifts the paragraph
+     below. */
+  .scroll-fade, .swipe-hint { visibility: hidden; }
+  .table-scroll-wrap[data-can-scroll] .scroll-fade,
+  /* Adjacent-sibling, not a descendant selector: .swipe-hint is a sibling
+     of .table-scroll-wrap, not inside it (kept out so it can never overlap
+     the table it describes). */
+  .table-scroll-wrap[data-can-scroll] + .swipe-hint { visibility: visible; }
+
+  .cta { margin-top: 28px; }
 </style>
+
+<script>
+  import { attachScrollHint } from '../lib/compare';
+  const wrap = document.querySelector<HTMLElement>('.table-scroll-wrap');
+  if (wrap) attachScrollHint(wrap);
+</script>

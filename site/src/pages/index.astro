@@ -46,17 +46,19 @@ const jsonLd = {
     <p class="lead-sub">
       Shortcuts, then the grid overlay, then drawing a region and binding it to a key.
     </p>
-    <video
-      controls muted playsinline loop
-      preload="none"
-      poster="/demo-poster.webp"
-      width="1280"
-      height="706"
-      aria-label="Windows snap to halves and quarters with keyboard shortcuts; the grid overlay places a window on a drawn selection; a left-two-thirds region is drawn, saved, bound to a shortcut, and used."
-    >
-      <source src="/demo.webm" type="video/webm" />
-      <source src="/demo.mp4" type="video/mp4" />
-    </video>
+    <div class="demo-frame">
+      <video
+        controls muted playsinline loop
+        preload="none"
+        poster="/demo-poster.webp"
+        width="1280"
+        height="706"
+        aria-label="Windows snap to halves and quarters with keyboard shortcuts; the grid overlay places a window on a drawn selection; a left-two-thirds region is drawn, saved, bound to a shortcut, and used."
+      >
+        <source src="/demo.webm" type="video/webm" />
+        <source src="/demo.mp4" type="video/mp4" />
+      </video>
+    </div>
   </section>
 
   <section class="section wrap">
@@ -163,6 +165,30 @@ const jsonLd = {
     border-radius: var(--radius); border: 1px solid var(--separator);
     background: var(--raised);
   }
+  /* Positioning context for the fullscreen button demo.ts adds — only when a
+     route for it actually exists (see that file). `position: relative` here,
+     not `overflow: hidden`, so the button sits just inside the video's own
+     rounded corner rather than being clipped by it. */
+  .demo-frame { position: relative; }
+  /*
+   * `:global` because the button is created by demo.ts at runtime, the same
+   * reason Command.astro styles its own JS-created `.copy` button this way —
+   * the site's CSP (`style-src 'self'`) drops style attributes, so this is
+   * authored here rather than written from the script.
+   *
+   * 36x36 clears the 24x24 WCAG 2.2 minimum on both axes with room to spare,
+   * matching the touch-target floor the hero's grid cells were fixed to meet.
+   */
+  .demo-frame :global(.fs-btn) {
+    position: absolute; top: 10px; right: 10px;
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 8px; border: 1px solid rgb(255 255 255 / 0.18);
+    background: rgb(16 22 34 / 0.6);
+    color: #fff;
+    cursor: pointer;
+  }
+  .demo-frame :global(.fs-btn:hover) { background: rgb(16 22 34 / 0.78); }
 
   .steps { display: grid; gap: 28px; list-style: none; margin: 0; padding: 0; }
   @media (min-width: 760px) { .steps { grid-template-columns: repeat(3, 1fr); } }
@@ -192,3 +218,9 @@ const jsonLd = {
     font-family: var(--font-mono); font-size: 10px; color: var(--label-secondary);
   }
 </style>
+
+<script>
+  import { attachDemo } from '../lib/demo';
+  const root = document.querySelector<HTMLElement>('.demo-frame');
+  if (root) attachDemo(root);
+</script>

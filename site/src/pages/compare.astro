@@ -188,12 +188,57 @@ const rows = [
      complaint. `visibility: hidden` still reserves the hint's line height,
      which is deliberate: showing or hiding it never shifts the paragraph
      below. */
-  .scroll-fade, .swipe-hint { visibility: hidden; }
-  .table-scroll-wrap[data-can-scroll] .scroll-fade,
+
+  /*
+   * CSS-ONLY BASELINE — this is what a visitor with no JavaScript at all
+   * sees, and it has to be the SAFE state on its own, with no help from
+   * compare.ts. An earlier version defaulted to `hidden` unconditionally and
+   * relied on the script to reveal it, which meant a no-JS visitor never saw
+   * the cue at all even though the table genuinely overflowed and genuinely
+   * scrolled (`480px` against a `272px` container at 320px) — the exact
+   * defect the design gate raised, reproduced for exactly the visitor this
+   * affordance exists for. Visible by default, hidden once the table
+   * genuinely cannot overflow.
+   *
+   * The breakpoint is measured, not guessed. `.table-scroll-wrap` has
+   * `max-width: none` (above) and no padding of its own, so its content
+   * width is the viewport's width minus `.wrap`'s own `padding-inline:
+   * var(--gutter)` (24px, tokens.css) on both sides — 48px total — as long
+   * as the viewport is narrower than `--page` (1080px), which it always is
+   * anywhere near this threshold. The table won't shrink below its own
+   * `min-width: 480px`, so it stops overflowing exactly when
+   * `viewport - 48 >= 480`, i.e. `viewport >= 528`. Confirmed empirically
+   * with a real Chromium instance swept pixel-by-pixel from 500px to 540px
+   * against the actual built page: `.scroll-x` at 527px wide gives
+   * `scrollWidth 480 / clientWidth 479` (overflowing); at 528px it gives
+   * `480 / 480` (not overflowing), and it stays not-overflowing above that.
+   */
+  .scroll-fade, .swipe-hint { visibility: visible; }
+  @media (min-width: 528px) {
+    .scroll-fade, .swipe-hint { visibility: hidden; }
+  }
+
+  /*
+   * Once compare.ts has actually run, its own live measurement always wins
+   * — at ANY viewport width, not just below the CSS breakpoint above. This
+   * is why attachScrollHint writes the literal string "true"/"false" rather
+   * than merely toggling the attribute's presence: `[data-can-scroll]`
+   * alone cannot be selected differently for "false" vs "never ran", but
+   * `[data-can-scroll="false"]` can, and specifically needs to for this
+   * case — reaching the end of the table below the 528px breakpoint has to
+   * override the CSS baseline's default-visible, and the two rules below
+   * have higher specificity (an extra attribute selector) than the bare
+   * `.scroll-fade`/`.swipe-hint` rules above regardless of which side of the
+   * media query wrote them, so they win in every case without needing
+   * `!important`.
+   */
+  .table-scroll-wrap[data-can-scroll="true"] .scroll-fade,
   /* Adjacent-sibling, not a descendant selector: .swipe-hint is a sibling
      of .table-scroll-wrap, not inside it (kept out so it can never overlap
      the table it describes). */
-  .table-scroll-wrap[data-can-scroll] + .swipe-hint { visibility: visible; }
+  .table-scroll-wrap[data-can-scroll="true"] + .swipe-hint { visibility: visible; }
+  .table-scroll-wrap[data-can-scroll="false"] .scroll-fade,
+  .table-scroll-wrap[data-can-scroll="false"] + .swipe-hint { visibility: hidden; }
 
   .cta { margin-top: 28px; }
 </style>

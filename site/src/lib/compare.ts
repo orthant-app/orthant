@@ -10,11 +10,19 @@
  * right-edge fade drawn with CSS alone stays visible even once the last
  * column is already on screen, which is exactly the "invisible to anyone
  * who has scrolled to the end" half of the gate's own complaint, just
- * inverted (permanently visible instead of never visible). This toggles one
- * attribute, `data-can-scroll`, that the component's stylesheet keys the
- * fade and the "Swipe to compare" label off — both hidden together, because
- * once the table stops overflowing (a wide viewport) or the user has
- * reached the last column, neither is true anymore.
+ * inverted (permanently visible instead of never visible).
+ *
+ * This sets `data-can-scroll` to the literal string `"true"` or `"false"` —
+ * never merely present/absent — specifically so the stylesheet's own
+ * no-JavaScript baseline (visible below the table's own overflow width,
+ * hidden at and above it; see compare.astro) can tell "JavaScript has run
+ * and decided false" apart from "JavaScript has not run at all" (attribute
+ * absent, in which case the CSS-only baseline is what a real no-JS visitor
+ * sees). A followup review found the presence-only version of this reduced
+ * to `visibility: hidden` unconditionally with no CSS fallback, so a
+ * visitor without JavaScript never saw the cue at all even though the table
+ * genuinely overflowed and genuinely scrolled — the exact defect the design
+ * gate raised, reproduced for anyone without a script engine.
  */
 export function attachScrollHint(wrap: HTMLElement): void {
   const scroller = wrap.querySelector<HTMLElement>('.scroll-x');
@@ -29,7 +37,7 @@ export function attachScrollHint(wrap: HTMLElement): void {
     const el = scroller!;
     const overflowing = el.scrollWidth > el.clientWidth;
     const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - EPSILON;
-    wrap.toggleAttribute('data-can-scroll', overflowing && !atEnd);
+    wrap.setAttribute('data-can-scroll', String(overflowing && !atEnd));
   }
 
   update();

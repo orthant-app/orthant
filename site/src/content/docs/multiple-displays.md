@@ -1,7 +1,8 @@
 ---
 title: Multiple displays
 description: How Orthant decides which screen a window belongs to.
-order: 6
+group: place
+order: 3
 ---
 
 ## A window snaps within its own display

@@ -1,6 +1,7 @@
 ---
 title: Shortcuts
 description: Every default Orthant shortcut, and how to rebind them.
+group: start
 order: 2
 ---
 

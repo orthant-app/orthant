@@ -1,7 +1,8 @@
 ---
 title: Settings
 description: Grid size, gaps between windows, and launch at login.
-order: 5
+group: help
+order: 2
 ---
 
 Open Settings from the menu bar icon. Everything here survives a relaunch.

@@ -1,6 +1,7 @@
 ---
 title: Getting started
 description: Install Orthant, grant Accessibility permission, and snap your first window.
+group: start
 order: 1
 ---
 

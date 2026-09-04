@@ -1,7 +1,8 @@
 ---
 title: Updates
 description: How Orthant updates itself, and how to turn that off.
-order: 7
+group: help
+order: 3
 ---
 
 Orthant checks for updates on its own and installs them in place. Every update is signed with

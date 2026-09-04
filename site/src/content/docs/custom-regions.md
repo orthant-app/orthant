@@ -1,7 +1,8 @@
 ---
 title: Custom regions
 description: Draw any block on any grid, name it, and give it a shortcut.
-order: 4
+group: place
+order: 2
 ---
 
 The built-in commands cover halves, quarters, maximize and center. A custom region is

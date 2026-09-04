@@ -1,24 +1,36 @@
 ---
 import { getCollection } from 'astro:content';
 import Base from '../../layouts/Base.astro';
+import { docsGroups } from '../../lib/docs';
 
-const pages = (await getCollection('docs')).sort((a, b) => a.data.order - b.data.order);
+const groups = docsGroups(await getCollection('docs'));
 ---
 <Base title="Documentation · Orthant" description="How to install, use and troubleshoot Orthant." path="/docs/">
   <div class="wrap prose">
     <h1>Documentation</h1>
-    <ul>
-      {pages.map((p) => (
-        <li>
-          <a href={`/docs/${p.id}/`}>{p.data.title}</a>
-          <span class="quiet">{p.data.description}</span>
-        </li>
-      ))}
-    </ul>
+    {groups.map((g) => (
+      <section class="group">
+        <h2>{g.title}</h2>
+        <ul>
+          {g.pages.map((p) => (
+            <li>
+              <a href={`/docs/${p.id}/`}>{p.data.title}</a>
+              <span class="quiet">{p.data.description}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ))}
   </div>
 </Base>
 
 <style>
+  /* Groups replaced a single flat list (see git history): three sections,
+     Troubleshooting leading the last one. Only the first group sits flush
+     under the page title; the rest get a rule so nine links read as three
+     scannable groups rather than one long list with headings dropped in. */
+  .group + .group { margin-top: 32px; padding-top: 28px; border-top: 1px solid var(--separator); }
+
   /* Title above, description below. Joined by a dash on one line, the
      description wrapped under the LINK rather than under itself, so a phone
      showed four ragged lines per entry with no visible structure. */

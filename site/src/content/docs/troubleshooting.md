@@ -1,7 +1,8 @@
 ---
 title: Troubleshooting
 description: Fixing the Accessibility permission when macOS says it is on but Orthant says it is not.
-order: 8
+group: help
+order: 1
 ---
 
 ## System Settings shows Orthant as enabled, but Orthant says permission is missing

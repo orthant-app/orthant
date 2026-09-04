@@ -1,7 +1,8 @@
 ---
 title: The grid overlay
 description: Summon a grid over every display and draw exactly where a window should go.
-order: 3
+group: place
+order: 1
 ---
 
 Press `⌃⌥O` and a translucent grid appears over every display. It takes about 50

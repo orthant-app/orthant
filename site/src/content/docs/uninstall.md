@@ -1,7 +1,8 @@
 ---
 title: Uninstall
 description: Removing Orthant completely, and the one thing an uninstall cannot remove.
-order: 9
+group: help
+order: 4
 ---
 
 ```sh

@@ -6,6 +6,9 @@ const docs = defineCollection({
   schema: z.object({
     title: z.string(),
     description: z.string(),
+    // Three groups, ordered by what a visitor is doing: getting it working,
+    // using it, keeping it working. `order` sorts within a group.
+    group: z.enum(['start', 'place', 'help']),
     order: z.number(),
   }),
 });

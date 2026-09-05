@@ -101,14 +101,20 @@ const next = sequence[index + 1];
   /*
    * ⚠️ The disclosure is a MOBILE control only. On desktop the summary is
    * removed and the groups are forced visible, because a <details> that is not
-   * `open` hides its non-summary children through the UA stylesheet.
+   * `open` hides its non-summary children.
    *
-   * Overriding that needs BOTH rules below, and which one does the work varies
-   * by engine: older engines respond to `display` on the children, while
-   * Chromium hides the content through the `::details-content` pseudo-element,
-   * which `display: block` on a child cannot reach. Verified in a real browser
-   * at 899 and 900 px rather than reasoned about, because the brief's own note
-   * says CSS-only reveal is not reliably portable and it is right to doubt it.
+   * `content-visibility` on `::details-content` is what does that, and it is
+   * the ONLY rule that does: browsers hide the content through that pseudo-
+   * element, which a `display` rule on a child cannot reach. An earlier version
+   * of this block also set `display: block` on `.toc-group` and claimed older
+   * engines needed it; deleting that rule live changed nothing in Chromium,
+   * Firefox or WebKit, so it went, rather than shipping a comment asserting a
+   * portability it had never been measured to buy.
+   *
+   * Checked at 899 and 900 px in a real browser. ⚠️ Use `checkVisibility()` to
+   * confirm, never `getBoundingClientRect()`: content inside a CLOSED <details>
+   * still reports a non-zero box, which reads as "the disclosure never
+   * collapses" when it collapses fine.
    */
   .toc-disclosure > summary {
     /* A control, so it clears the 24 px minimum on BOTH axes, not just width. */
@@ -124,7 +130,6 @@ const next = sequence[index + 1];
 
   @media (min-width: 900px) {
     .toc-disclosure > summary { display: none; }
-    .toc-disclosure > .toc-group { display: block; }
     .toc-disclosure::details-content { content-visibility: visible; block-size: auto; }
   }
 

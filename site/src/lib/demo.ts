@@ -90,7 +90,7 @@ export function attachDemo(root: HTMLElement): void {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'fs-btn';
-  button.setAttribute('aria-label', 'Play the demo fullscreen');
+  button.setAttribute('aria-label', 'Show the demo fullscreen');
   button.appendChild(buildIcon());
   button.addEventListener('click', () => enter(video, route));
 

@@ -18,8 +18,9 @@ without a trip through System Settings. Orthant needs **macOS 13+**.
 ## Launch it
 
 Open Orthant from Applications, like any other app. On this first launch it opens a small
-window to walk you through the next step. What it never does is appear in the Dock: look
-for its icon in the **menu bar**, at the top of the screen. That is Orthant, running.
+window to walk you through the next step. Once that window closes, look for its icon in the
+**menu bar**, at the top of the screen. Its settings and update windows can appear in the
+Dock while open.
 
 Every launch after this one is quieter: once permission is granted, Orthant starts
 straight into the menu bar and gets on with it, which is what you want from something
@@ -39,7 +40,7 @@ the permission is on.
 ## Press one shortcut
 
 Click any window to focus it, then press `⌃⌥←`. It fills the left half of its display.
-Orthant never becomes the frontmost app, so the window you are arranging stays active.
+The window you are arranging stays active throughout the placement.
 
 ## Open the grid
 

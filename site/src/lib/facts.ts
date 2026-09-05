@@ -17,7 +17,5 @@ export const FACTS: Fact[] = [
   { value: 'Free · MIT',   note: 'open source, no paid tier' },
   { value: 'about 50 ms',  note: 'grid on every display' },
   { value: '0.0% CPU',     note: '0 wake-ups while idle' },
-  { value: 'No account',   note: 'nothing to sign in to' },
-  { value: 'No telemetry', note: 'in the app' },
   { value: 'macOS 13+',    note: 'Ventura and later' },
 ];

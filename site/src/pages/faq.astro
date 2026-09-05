@@ -10,38 +10,27 @@ const faqs = [
   },
   {
     q: 'Why does it need Accessibility permission?',
-    a: `<p>Moving another app's windows is only possible through the macOS Accessibility API,
-        and macOS gates that API behind <strong>System Settings ▸ Privacy & Security ▸
-        Accessibility</strong>. Every window manager on the Mac works this way.</p>
-        <p>It is the only permission Orthant asks for. It does not read your screen, your
-        keystrokes outside its own shortcuts, or your files.</p>`,
+    a: `<p>Orthant uses the macOS Accessibility API to move and resize other apps' windows.
+        Enable it in <strong>System Settings ▸ Privacy & Security ▸ Accessibility</strong>.
+        First launch walks you through this step.</p>`,
   },
   {
     q: "Why isn't it on the Mac App Store?",
-    a: `<p>Moving another app's windows requires the Accessibility API, which does not work
-        inside the App Sandbox, and the App Store requires the sandbox. <strong>Orthant
-        cannot be distributed through the Mac App Store under its current rules.</strong></p>
-        <p>Instead each release is signed with an Apple Developer ID and notarized by Apple,
-        so it opens without a detour through System Settings.</p>`,
-  },
-  {
-    q: 'Does it collect anything?',
-    a: `<p>The app has no account and sends no telemetry. Its only network access is checking
-        for updates, which you can switch off. This website counts page views with a cookieless
-        analytics service. The full detail is on the <a href="/privacy/">privacy page</a>.</p>`,
+    a: `<p>Orthant is distributed directly, with its own updater. Its window-control code
+        runs outside the App Sandbox.</p>
+        <p>Each release is signed with an Apple Developer ID and notarized by Apple.
+        Install it with Homebrew or <a href="/download">download the disk image</a>.</p>`,
   },
   {
     q: 'Does it conflict with macOS tiling, Rectangle, or Moom?',
-    a: `<p>No. Orthant acts only on the shortcuts you give it, so it coexists with macOS's
-        built-in tiling and with any other window manager. If two apps want the same
+    a: `<p>Orthant acts on the shortcuts you give it and can run alongside macOS's
+        built-in tiling or another window manager. If two apps want the same
         combination, rebind one of them. Orthant's Shortcuts pane tells you when macOS itself
         has already claimed a chord.</p>`,
   },
   {
     q: 'Windows? Linux?',
-    a: `<p>Windows support is planned, behind the same interface the macOS version uses.</p>
-        <p>Linux is not possible. Wayland does not let one application move another's windows,
-        by design, and no amount of work gets around that.</p>`,
+    a: `<p>Windows support is planned. Linux is not supported.</p>`,
   },
   {
     q: 'How do updates work?',
@@ -69,7 +58,7 @@ const jsonLd = {
 ---
 <Base
   title="FAQ · Orthant"
-  description="Is it free, why does it need Accessibility permission, why isn't it on the App Store, and what it collects."
+  description="Answers about pricing, Accessibility permission, installation, updates and support."
   path="/faq/"
 >
   <Fragment slot="head">

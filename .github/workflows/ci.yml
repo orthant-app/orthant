@@ -20,6 +20,19 @@ jobs:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # First, deliberately. These cover the code that publishes signed,
+      # notarized, IMMUTABLE releases, and until 2026-09-05 no workflow ran
+      # them at all: 100+ assertions that only executed when someone
+      # remembered to. They take seconds, so running them ahead of the Flutter
+      # build reports a release-tooling regression in half a minute rather than
+      # after a full macOS build.
+      - name: Release tooling tests
+        run: |
+          for suite in tool/ci/test_*.sh; do
+            echo "--- $suite"
+            bash "$suite"
+          done
+
       - name: Resolve Flutter cache paths
         id: flutter-meta
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0

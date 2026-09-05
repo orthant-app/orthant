@@ -664,6 +664,39 @@ assert_eq 'publish rejects a beta version with no BASE-version changelog entry' 
 assert_contains 'publish names the missing base-version entry for a beta version' \
   'changelog entry missing: site/src/content/changelog/1.1.0.md' "$stderr"
 
+# RELEASING.md is the tracked runbook, and a runbook that quietly stops matching
+# the pipeline is worse than none: it is followed confidently and is wrong. Pin
+# the load-bearing facts it states to the code that implements them.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+RELEASING="$REPO_ROOT/RELEASING.md"
+
+assert_ok 'RELEASING.md exists' test -f "$RELEASING"
+
+# The collection path. If the changelog moves, the runbook tells you to write
+# the entry somewhere the release will not look for it.
+changelog_dir_in_code="$(grep -oE 'site/src/content/changelog/' "$REPO_ROOT/tool/ci/release_workflow.sh" | head -n 1)"
+assert_contains 'RELEASING.md names the changelog path the pipeline actually reads' \
+  "$changelog_dir_in_code" "$(<"$RELEASING")"
+
+# The two frontmatter keys the release and the site each turn on: `version` is
+# what test/site_docs_test.dart matches against pubspec, and `published` is what
+# gates the site advertising the release at all.
+assert_contains 'RELEASING.md documents the version frontmatter key' \
+  'version:' "$(<"$RELEASING")"
+assert_contains 'RELEASING.md documents the published frontmatter key' \
+  'published:' "$(<"$RELEASING")"
+
+# The notes mechanism. If publish() ever went back to --generate-notes, the
+# runbook's claim that the entry is the single source would be false.
+assert_contains 'publish() still sources release notes from the changelog entry' \
+  '--notes-file' "$(<"$REPO_ROOT/tool/ci/release_workflow.sh")"
+# Comments stripped first: the line above the create_args assignment explains
+# why --generate-notes is NOT used by naming it, so scanning the raw file trips
+# on the very prose that documents the decision. Same trap as the docs sidebar
+# and hero style guards.
+assert_ok 'publish() does not use --generate-notes' \
+  bash -c "! sed 's/#.*//' '$REPO_ROOT/tool/ci/release_workflow.sh' | grep -q -- '--generate-notes'"
+
 if (( FAIL_COUNT > 0 )); then
   printf '%d passed, %d failed\n' "$PASS_COUNT" "$FAIL_COUNT" >&2
   exit 1

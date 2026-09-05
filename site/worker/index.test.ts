@@ -51,6 +51,52 @@ describe('handleDownload', () => {
     expect(res.headers.get('location')).toBe(FALLBACK_URL);
   });
 
+  /*
+   * The stall cases. Every other failure here REJECTS, which the catch has
+   * always handled; a request that simply never settles reached nothing at
+   * all, so /download hung for as long as the runtime allowed.
+   *
+   * Two shapes, because they fail at different points and a deadline on the
+   * connection alone would only catch the first: headers that never arrive,
+   * and headers that arrive over a body that never finishes.
+   *
+   * Both fetches honour the abort signal, which is what the real one does.
+   * Fake timers are why the deadline uses an explicit AbortController —
+   * AbortSignal.timeout() schedules natively and would not advance here.
+   */
+  /** Never answers; rejects when aborted, as a real fetch does. */
+  const neverAnswers = ((_url: string, init?: RequestInit) =>
+    new Promise<Response>((_, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+    })) as unknown as typeof fetch;
+
+  /** 200 whose body never completes. Aborting ERRORS the stream, which is what
+   *  a real fetch does to a response body when its signal fires — modelling it
+   *  any other way would test a deadline that cannot fail. */
+  const stallsMidBody = ((_url: string, init?: RequestInit) => {
+    let ctrl!: ReadableStreamDefaultController<Uint8Array>;
+    const body = new ReadableStream<Uint8Array>({ start: (c) => { ctrl = c; } });
+    init?.signal?.addEventListener('abort', () => ctrl.error(new Error('aborted')));
+    return Promise.resolve(new Response(body, { status: 200 }));
+  }) as unknown as typeof fetch;
+
+  it.each([
+    ['never answers', neverAnswers],
+    ['answers and then stalls mid-body', stallsMidBody],
+  ])('falls back when the feed %s', async (_name, stalling) => {
+    vi.useFakeTimers();
+    try {
+      const pending = handleDownload({ fetch: stalling, cache: memoryCache() });
+      await vi.advanceTimersByTimeAsync(5000);
+      const res = await pending;
+      expect(res.status).toBe(302);
+      expect(res.headers.get('location')).toBe(FALLBACK_URL);
+      expect(res.headers.get('cache-control')).toBe('no-store');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('falls back on a non-200 feed', async () => {
     const res = await handleDownload({
       fetch: async () => new Response('nope', { status: 500 }),

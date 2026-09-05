@@ -23,6 +23,40 @@ export const FALLBACK_URL = 'https://github.com/orthant-app/orthant/releases/lat
 const TTL_SECONDS = 300;
 const CACHE_KEY = 'download-target';
 
+/** 3 s to fetch the feed AND read its body, after which the fallback wins.
+ *
+ *  Without a deadline this handler had no bounded running time. The catch
+ *  below turns a *rejected* fetch into the fallback, but a request that simply
+ *  never settles never reaches it — the visitor sits on /download with nothing
+ *  happening, which is strictly worse than being sent to the releases page.
+ *
+ *  It has to cover the body read too, not just the connection: a response
+ *  whose headers arrive and whose body never finishes is the same stall
+ *  wearing a different face. One AbortSignal does both, because aborting after
+ *  the response is returned errors its body stream as well.
+ *
+ *  An explicit controller rather than AbortSignal.timeout(): that schedules on
+ *  a native timer, which fake timers do not intercept, so the stall would only
+ *  be testable in real time. */
+const DEADLINE_MS = 3000;
+
+/** The feed's body, or null for every way it can fail to arrive usably —
+ *  rejected, non-200, or too slow. All three take the same fallback, so the
+ *  caller does not need to tell them apart. */
+async function fetchFeed(deps: Deps): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEADLINE_MS);
+  try {
+    const res = await deps.fetch(FEED_URL, { signal: controller.signal });
+    if (!res.ok) return null;
+    return await res.text();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export interface CacheLike {
   match(key: string): Promise<string | null>;
   put(key: string, value: string): Promise<void>;
@@ -71,14 +105,8 @@ export async function handleDownload(deps: Deps): Promise<Response> {
   const cached = await deps.cache.match(CACHE_KEY).catch(() => null);
   if (cached) return redirect(cached, `public, max-age=${TTL_SECONDS}`);
 
-  let xml: string;
-  try {
-    const res = await deps.fetch(FEED_URL);
-    if (!res.ok) return redirect(FALLBACK_URL, 'no-store');
-    xml = await res.text();
-  } catch {
-    return redirect(FALLBACK_URL, 'no-store');
-  }
+  const xml = await fetchFeed(deps);
+  if (xml === null) return redirect(FALLBACK_URL, 'no-store');
 
   const target = resolveDownloadUrl(xml);
   // A failure is never cached: a transient bad feed must not pin the download

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
 import '../core/geometry.dart';
 import '../core/grid_config.dart';
@@ -210,6 +211,7 @@ class GridOverlayState extends State<GridOverlay> {
   /// live in [moveSelection], where they are testable on their own.
   void moveSelection(GridDirection direction, {bool extend = false}) {
     if (!widget.active) return;
+    final previous = _effectiveBlock;
     final next = moveSelectionFor(
       anchor: _anchor,
       focus: _focus,
@@ -222,6 +224,10 @@ class GridOverlayState extends State<GridOverlay> {
       _anchor = next.anchor;
       _focus = next.focus;
     });
+    // Spoken, not just exposed: a screen reader's cursor is not on the grid
+    // while its user is pressing arrows, so a changed `value` alone would go
+    // unread. Once per actual change — clamping at an edge says nothing.
+    if (_effectiveBlock != previous) announce(context, _selectionDescription);
   }
 
   void _setFocusFrom(Offset panelLocal) {
@@ -307,6 +313,75 @@ class GridOverlayState extends State<GridOverlay> {
     return blockFrom(_anchor ?? f, f);
   }
 
+  /// Flutter's own announcement path, so every platform speaks the same words
+  /// from the same place; the macOS embedder posts it on this panel's view.
+  static void announce(BuildContext context, String message) =>
+      SemanticsService.sendAnnouncement(View.of(context), message,
+          TextDirection.ltr, assertiveness: Assertiveness.assertive);
+
+  String get _selectionDescription {
+    final b = _effectiveBlock;
+    final t = _effectiveTarget;
+    if (b == null || t == null) return 'No cells selected.';
+    final row = b.r0 == b.r1
+        ? 'Row ${b.r0 + 1}' : 'Rows ${b.r0 + 1} to ${b.r1 + 1}';
+    final col = b.c0 == b.c1
+        ? 'column ${b.c0 + 1}' : 'columns ${b.c0 + 1} to ${b.c1 + 1}';
+    String points(double n) => n == n.roundToDouble()
+        ? n.toInt().toString() : n.toStringAsFixed(1);
+    return '$row, $col. Target: x ${points(t.x)}, y ${points(t.y)}, '
+        'width ${points(t.width)}, height ${points(t.height)} points.';
+  }
+
+  /// Flutter's macOS bridge dispatches the standard press action, but does
+  /// not dispatch custom actions, increment/decrement, or dismiss. Keep these
+  /// commands resident as pressable semantics nodes. Their boxes sit inside
+  /// the painted grid; they add no pointer handlers or keyboard focus nodes.
+  Widget _accessibleGrid(Widget child) {
+    final selected = _effectiveBlock != null;
+    final commands = <(String, VoidCallback?)>[
+      for (final d in GridDirection.values)
+        ('Move ${d.name}', () => moveSelection(d)),
+      for (final d in GridDirection.values)
+        ('Extend ${d.name}', () => moveSelection(d, extend: true)),
+      ('Place window', selected ? commitCurrent : null),
+      if (widget.onSave != null)
+        ('Place window and save shortcut', selected ? saveCurrent : null),
+      ('Cancel grid', widget.onCancel),
+    ];
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: 'Window grid for ${widget.appName}, '
+          '${widget.cols} columns, ${widget.rows} rows',
+      value: _selectionDescription,
+      selected: selected,
+      hint: 'Arrow keys move. Shift and arrow keys extend. '
+          'Return places the window. Escape cancels.',
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          child,
+          Column(
+            children: [
+              for (final (label, action) in commands)
+                Expanded(
+                  child: Semantics(
+                    container: true,
+                    label: label,
+                    button: true,
+                    enabled: action != null,
+                    onTap: action,
+                    child: const SizedBox.expand(),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final block = _effectiveBlock;
@@ -326,7 +401,9 @@ class GridOverlayState extends State<GridOverlay> {
       onPointerHover: _onPointerHover,
       onPointerUp: _onPointerUp,
       onPointerCancel: _onPointerCancel,
-      child: Opacity(
+      child: ExcludeSemantics(
+        excluding: !widget.active,
+        child: Opacity(
         opacity: dim,
         child: Stack(
           children: [
@@ -415,17 +492,18 @@ class GridOverlayState extends State<GridOverlay> {
             ),
             Positioned.fromRect(
               rect: _cellsRect,
-              child: CustomPaint(
+              child: _accessibleGrid(CustomPaint(
                 key: GridOverlay.cellsKey,
                 painter: _GridPainter(
                     block: block,
                     dragging: dragging,
                     cols: widget.cols,
                     rows: widget.rows),
-              ),
+              )),
             ),
           ],
         ),
+      ),
       ),
     );
   }

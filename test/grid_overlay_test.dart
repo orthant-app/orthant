@@ -1,5 +1,8 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/geometry.dart';
 import 'package:orthant/overlay/grid_overlay.dart';
@@ -14,6 +17,7 @@ void main() {
     int cols = 6,
     int rows = 6,
     double gap = 0,
+    WinRect displayFrame = frame,
     void Function()? onBeginDrag,
     void Function()? onEndDrag,
     void Function(WinRect)? onCommit,
@@ -29,7 +33,7 @@ void main() {
           child: GridOverlay(
             key: gridKey,
             sessionId: sessionId,
-            displayFrame: frame,
+            displayFrame: displayFrame,
             appName: 'Google Chrome',
             active: active,
             cols: cols,
@@ -64,6 +68,112 @@ void main() {
   testWidgets('names the captured window', (tester) async {
     await tester.pumpWidget(host());
     expect(find.text('Google Chrome'), findsOneWidget);
+  });
+
+  group('accessibility', () {
+    testWidgets('empty selection exposes usable movement and cancel actions',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      var cancelled = 0;
+      final committed = <WinRect>[];
+      await tester.pumpWidget(host(
+        onCancel: () => cancelled++,
+        onCommit: committed.add,
+      ));
+
+      final grid = tester.getSemantics(find.bySemanticsLabel(
+          'Window grid for Google Chrome, 6 columns, 6 rows'));
+      // The app name is spoken once, by its own label; the grid names it too.
+      expect(find.semantics.byLabel('Google Chrome'), findsOne);
+      expect(grid.getSemanticsData().flagsCollection.isSelected, Tristate.isFalse);
+      final place = tester.getSemantics(find.bySemanticsLabel('Place window'));
+      expect(place.getSemanticsData().flagsCollection.isButton, isTrue);
+      expect(place.getSemanticsData().flagsCollection.isEnabled, Tristate.isFalse);
+      expect(place.getSemanticsData().hasAction(SemanticsAction.tap), isFalse);
+      final move = tester.getSemantics(find.bySemanticsLabel('Move right'));
+      expect(move.getSemanticsData().flagsCollection.isEnabled, Tristate.isTrue);
+      expect(move.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+      tester.semantics.performAction(
+          find.semantics.byLabel('Cancel grid'), SemanticsAction.tap);
+      expect(cancelled, 1);
+      expect(committed, isEmpty);
+      semantics.dispose();
+    });
+
+    testWidgets('semantic movement and extension describe and place the same region',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      WinRect? committed;
+      await tester.pumpWidget(host(
+        displayFrame: const WinRect(-1200, 24, 1200, 600),
+        gap: 6,
+        onCommit: (r) => committed = r,
+      ));
+      for (final label in ['Move right', 'Move down', 'Extend right']) {
+        tester.semantics.performAction(
+            find.semantics.byLabel(label), SemanticsAction.tap);
+        await tester.pump();
+      }
+      final grid = tester.getSemantics(find.bySemanticsLabel(
+          'Window grid for Google Chrome, 6 columns, 6 rows'));
+      final data = grid.getSemanticsData();
+      expect(data.flagsCollection.isSelected, Tristate.isTrue);
+      expect(data.value, contains('Row 2, columns 1 to 2'));
+      expect(data.value, contains('x -1194, y 129, width 392, height 93 points'));
+      final place = tester.getSemantics(find.bySemanticsLabel('Place window'));
+      expect(place.getSemanticsData().flagsCollection.isEnabled, Tristate.isTrue);
+      expect(place.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+      tester.semantics.performAction(
+          find.semantics.byLabel('Place window'), SemanticsAction.tap);
+      expect(committed, const WinRect(-1194, 129, 392, 93));
+      semantics.dispose();
+    });
+
+    testWidgets('every semantic direction uses the keyboard selection rules',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      WinRect? committed;
+      await tester.pumpWidget(host(onCommit: (r) => committed = r));
+      final steps = <(String, WinRect)>[
+        ('Move right', const WinRect(0, 0, 200, 100)),
+        ('Move right', const WinRect(200, 0, 200, 100)),
+        ('Move down', const WinRect(200, 100, 200, 100)),
+        ('Extend right', const WinRect(200, 100, 400, 100)),
+        ('Extend down', const WinRect(200, 100, 400, 200)),
+        ('Extend left', const WinRect(200, 100, 200, 200)),
+        ('Extend up', const WinRect(200, 100, 200, 100)),
+        ('Move left', const WinRect(0, 100, 200, 100)),
+        ('Move up', const WinRect(0, 0, 200, 100)),
+      ];
+      for (final (label, target) in steps) {
+        tester.semantics.performAction(
+            find.semantics.byLabel(label), SemanticsAction.tap);
+        await tester.pump();
+        tester.semantics.performAction(
+            find.semantics.byLabel('Place window'), SemanticsAction.tap);
+        expect(committed, target, reason: label);
+      }
+      semantics.dispose();
+    });
+
+    testWidgets('inactive panels expose no controls or stale selection',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(host());
+      tester.semantics.performAction(
+          find.semantics.byLabel('Move right'), SemanticsAction.tap);
+      await tester.pump();
+      await tester.pumpWidget(host(active: false, saveHint: true));
+      expect(find.semantics.byLabel(RegExp('Window grid|Move right|Google Chrome|⌘S')),
+          findsNothing);
+      await tester.pumpWidget(host(active: true));
+      final grid = tester.getSemantics(find.bySemanticsLabel(
+          'Window grid for Google Chrome, 6 columns, 6 rows'));
+      expect(grid.getSemanticsData().flagsCollection.isSelected, Tristate.isFalse);
+      expect(tester.getSemantics(find.bySemanticsLabel('Place window'))
+          .getSemanticsData().hasAction(SemanticsAction.tap), isFalse);
+      semantics.dispose();
+    });
   });
 
   testWidgets('a resized grid repaints, rather than drawing the old lattice',

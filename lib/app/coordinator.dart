@@ -107,6 +107,17 @@ class OrthantCoordinator extends ChangeNotifier {
   List<Binding> _bindings = const [];
   List<Binding> get bindings => _bindings;
 
+  Map<int, String> _keyboardLabels = const {};
+  Map<int, String> get keyboardLabels => _keyboardLabels;
+
+  /// Labels follow the input source, not the saved physical bindings.
+  Future<void> refreshKeyboardLabels() async {
+    final labels = await wc.keyboardLabels();
+    if (mapEquals(labels, _keyboardLabels)) return;
+    _keyboardLabels = labels;
+    notifyListeners();
+  }
+
   /// The user's own regions, loaded and saved alongside the bindings so a
   /// partial write cannot orphan one against the other.
   List<CustomRegion> _regions = const [];
@@ -164,6 +175,7 @@ class OrthantCoordinator extends ChangeNotifier {
     // Before anything can render the tray. Cheap, and it cannot change
     // under a running process, so this is the only read.
     _appVersion = await wc.appVersion();
+    await refreshKeyboardLabels();
 
     // Preferences load **either way**. They are settings, not capabilities:
     // Accessibility governs whether a shortcut can move a window, not whether
@@ -433,6 +445,7 @@ class OrthantCoordinator extends ChangeNotifier {
             _bindings,
             const BuiltIn(ShortcutCommand.showGrid),
             unavailable: _unavailable,
+            keyLabels: _keyboardLabels,
           )
         : null;
     return combo == null ? 'Open Grid' : 'Open Grid   $combo';

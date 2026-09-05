@@ -43,6 +43,9 @@ class _FakeWc implements WindowController {
   // Launch-at-login is not what any of these tests exercise; the seam just
   // requires an answer. `unavailable` is the honest default for a fake.
   @override
+  Future<Map<int, String>> keyboardLabels() async => const {};
+
+  @override
   Future<AppVersion> appVersion() async => const AppVersion('1.0.0', '1');
 
   @override

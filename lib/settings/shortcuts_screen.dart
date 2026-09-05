@@ -7,6 +7,7 @@ import '../shortcuts/custom_region.dart';
 import '../shortcuts/region_commands.dart';
 import '../shortcuts/shortcut_command.dart';
 import 'keycap.dart';
+import 'keyboard_labels.dart';
 import 'mac_control.dart';
 import 'mac_theme.dart';
 import 'recording_field.dart';
@@ -454,7 +455,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
         ),
       );
       _notify(
-        '${formatCombo(combo.keyCode, combo.modifiers)} is used by '
+        '${formatCombo(combo.keyCode, combo.modifiers, keyLabels: KeyboardLabels.of(context))} is used by '
         '${_labelFor(displaced)}. Press it again to use it here.',
         actionLabel: 'Use it here',
         // Two ways in, and not for redundancy: [RecordingField] answers every
@@ -558,7 +559,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
     final restore = widget.onRestoreBindings;
     _notify(
       '${_labelFor(displaced)} lost '
-      '${formatCombo(combo.keyCode, combo.modifiers)}.',
+      '${formatCombo(combo.keyCode, combo.modifiers, keyLabels: KeyboardLabels.of(context))}.',
       actionLabel: restore == null ? null : 'Undo',
       action: restore == null ? null : () => restore(before),
     );
@@ -1291,12 +1292,12 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
         // exists to remove, restored for exactly one class of user.
         semanticLabel: switch ((isRecording, _pending)) {
           (true, final p?) when p.row == cmd =>
-            '${_labelFor(cmd)}, ${formatCombo(p.keyCode, p.modifiers)} is '
+            '${_labelFor(cmd)}, ${formatCombo(p.keyCode, p.modifiers, keyLabels: KeyboardLabels.of(context))} is '
                 'used by ${_labelFor(p.owner)}. '
                 'Press it again to use it here, or escape to cancel.',
           (true, _) => '${_labelFor(cmd)}, listening for a combination',
           _ =>
-            '${_labelFor(cmd)}, ${binding.isBound ? formatCombo(binding.keyCode, binding.modifiers) : "no shortcut"}'
+            '${_labelFor(cmd)}, ${binding.isBound ? formatCombo(binding.keyCode, binding.modifiers, keyLabels: KeyboardLabels.of(context)) : "no shortcut"}'
                 '${widget.unavailable.contains(cmd) ? ", unavailable" : ""}',
         },
         // The clear button lives inside this row and must stay reachable; the

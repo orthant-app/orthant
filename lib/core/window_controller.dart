@@ -153,6 +153,10 @@ abstract class WindowController {
   /// prevent.
   Future<AppVersion> appVersion();
 
+  /// Printable labels for physical key codes in the current input source.
+  /// Display data only: bindings continue to store their original key codes.
+  Future<Map<int, String>> keyboardLabels();
+
   /// Whether the app currently launches at login, per the OS.
   Future<LoginItemStatus> loginItemStatus();
 

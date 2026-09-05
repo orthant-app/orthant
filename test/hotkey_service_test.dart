@@ -13,6 +13,19 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
+  test('layout notifications arrive before Accessibility enables shortcuts', () async {
+    var changes = 0;
+    HotkeyService(onCommand: (_) {}, onKeyboardLayoutChanged: () => changes++);
+    // First-run onboarding has not called apply(), but its labels must update.
+    await messenger.handlePlatformMessage(
+      kOrthantChannel,
+      const StandardMethodCodec().encodeMethodCall(
+        const MethodCall('onKeyboardLayoutChanged')),
+      (_) {},
+    );
+    expect(changes, 1);
+  });
+
   /// Records the ids `apply` asks the native side to register. [reply] decides
   /// what the OS "says" for each id; the default is that every chord is taken.
   List<int> captureIds({bool Function(int id)? reply}) {

@@ -4,6 +4,20 @@ import 'package:orthant/shortcuts/command_ref.dart';
 import 'package:orthant/shortcuts/shortcut_command.dart';
 
 void main() {
+  test('layout labels change the displayed key, never the physical binding', () {
+    const binding = Binding(BuiltIn(ShortcutCommand.showGrid), 31, kControlOption);
+    // Dvorak's R occupies the physical US O key. The hotkey still stores 31.
+    expect(formatCombo(binding.keyCode, binding.modifiers,
+        keyLabels: const {31: 'R'}), '⌃⌥R');
+    expect(comboSymbols(31, kControlOption, keyLabels: const {31: 'R'}),
+        ['⌃', '⌥', 'R']);
+    expect(binding.toJson()['keyCode'], 31);
+    expect(comboLabelFor([binding], binding.command,
+        keyLabels: const {31: 'R'}), '⌃⌥R');
+    expect(formatCombo(123, kControlOption, keyLabels: const {31: 'R'}), '⌃⌥←');
+    expect(formatCombo(31, kControlOption), '⌃⌥O');
+  });
+
   test('a rebind for a command absent from the list is added, not dropped', () {
     // The list is rendered from the commands that exist, not from whatever
     // preferences hold, so a row can be on screen with no entry behind it.

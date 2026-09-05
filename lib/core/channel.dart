@@ -24,3 +24,5 @@ const String kAutomaticUpdateChecks = 'automaticUpdateChecks';
 const String kSetAutomaticUpdateChecks = 'setAutomaticUpdateChecks';
 
 const String kAppVersion = 'appVersion';
+const String kKeyboardLabels = 'keyboardLabels';
+const String kKeyboardLayoutChanged = 'onKeyboardLayoutChanged';

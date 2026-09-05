@@ -13,6 +13,25 @@ void main() {
 
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
+  test('keyboard labels retain valid Unicode and ignore malformed entries', () async {
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      expect(call.method, 'keyboardLabels');
+      return <Object, Object>{31: 'R', 0: 'Ä', 1: '', 2: 3, -1: 'X',
+        128: 'Y', '31': 'wrong key type'};
+    });
+    expect(await const MacosWindowController().keyboardLabels(), {31: 'R', 0: 'Ä'});
+  });
+
+  test('a failed keyboard label read is an empty map, not a launch failure', () async {
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      throw PlatformException(code: 'layout');
+    });
+    expect(await const MacosWindowController().keyboardLabels(), isEmpty);
+    // No handler at all — the shape of a Dart side newer than its native side.
+    messenger.setMockMethodCallHandler(channel, null);
+    expect(await const MacosWindowController().keyboardLabels(), isEmpty);
+  });
+
   test('applyFrame sends the rect and returns the native bool', () async {
     final calls = <MethodCall>[];
     messenger.setMockMethodCallHandler(channel, (call) async {

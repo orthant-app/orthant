@@ -5,6 +5,7 @@ import '../overlay/grid_selection.dart';
 import '../shortcuts/bindings.dart';
 import '../shortcuts/custom_region.dart';
 import 'keycap.dart';
+import 'keyboard_labels.dart';
 import 'mac_control.dart';
 import 'mac_theme.dart';
 import 'recording_field.dart';
@@ -562,7 +563,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
                 semanticLabel: _keyCode == kUnboundKey
                     ? 'Record shortcut, none set'
                     : 'Record shortcut, currently '
-                          '${formatCombo(_keyCode, _modifiers)}',
+                          '${formatCombo(_keyCode, _modifiers, keyLabels: KeyboardLabels.of(context))}',
                 focusRingRadius: 6,
                 inset: 1,
                 child: Align(

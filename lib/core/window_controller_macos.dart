@@ -9,6 +9,28 @@ class MacosWindowController implements WindowController {
   static const MethodChannel _channel = MethodChannel(kOrthantChannel);
 
   @override
+  Future<Map<int, String>> keyboardLabels() async {
+    // Display data only, so a failure here degrades to Dart's fallback
+    // glyphs rather than surfacing anywhere — least of all at launch, where
+    // the coordinator awaits this before anything renders.
+    final Object? reply;
+    try {
+      reply = await _channel.invokeMethod<Object?>(kKeyboardLabels);
+    } on PlatformException {
+      return const {};
+    } on MissingPluginException {
+      return const {};
+    }
+    if (reply is! Map) return const {};
+    return Map.unmodifiable({
+      for (final entry in reply.entries)
+        if (entry.key is int && entry.key >= 0 && entry.key <= 127 &&
+            entry.value is String && (entry.value as String).trim().isNotEmpty)
+          entry.key as int: entry.value as String,
+    });
+  }
+
+  @override
   Future<bool> checkPermission() async =>
       await _channel.invokeMethod<bool>(kCheckPermission) ?? false;
 

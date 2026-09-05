@@ -29,12 +29,14 @@
 		33CC10F32044A3C60003C045 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F22044A3C60003C045 /* Assets.xcassets */; };
 		33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F42044A3C60003C045 /* MainMenu.xib */; };
 		33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC11122044BFA00003C045 /* MainFlutterWindow.swift */; };
+		3F4833CB70752386F76EABF4 /* KeyboardLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 745926FF55ACF5BAA2A6E35A /* KeyboardLayout.swift */; };
 		50AC926456BE5D511F8F965D /* ActivationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E437BB2B01E6FFF86C2CE8C /* ActivationPolicy.swift */; };
 		69C930E39F1F972A92292449 /* OverlayPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 590CC03D58462E7713303F97 /* OverlayPanel.swift */; };
 		78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */; };
 		7F0FB3435ACBBE5311FBBA46 /* WindowControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2BED8828E63E43700CCF25B /* WindowControl.swift */; };
 		841C28ABA9DB5197D7F80770 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 3860F210BA59C9046093C92A /* Sparkle */; };
 		86CB2EB052B444169CBBF3D9 /* Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2418C13F0A48F16D2CA7C31 /* Updater.swift */; };
+		8704DAA042B16F894EDEB007 /* KeyboardLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBA1086BB72EF8F4F066F3F7 /* KeyboardLayoutTests.swift */; };
 		8818ECD07DC6039C465A9E8A /* LoginItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EC4DE3304049EAB9122C70B /* LoginItem.swift */; };
 		8F48D54130303CEF3F54BB7D /* EUIPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EB57A1BEAFA64AFBAF07C46 /* EUIPolicy.swift */; };
 		C4103E7B9569B1C09A67B4FB /* ActivationPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A3E209351B77786F4124CEF /* ActivationPolicyTests.swift */; };
@@ -96,11 +98,13 @@
 		6DEFB1934EB4AD8C4ABBDAE4 /* HotkeyManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HotkeyManager.swift; sourceTree = "<group>"; };
 		6E437BB2B01E6FFF86C2CE8C /* ActivationPolicy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActivationPolicy.swift; sourceTree = "<group>"; };
 		6EE5CE3828165F4403E294D6 /* AppShell.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShell.swift; sourceTree = "<group>"; };
+		745926FF55ACF5BAA2A6E35A /* KeyboardLayout.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardLayout.swift; sourceTree = "<group>"; };
 		78E0A7A72DC9AD7400C4905E /* FlutterGeneratedPluginSwiftPackage */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = FlutterGeneratedPluginSwiftPackage; path = ephemeral/Packages/FlutterGeneratedPluginSwiftPackage; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		967169EDF93CBEF3C483CBBE /* Accessibility.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Accessibility.swift; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		B2418C13F0A48F16D2CA7C31 /* Updater.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
+		BBA1086BB72EF8F4F066F3F7 /* KeyboardLayoutTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardLayoutTests.swift; sourceTree = "<group>"; };
 		E2BED8828E63E43700CCF25B /* WindowControl.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WindowControl.swift; sourceTree = "<group>"; };
 		EE9B8B3ED804B042B867CACB /* OverlayPanelSet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OverlayPanelSet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -130,6 +134,7 @@
 			children = (
 				331C80D7294CF71000263BE5 /* RunnerTests.swift */,
 				1A3E209351B77786F4124CEF /* ActivationPolicyTests.swift */,
+				BBA1086BB72EF8F4F066F3F7 /* KeyboardLayoutTests.swift */,
 			);
 			path = RunnerTests;
 			sourceTree = "<group>";
@@ -207,6 +212,7 @@
 				3EB57A1BEAFA64AFBAF07C46 /* EUIPolicy.swift */,
 				B2418C13F0A48F16D2CA7C31 /* Updater.swift */,
 				6E437BB2B01E6FFF86C2CE8C /* ActivationPolicy.swift */,
+				745926FF55ACF5BAA2A6E35A /* KeyboardLayout.swift */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -385,6 +391,7 @@
 			files = (
 				331C80D8294CF71000263BE5 /* RunnerTests.swift in Sources */,
 				C4103E7B9569B1C09A67B4FB /* ActivationPolicyTests.swift in Sources */,
+				8704DAA042B16F894EDEB007 /* KeyboardLayoutTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -405,6 +412,7 @@
 				8F48D54130303CEF3F54BB7D /* EUIPolicy.swift in Sources */,
 				86CB2EB052B444169CBBF3D9 /* Updater.swift in Sources */,
 				50AC926456BE5D511F8F965D /* ActivationPolicy.swift in Sources */,
+				3F4833CB70752386F76EABF4 /* KeyboardLayout.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

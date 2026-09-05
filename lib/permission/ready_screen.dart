@@ -133,7 +133,7 @@ class ReadyScreen extends StatelessWidget {
                           // the pointer.
                           caption:
                               'Opens the grid. Drag across it to pick any '
-                              'block — thirds, two-thirds, anything. Or use '
+                              'block: thirds, two-thirds, anything. Or use '
                               'the arrow keys, ⇧ to extend, ↩ to place.',
                         ),
                       ),
@@ -172,7 +172,7 @@ class ReadyScreen extends StatelessWidget {
                           // fell into before this screen existed.
                           caption:
                               'Snaps straight to a half, a quarter, or full '
-                              'screen. No aiming — and you can add shapes of '
+                              'screen. No aiming, and you can add shapes of '
                               'your own, like the third one.',
                         ),
                       ),

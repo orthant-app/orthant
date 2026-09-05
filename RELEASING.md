@@ -21,8 +21,8 @@ Two commits, and they are deliberately not one. See step 7.
 
 Two gitignored files hold the signing identity, so it never enters the repo:
 
-- `macos/Runner/Configs/Local.xcconfig` — `DEVELOPMENT_TEAM` for the Release config.
-- `tool/release.local` — `EXPECTED_TEAM`, which `tool/release.sh` checks against the
+- `macos/Runner/Configs/Local.xcconfig`: `DEVELOPMENT_TEAM` for the Release config.
+- `tool/release.local`: `EXPECTED_TEAM`, which `tool/release.sh` checks against the
   identity it actually signs with.
 
 The release tooling exits with instructions if either is missing. You also need the
@@ -44,10 +44,10 @@ missing credential rather than a locked one.
 
 `N` must be greater than every `<sparkle:version>` in **both** live feeds
 (`appcast.xml` and `appcast-beta.xml`). `max_feed_version` in `tool/ci/release_lib.sh`
-enforces this, but check it locally first — a rejection after the tag is pushed is far
+enforces this, but check it locally first: a rejection after the tag is pushed is far
 more annoying than one before.
 
-## 2. Write the changelog entry — this is a hard precondition
+## 2. Write the changelog entry, a hard precondition
 
 Create `site/src/content/changelog/<X.Y.Z>.md`:
 
@@ -127,7 +127,7 @@ git push origin vX.Y.Z
 ## 6. Approve, then verify the release
 
 The `release` environment requires an individual approval before any job can read a
-secret. That approval is the reason keeping signing keys in CI was judged acceptable —
+secret. That approval is the reason keeping signing keys in CI was judged acceptable. It lives under
 Actions ▸ the running workflow ▸ Review deployments.
 
 When it finishes, verify:
@@ -141,7 +141,7 @@ When it finishes, verify:
 first job deliberately rejects a tag whose release is already public rather than
 rebuild different signed bytes.
 
-## 7. Flip `published: true` — a separate commit
+## 7. Flip `published: true` in a separate commit
 
 Once the release is verified live:
 
@@ -187,7 +187,7 @@ that the site is up to date.
   `com.apple.security.get-task-allow` into Release, and Apple rejects notarization
   outright when it is present. `tool/release.sh` strips it by re-signing with explicit
   entitlements, which makes that re-sign load-bearing rather than belt-and-braces.
-- **`generate_appcast` hides two failures behind exit 0** — it hard-fails on a
+- **`generate_appcast` hides two failures behind exit 0.** It hard-fails on a
   coexisting same-version `.zip` and `.dmg`, and can exit 0 having silently skipped
   signing. `tool/release.sh` counts signed items instead of trusting the exit code, and
   counts the full-DMG and delta regions separately, because a delta legitimately adds a

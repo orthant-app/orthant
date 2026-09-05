@@ -668,7 +668,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   Widget _regionsHint(MacTokens t) => Padding(
     padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
     child: Text(
-      "Bind a shape the built-ins don't cover — draw it here, or select it "
+      "Bind a shape the built-ins don't cover. Draw it here, or select it "
       'in the grid and press ⌘S.',
       style: TextStyle(fontSize: 11, color: t.labelTertiary),
     ),

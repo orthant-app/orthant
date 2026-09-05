@@ -22,7 +22,7 @@ brew install --cask orthant-app/tap/orthant
 
 Or grab the `.dmg` from [the latest release](https://github.com/orthant-app/orthant/releases/latest) and drag Orthant to Applications. Either way you get the same build: signed with an Apple Developer ID and notarized by Apple, so it opens without a trip through System Settings. You can also [build from source](#build-from-source).
 
-Orthant checks for updates on its own and installs them in place. Homebrew knows this — the cask is marked `auto_updates true`, so `brew upgrade` deliberately skips it rather than fighting over the same app. If you'd rather Homebrew drove updates, `brew upgrade --cask --greedy-auto-updates orthant` includes it.
+Orthant checks for updates on its own and installs them in place. Homebrew knows this: the cask is marked `auto_updates true`, so `brew upgrade` deliberately skips it rather than fighting over the same app. If you'd rather Homebrew drove updates, `brew upgrade --cask --greedy-auto-updates orthant` includes it.
 
 ## What it does
 

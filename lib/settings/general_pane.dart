@@ -330,7 +330,7 @@ class GeneralPane extends StatelessWidget {
             // in the pane and the window is only 560 pt wide.
             Flexible(
               child: Text(
-                'Not granted — shortcuts and the grid do nothing',
+                'Not granted. Shortcuts and the grid do nothing',
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.35,

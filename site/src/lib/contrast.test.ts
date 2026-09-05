@@ -94,14 +94,30 @@ describe('the palette declared in tokens.css', () => {
    * mode was the worse of the two, and a light-only check would have passed a
    * button that is still failing for half the visitors.
    */
-  it.each(['light', 'dark'] as const)(
-    'clears 4.5:1 for white text on the %s primary button fill',
-    (scope) => {
-      const t = tokens(scope);
-      expect(t['--accent-fill'], '--accent-fill missing from tokens.css').toBeDefined();
-      expect(contrastRatio('#FFFFFF', toHex8(t['--accent-fill']))).toBeGreaterThanOrEqual(4.5);
-    },
-  );
+  /*
+   * BOTH states, because hover is not a decoration — it is the state the
+   * visitor is in while deciding to click. The first version of this fix
+   * covered only the resting fill and left `filter: brightness(1.08)` in
+   * place, which measured 4.30:1: the resting state cleared the bar and the
+   * hovered one did not.
+   */
+  const FILLS = [
+    ['light', '--accent-fill'], ['dark', '--accent-fill'],
+    ['light', '--accent-fill-hover'], ['dark', '--accent-fill-hover'],
+  ] as const;
+
+  it.each(FILLS)('clears 4.5:1 for white text on the %s %s', (scope, name) => {
+    const t = tokens(scope);
+    expect(t[name], `${name} missing from tokens.css`).toBeDefined();
+    expect(contrastRatio('#FFFFFF', toHex8(t[name]))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // Non-text UI still has a floor: a button nobody can find is not an
+  // improvement on one whose label is hard to read. SC 1.4.11 is 3:1.
+  it.each(FILLS)('keeps the %s %s distinguishable from its surface', (scope, name) => {
+    const t = tokens(scope);
+    expect(contrastRatio(toHex8(t[name]), toHex8(t['--surface']))).toBeGreaterThanOrEqual(3);
+  });
 
   // A fill that clears 4.5:1 buys nothing if the button stops using it. Pins
   // both halves: the declaration, and that it is not the bare --accent whose
@@ -114,13 +130,20 @@ describe('the palette declared in tokens.css', () => {
     expect(rule![1]).not.toMatch(/background:\s*var\(--accent\)/);
   });
 
-  // Non-text UI still has a floor: a button nobody can find is not an
-  // improvement on one whose label is hard to read. SC 1.4.11 is 3:1.
-  it.each(['light', 'dark'] as const)(
-    'keeps the %s primary button distinguishable from its surface',
-    (scope) => {
-      const t = tokens(scope);
-      expect(contrastRatio(toHex8(t['--accent-fill']), toHex8(t['--surface']))).toBeGreaterThanOrEqual(3);
-    },
-  );
+  /*
+   * The hover state has to be a COLOUR, not a filter.
+   *
+   * Everything above reads declared colours out of tokens.css, so a
+   * `filter: brightness()` hover is a state this file cannot evaluate at all:
+   * the four assertions would keep passing while the hovered button failed.
+   * Forbidding the mechanism is what makes the assertions above complete.
+   */
+  it('gives the primary button a hover colour rather than a filter', () => {
+    const css = readFileSync('src/styles/tokens.css', 'utf8');
+    const rule = /\.btn-primary:hover\s*\{([^}]*)\}/.exec(css);
+    expect(rule, 'no `.btn-primary:hover { }` rule in tokens.css').not.toBeNull();
+    expect(rule![1]).toContain('var(--accent-fill-hover)');
+    expect(rule![1], 'a filtered hover is a state the assertions above cannot see')
+      .not.toContain('filter');
+  });
 });

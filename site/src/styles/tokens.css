@@ -27,10 +27,21 @@
      exactly the same reason — the number was already recorded above, next to
      the wrong conclusion, because a filled button is the one place the accent
      is a background for text rather than a foreground. Measured 4.91:1 in
-     both schemes; contrast.test.ts asserts it against #fff, not the surface. */
+     both schemes; contrast.test.ts asserts it against #fff, not the surface.
+
+     --accent-fill-hover DARKENS, and is a colour rather than a filter. Hover
+     used to be `filter: brightness(1.08)`, which measured 4.30:1 — a state the
+     visitor is in while deciding to click, failing the bar the resting state
+     had just been fixed to clear. Brightening a fill always moves it the wrong
+     way, because contrast with white text falls as luminance rises.
+     A filter is also unassertable: contrast.test.ts reads declared colours, so
+     a brightness() hover is a state no test here can evaluate. That is why the
+     hover colour must stay a token, and why the test forbids `filter` on this
+     rule. Measured 5.45:1 on #fff, 5.22:1 / 3.35:1 on the two surfaces. */
   --accent: #007AFF;
   --accent-text: #0060D6;
   --accent-fill: #006CE5;
+  --accent-fill-hover: #0065D8;
 
   --raised: rgb(16 22 34 / 0.04);
   --raised-strong: rgb(16 22 34 / 0.08);
@@ -59,13 +70,14 @@
     --accent: #0A84FF;
     /* Measures 5.00:1 on #0E1524, so dark mode needs no separate link colour. */
     --accent-text: #0A84FF;
-    /* --accent-fill is deliberately NOT re-declared: it inherits the light
-       value. Dark mode wants a brighter accent, and #0A84FF is brighter, but
-       white on it measures 3.65:1 — worse than light mode, not better, because
-       raising a fill's luminance lowers its contrast with the white text on
-       top. The inherited fill still clears 3:1 against this surface (3.71:1),
-       so the button is plainly visible. Overriding it here to "match dark
-       mode" is how this defect comes back. */
+    /* --accent-fill and --accent-fill-hover are deliberately NOT re-declared:
+       they inherit the light values. Dark mode wants a brighter accent, and
+       #0A84FF is brighter, but white on it measures 3.65:1 — worse than light
+       mode, not better, because raising a fill's luminance lowers its contrast
+       with the white text on top. The inherited fills still clear 3:1 against
+       this surface (3.71:1 and 3.35:1), so the button is plainly visible in
+       both states. Overriding either here to "match dark mode" is how this
+       defect comes back. */
 
     --raised: rgb(226 236 255 / 0.05);
     --raised-strong: rgb(226 236 255 / 0.10);
@@ -223,7 +235,7 @@ pre {
   cursor: pointer;
 }
 .btn-primary { background: var(--accent-fill); color: #fff; }
-.btn-primary:hover { filter: brightness(1.08); }
+.btn-primary:hover { background: var(--accent-fill-hover); }
 .btn-secondary {
   background: var(--raised);
   border-color: var(--separator);

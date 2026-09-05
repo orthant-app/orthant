@@ -108,12 +108,47 @@ for (const path of PATHS) {
         const linkText = [...p.querySelectorAll('a')]
           .map((a) => (a.textContent || '').trim()).join('');
         const prose = (p.textContent || '').replace(/\s+/g, ' ').trim();
-        // Whatever is left once every link's text is removed.
-        return prose.length - linkText.length > 2;
+
+        /*
+         * What is left once every link's text is removed has to contain an
+         * actual WORD, not merely characters.
+         *
+         * Counting leftover length exempted a comma-separated list of links:
+         * `<p><a>A</a>, <a>B</a>, <a>C</a></p>` leaves ", , ", four characters,
+         * which passed a length threshold. That is a link list, not a sentence,
+         * and it is exactly the standalone-link shape this check exists to
+         * find. Requiring three consecutive letters keeps WCAG's real exemption
+         * ("See <link>." is a sentence, and "See" is a word) while refusing
+         * punctuation and whitespace as evidence of prose.
+         */
+        let remainder = prose;
+        for (const t of [...p.querySelectorAll('a')].map((a) => (a.textContent || '').trim())) {
+          if (t) remainder = remainder.replace(t, ' ');
+        }
+        return /[A-Za-z]{3,}/.test(remainder) && prose.length > linkText.length;
       };
 
+      /*
+       * ⚠️ `checkVisibility()` bare is weaker than it looks: it catches
+       * `display: none` and a closed <details>, and returns TRUE for
+       * `visibility: hidden`, `opacity: 0`, and the clip-path technique this
+       * site uses for `.visually-hidden`. A visually-hidden link measures about
+       * 1x1, so bare it would be reported as a real 1x1 target — a false
+       * positive, which is how a CI gate ends up switched off.
+       *
+       * The options below cover the first two. Clip-path is not expressible
+       * here, so the class is named: it is the site's own technique and is what
+       * `.visually-hidden` means.
+       */
+      const isVisible = (e) =>
+        e.checkVisibility({
+          contentVisibilityAuto: true,
+          opacityProperty: true,
+          visibilityProperty: true,
+        }) && !e.closest('.visually-hidden');
+
       const targets = [...document.querySelectorAll('a, button')].filter((e) => {
-        if (!e.checkVisibility()) return false;
+        if (!isVisible(e)) return false;
         if (EXEMPT_CLASSES.some((c) => e.classList.contains(c))) return false;
         if (e.tagName === 'BUTTON') return true;
         return !inSentence(e);

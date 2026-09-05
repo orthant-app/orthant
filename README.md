@@ -26,7 +26,7 @@ Orthant checks for updates on its own and installs them in place. Homebrew knows
 
 ## What it does
 
-Orthant lives in the menu bar (no Dock icon) and moves the window you were just using, without ever stealing focus from it. The target window is captured *before* any Orthant UI appears, so the app you're arranging stays frontmost throughout.
+Orthant runs in the menu bar in the background and moves the window you were just using, without stealing focus during placement. The target window is captured *before* the grid appears, so the app you're arranging stays frontmost throughout. Settings and update windows can appear in the Dock while open.
 
 Two ways to place a window:
 
@@ -63,14 +63,14 @@ All of these are rebindable in **Settings → Shortcuts**. (`⌃` Control, `⌥`
 | --- | --- |
 | **macOS 13+** | Works today |
 | **Windows** | Planned: the same Dart UI over a pure-Dart Win32 backend, behind the same `WindowController` seam |
-| **Linux** | Not possible: Wayland doesn't let one app move another's windows, by design |
+| **Linux** | Not supported |
 
 ## Permissions
 
-**Accessibility permission** is the one thing Orthant asks for. It positions other apps' windows through the macOS Accessibility API, the same mechanism every window manager uses, and macOS gates that behind **System Settings ▸ Privacy & Security ▸ Accessibility**. On first launch Orthant walks you through granting it, and gets out of the way the moment it's on.
+**Accessibility permission** lets Orthant position other apps' windows through the macOS Accessibility API. Enable it in **System Settings ▸ Privacy & Security ▸ Accessibility**. On first launch Orthant walks you through granting it, and gets out of the way the moment it's on.
 
 > [!TIP]
-> **Why isn't this on the Mac App Store?** The Accessibility API doesn't work from inside the App Sandbox, and the store requires the sandbox. That rules it out permanently, for Orthant and every app in this category.
+> **Why isn't this on the Mac App Store?** Orthant is distributed directly, with its own updater. Its window-control code runs outside the App Sandbox. Each release is Developer ID-signed and notarized by Apple.
 
 ## Build from source
 
@@ -115,7 +115,7 @@ The choices that matter:
 
 - **One coordinate system.** All window geometry is top-left-origin global points (the Accessibility/CoreGraphics space), converted from AppKit's bottom-left space exactly once, natively. Mixing the two spaces is the classic correctness bug in this category of app.
 - **The overlay is a non-activating `NSPanel`** on a second, resident Flutter engine. It appears without Orthant ever becoming the frontmost app, and idles at 0% CPU while hidden.
-- **Native handles never cross the platform channel.** Only plain data does, which is what keeps a second backend practical: the planned **Windows** port (pure-Dart Win32) implements the same `WindowController` seam behind the same UI. **Linux** isn't possible: Wayland doesn't let one app move another's windows, by design.
+- **Native handles never cross the platform channel.** Only plain data does, which is what keeps a second backend practical: the planned **Windows** port (pure-Dart Win32) implements the same `WindowController` seam behind the same UI. **Linux** is not supported.
 
 ## Testing
 
@@ -139,7 +139,9 @@ Maintainer process, including the changelog entry every release depends on:
 brew uninstall --zap orthant
 ```
 
-`--zap` is the complete removal: it also clears Orthant's preferences, caches and saved state, and revokes its Accessibility grant. A plain `brew uninstall` leaves those behind. If you reinstall after a zap, you'll be asked for Accessibility again — that's the grant having genuinely gone, not a bug.
+Before uninstalling, turn off **Settings → General → Launch at login** if you enabled it. macOS keeps that registration after the app is removed, and a reinstall can pick it back up.
+
+`--zap` also clears Orthant's preferences, caches and saved state, and revokes its Accessibility grant. A plain `brew uninstall` leaves those behind. If you reinstall after a zap, you'll be asked for Accessibility again.
 
 Installed by hand instead? Quit Orthant and delete the app. Settings live in `~/Library/Preferences/app.orthant.orthant.plist`, and the Accessibility entry can be removed in System Settings ▸ Privacy & Security ▸ Accessibility.
 

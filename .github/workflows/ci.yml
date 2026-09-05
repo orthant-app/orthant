@@ -80,3 +80,9 @@ jobs:
       - name: Test
         run: npm test
         working-directory: site
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: site
+      - name: Responsive sweep
+        run: npm run sweep
+        working-directory: site

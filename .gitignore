@@ -63,3 +63,8 @@ tool/release.local
 # is Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 # (committed — measured in M12 Task 1); this copy only regenerates and drifts.
 macos/Runner.xcworkspace/xcshareddata/swiftpm/
+
+# playwright-cli session snapshots, written wherever the tool is invoked from.
+# Ignored rather than left untracked: `git add <dir>` sweeps up what is lying
+# around, and this repo's identity rules make one accidental commit expensive.
+.playwright-cli/

@@ -3,8 +3,8 @@
     The app icon's motif, re-expressed for the web: same proportions as
     tool/make_app_icon.py (grid 52% of the plate, 8.5% gutter, 16% cell radius,
     three cells at 110/255 alpha and one "placed" at full), but the plate fills
-    the canvas instead of sitting inside macOS's 80.5% padding — that padding
-    exists for the system's own shadowing and only makes a favicon look small.
+    the canvas instead of sitting inside macOS's 80.5% padding, which exists
+    for the system's own shadowing and only makes a favicon look small.
   -->
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">

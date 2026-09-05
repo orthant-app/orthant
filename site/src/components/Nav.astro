@@ -65,7 +65,12 @@ const current = (href: string) => href.startsWith('/') && path.startsWith(href);
     ul {
       order: 3; width: 100%;
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      /* `minmax(0, 1fr)`, not a bare `1fr`: an auto-floored track cannot
+         shrink below its min-content width, so a bare `1fr` holds only while
+         all five labels stay short. That makes the no-overflow promise depend
+         on the copy rather than on the layout, and it is the same floor that
+         pushed the whole page to 450px wide from the hero once already. */
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 0;
       border-top: 1px solid var(--separator);
       padding-top: 6px;

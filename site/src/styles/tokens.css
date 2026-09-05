@@ -116,8 +116,12 @@ h2 { font-size: 27px; margin-block: 0 16px; }
 h3 { font-size: 20px; margin-block: 28px 8px; }
 
 /* The browser default is #0000EE, which clashes with --accent in light mode
-   and is close to unreadable on #1E1E1F in dark mode. Every link on the site
-   was rendering in it. */
+   and is close to unreadable on the dark surface. Every link on the site was
+   rendering in it.
+
+   The surface was named as #1E1E1F here until the blueprint palette replaced
+   it; a comment citing a colour the file no longer defines misleads whoever
+   next checks the contrast maths, so it names the token instead. */
 a { color: var(--accent-text); text-underline-offset: 2px; text-decoration-thickness: 1px; }
 a:hover { text-decoration-thickness: 2px; }
 

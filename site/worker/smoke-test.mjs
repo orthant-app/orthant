@@ -44,6 +44,35 @@ const FATAL_MARKER = 'The Workers runtime failed to start';
 // fetch itself succeeds in this environment.
 const EXPECTED_LOCATION_PREFIX = 'https://github.com/orthant-app/orthant/';
 
+// ⚠️ The prefix alone accepts the FALLBACK, so a /download that never once
+// resolved a real asset passed this test while printing the evidence.
+//
+// So when the feed is reachable FROM HERE, the Worker has no excuse for
+// falling back, and landing on this URL is a failure rather than a pass. When
+// it is not reachable, the strict check is skipped OUT LOUD. A check that
+// cannot tell "the feed is down" from "resolution is broken" reports the
+// second as the first.
+//
+// ⚠️ What this still CANNOT catch, measured rather than assumed: `wrangler
+// dev` runs a local workerd that does NOT enforce the `this` binding on the
+// global fetch. Deleting the .bind(globalThis) in download.ts's runtimeDeps()
+// leaves this test resolving the DMG and exiting 0; the same code on the real
+// edge throws "Illegal invocation" on every request. That is exactly the
+// defect this strict check was written for, and it is out of its reach.
+// The guard for it is the unit test in index.test.ts, which models the rule
+// directly. Only `wrangler dev --remote` or a deployment reproduces it here.
+const FALLBACK_LOCATION = 'https://github.com/orthant-app/orthant/releases/latest';
+const FEED_URL = 'https://updates.orthant.app/appcast.xml';
+
+async function feedIsReachable() {
+  try {
+    const res = await fetch(FEED_URL, { signal: AbortSignal.timeout(10_000) });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 if (!existsSync(path.join(SITE_DIR, 'dist', '_headers'))) {
   console.error('worker/smoke-test.mjs: dist/ is missing or incomplete — run `npm run build` first.');
   process.exit(1);
@@ -100,7 +129,7 @@ async function waitForReady() {
   throw new Error(`wrangler dev did not become ready within ${READY_TIMEOUT_MS}ms.\nCaptured output:\n${output}`);
 }
 
-async function checkDownloadPath(pathname) {
+async function checkDownloadPath(pathname, strict) {
   const res = await fetch(BASE + pathname, { redirect: 'manual' });
   if (res.status !== 302) {
     throw new Error(`GET ${pathname}: expected 302, got ${res.status}`);
@@ -109,6 +138,12 @@ async function checkDownloadPath(pathname) {
   if (!location || !location.startsWith(EXPECTED_LOCATION_PREFIX)) {
     throw new Error(
       `GET ${pathname}: expected a location starting with ${EXPECTED_LOCATION_PREFIX}, got ${JSON.stringify(location)}`,
+    );
+  }
+  if (strict && location === FALLBACK_LOCATION) {
+    throw new Error(
+      `GET ${pathname}: the appcast is reachable from this machine, so the Worker had no reason to fall back. ` +
+        `It redirected to ${location} instead of a release asset, which means the feed fetch failed INSIDE the Worker.`,
     );
   }
   console.log(`  ✓ GET ${pathname} -> 302 ${location}`);
@@ -141,8 +176,14 @@ let failureMessage = null;
 try {
   await waitForReady();
   console.log('wrangler dev is ready. Checking routes...');
-  await checkDownloadPath('/download');
-  await checkDownloadPath('/download/');
+  const strict = await feedIsReachable();
+  if (strict) {
+    console.log('  the appcast is reachable from here, so a fallback redirect is a FAILURE');
+  } else {
+    console.log('  ⚠️  the appcast is NOT reachable from here; skipping the strict resolution check');
+  }
+  await checkDownloadPath('/download', strict);
+  await checkDownloadPath('/download/', strict);
 } catch (err) {
   failureMessage = err?.message ?? String(err);
 } finally {

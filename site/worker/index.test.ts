@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import handler from './index';
-import { FALLBACK_URL, SECURITY_HEADERS, handleDownload, type CacheLike } from './download';
+import { FALLBACK_URL, SECURITY_HEADERS, handleDownload, runtimeDeps, type CacheLike } from './download';
 
 const GOOD = 'https://github.com/orthant-app/orthant/releases/download/v1.0.1/Orthant-1.0.1.dmg';
 
@@ -130,6 +130,55 @@ describe('handleDownload', () => {
 
     const privacy = readFileSync('src/pages/privacy.astro', 'utf8');
     expect(privacy).not.toContain('Cloudflare Web Analytics');
+  });
+
+  /*
+   * The bug this whole file could not see.
+   *
+   * index.ts passed `globalThis.fetch` into the deps object, which detaches
+   * it, so `deps.fetch(...)` ran with `this === deps`. workerd rejects that
+   * with "Illegal invocation", handleDownload catches every fetch failure, and
+   * the result was a /download that silently served the releases listing
+   * instead of the DMG on every single request.
+   *
+   * Every test above injects a plain async function, which has no `this`
+   * requirement, so none of them could reach it; the workerd smoke test
+   * asserted the fallback URL, i.e. it asserted the bug. This models workerd's
+   * actual rule instead, which is why it fails when the bind is removed.
+   */
+  it('binds the global fetch, so calling it as a method is legal', async () => {
+    const real = globalThis.fetch;
+    globalThis.fetch = function (this: unknown) {
+      if (this !== globalThis && this !== undefined) {
+        throw new TypeError('Illegal invocation: function called with incorrect `this` reference.');
+      }
+      return Promise.resolve(ok(FEED));
+    } as unknown as typeof fetch;
+    try {
+      // Called as a METHOD of the deps object, exactly as handleDownload calls it.
+      const deps = runtimeDeps();
+      await expect(deps.fetch('https://example.com/')).resolves.toBeInstanceOf(Response);
+    } finally {
+      globalThis.fetch = real;
+    }
+  });
+
+  it('resolves the DMG end to end through the production deps', async () => {
+    const real = globalThis.fetch;
+    globalThis.fetch = function (this: unknown) {
+      if (this !== globalThis && this !== undefined) {
+        throw new TypeError('Illegal invocation: function called with incorrect `this` reference.');
+      }
+      return Promise.resolve(ok(FEED));
+    } as unknown as typeof fetch;
+    try {
+      // The real deps' fetch, but a memory cache: runtimeCache() reaches for
+      // caches.default, which only exists inside workerd.
+      const res = await handleDownload({ fetch: runtimeDeps().fetch, cache: memoryCache() });
+      expect(res.headers.get('location')).toBe(GOOD);
+    } finally {
+      globalThis.fetch = real;
+    }
   });
 
   it('falls back on a non-200 feed', async () => {

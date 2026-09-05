@@ -117,6 +117,32 @@ export async function handleDownload(deps: Deps): Promise<Response> {
   return redirect(target, `public, max-age=${TTL_SECONDS}`);
 }
 
+/**
+ * The dependencies handleDownload runs with in production.
+ *
+ * ⚠️ `fetch` is BOUND, and that is the whole point of this function existing.
+ *
+ * workerd requires the global fetch to be invoked with the global as its
+ * `this`. Passing `globalThis.fetch` into an object detaches it, so
+ * `deps.fetch(...)` runs with `this === deps` and throws
+ * "Illegal invocation: function called with incorrect `this` reference".
+ * handleDownload catches every fetch failure and falls back, so the symptom
+ * was not an error page: /download quietly redirected to the releases listing
+ * instead of the DMG, on every request since the Worker was first written.
+ *
+ * Nothing caught it. The unit tests inject a plain async function, which has
+ * no `this` requirement, and the workerd smoke test asserted the fallback URL
+ * — i.e. it asserted the bug. It took a real deployment and `wrangler dev
+ * --remote` to see the exception at all.
+ *
+ * It lives here rather than in index.ts because index.ts is the entry module,
+ * whose named exports workerd treats as candidate entrypoints. Here it is an
+ * ordinary export, so runtimeDeps() can be unit-tested directly.
+ */
+export function runtimeDeps(): Deps {
+  return { fetch: globalThis.fetch.bind(globalThis), cache: runtimeCache() };
+}
+
 /** Adapts Workers' Cache API — which stores Responses, not strings — to CacheLike. */
 export function runtimeCache(): CacheLike {
   const key = new Request(`https://orthant.app/__cache/${CACHE_KEY}`);

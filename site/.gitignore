@@ -1,3 +1,13 @@
 dist/
 node_modules/
 .astro/
+
+# Scratch written by the tools that verify this site: playwright-cli's session
+# snapshots and wrangler's local state. They appear wherever a tool is invoked
+# from, which is why the patterns are unanchored rather than a fixed list.
+#
+# Ignored rather than merely left untracked: this repo's own rule is that
+# `git add <dir>` sweeps up whatever is lying around, and it carries identity
+# constraints that make one accidental commit expensive.
+.playwright-cli/
+.wrangler/

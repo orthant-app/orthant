@@ -29,6 +29,18 @@ import { FACTS } from '../lib/facts';
     gap: 14px 16px;
     list-style: none; margin-block: 0; padding-block: 18px;
   }
+  /*
+   * One column when two would not fit their own text.
+   *
+   * The responsive floor is 320px, so nothing supported reaches here: this is
+   * for 200% zoom on a small phone, where a 390px viewport becomes 195px of
+   * CSS and two columns give ~66px cells for ~80px of content, overlapping
+   * "No telemetry" onto "macOS 13+". Below 260px, two columns cannot hold the
+   * longest value, so there is no width at which this rule costs anything.
+   */
+  @media (max-width: 260px) {
+    .strip { grid-template-columns: minmax(0, 1fr); }
+  }
   @media (min-width: 500px) {
     .strip { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px 24px; }
   }

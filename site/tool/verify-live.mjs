@@ -67,13 +67,30 @@ const get = (url, opts = {}) =>
  * The retry is bounded and only covers statuses that are actually transient,
  * so a persistent block still fails the deploy rather than being waited out.
  */
-const TRANSIENT = new Set([403, 408, 429, 500, 502, 503, 504]);
+const TRANSIENT = new Set([408, 429, 500, 502, 503, 504]);
+
+/**
+ * A Cloudflare bot challenge, which is not a fact about the site.
+ *
+ * Measured from a GitHub runner: `/` intermittently answers 403 with
+ * `cf-mitigated: challenge` and Cloudflare's "Just a moment..." interstitial,
+ * because Bot Fight Mode challenges automated clients from datacenter IPs. It
+ * is probabilistic, hits the same edge that serves 200 a second later, and no
+ * real visitor sees it.
+ *
+ * ⚠️ A bare 403 is deliberately NOT retried. Retrying every 403 would also
+ * swallow a genuine one (a WAF rule, a broken route, a misconfigured origin),
+ * which is precisely the "retry until green" habit that turns a check into
+ * decoration. Only a 403 that Cloudflare itself labels a challenge is waited
+ * out; anything else fails on the first response.
+ */
+const isChallenge = (res) => res.status === 403 && res.headers.has('cf-mitigated');
 
 async function getPage(url) {
   let res;
   for (let attempt = 1; attempt <= 3; attempt++) {
     res = await get(url);
-    if (!TRANSIENT.has(res.status)) {
+    if (!TRANSIENT.has(res.status) && !isChallenge(res)) {
       // ⚠️ A silent retry is a check that lies about how healthy its subject
       // is: "green" and "green only on the third try" are different facts, and
       // the second one is the interesting one. Say so.

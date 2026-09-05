@@ -77,6 +77,14 @@ jobs:
       - name: Build
         run: npm run build
         working-directory: site
+      # `astro build` does NOT type-check: a .ts file with a type error builds
+      # clean, proven by injecting one. Every type error caught during the site
+      # redesign was caught by someone running tsc by hand, which is not a
+      # check. Runs after Build because tsc needs the `astro:content` types
+      # that the build generates into .astro/.
+      - name: Typecheck
+        run: npm run typecheck
+        working-directory: site
       - name: Test
         run: npm test
         working-directory: site

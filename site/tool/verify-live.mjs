@@ -56,11 +56,48 @@ const check = (ok, what, detail) => {
 const get = (url, opts = {}) =>
   fetch(url, { redirect: 'manual', headers: NAV, signal: AbortSignal.timeout(20_000), ...opts });
 
+/**
+ * Retry a status that can be transient, and describe one that is not.
+ *
+ * "status 403" on its own is not a finding, it is a mystery: a Cloudflare bot
+ * mitigation, a WAF rule and a genuinely broken origin all look identical from
+ * the exit code. Any check that can fail against a CDN has to report cf-ray
+ * and cf-mitigated, or the next person is left rerunning it and guessing.
+ *
+ * The retry is bounded and only covers statuses that are actually transient,
+ * so a persistent block still fails the deploy rather than being waited out.
+ */
+const TRANSIENT = new Set([403, 408, 429, 500, 502, 503, 504]);
+
+async function getPage(url) {
+  let res;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    res = await get(url);
+    if (!TRANSIENT.has(res.status)) return res;
+    if (attempt < 3) await new Promise((r) => setTimeout(r, 2000 * attempt));
+  }
+  return res;
+}
+
+async function describe(res) {
+  const bits = [`status ${res.status}`];
+  for (const h of ['cf-ray', 'cf-mitigated', 'server', 'cf-cache-status']) {
+    const v = res.headers.get(h);
+    if (v) bits.push(`${h}: ${v}`);
+  }
+  if (!res.ok) {
+    const body = await res.clone().text().catch(() => '');
+    const snippet = body.replace(/\s+/g, ' ').trim().slice(0, 140);
+    if (snippet) bits.push(`body: ${snippet}`);
+  }
+  return bits.join(' | ');
+}
+
 console.log(`Verifying ${BASE}\n`);
 
 for (const path of PAGES) {
-  const res = await get(BASE + path);
-  check(res.status === 200, `GET ${path}`, `status ${res.status}`);
+  const res = await getPage(BASE + path);
+  check(res.status === 200, `GET ${path}`, await describe(res));
 }
 
 // The single most important control on the site, asked the way a visitor asks.

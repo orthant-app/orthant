@@ -314,7 +314,7 @@ restore() {
 }
 
 assemble_pages() {
-  local mode="$1" dist="$2" site="$3"
+  local mode="$1" dist="$2" site="$3" repaired_urls url status
   require_mode "$mode" || return 1
   [[ -n "$site" && "$site" != / && "$site" != . ]] ||
     workflow_error "unsafe Pages site path: $site" || return 1
@@ -336,6 +336,58 @@ assemble_pages() {
       fi
       ;;
   esac
+  # generate_appcast applies this release's download prefix to every DMG,
+  # including restored ones that remain assets of their original immutable
+  # releases. Derive each full-DMG tag from its filename. Do this on BOTH
+  # assembled feeds, so even a beta deploy heals already-corrupt stable
+  # history. Delta URLs stay on the new release, where publish uploads them.
+  repaired_urls="$(python3 - "$site" <<'PYTHON'
+import re
+import sys
+from pathlib import Path
+from xml.dom import minidom
+
+prefix = 'https://github.com/orthant-app/orthant/releases/download/'
+artifact = re.compile(
+    re.escape(prefix) + r'[^/]+/(Orthant-([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)\.dmg)'
+)
+repaired = set()
+for name in ('appcast.xml', 'appcast-beta.xml'):
+    path = Path(sys.argv[1]) / name
+    if not path.exists():
+        continue
+    document = minidom.parse(str(path))
+    changed = False
+    for enclosure in document.getElementsByTagName('enclosure'):
+        url = enclosure.getAttribute('url')
+        match = artifact.fullmatch(url)
+        if match is None:
+            continue
+        canonical = f'{prefix}v{match[2]}/{match[1]}'
+        if canonical != url:
+            enclosure.setAttribute('url', canonical)
+            repaired.add(canonical)
+            changed = True
+    if changed:
+        path.write_bytes(document.toxml(encoding='utf-8'))
+for url in sorted(repaired):
+    print(url)
+PYTHON
+)" || workflow_error 'could not repair appcast enclosure URLs' || return 1
+
+  # Only rewritten historical assets are already public. The current DMG
+  # and deltas are uploaded later, so probing those here would reject every
+  # new release. A bad historical target must stop assembly before upload.
+  while IFS= read -r url; do
+    [[ -n "$url" ]] || continue
+    status="$(curl --head --location --silent --show-error \
+      --connect-timeout 15 --max-time 60 \
+      --output /dev/null --write-out '%{http_code}' "$url")" ||
+      workflow_error "historical asset transport failed: $url" || return 1
+    [[ "$status" == 200 ]] ||
+      workflow_error "historical asset returned HTTP $status: $url" || return 1
+  done <<<"$repaired_urls"
+
   # A Pages deploy replaces the WHOLE site, so anything absent from this
   # directory ceases to exist at the next release — which is why both feeds are
   # copied above rather than just the one generated. CNAME is subject to the

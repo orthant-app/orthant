@@ -126,13 +126,16 @@ while (( $# > 0 )); do
     --output) output="$2"; shift 2 ;;
     --write-out) shift 2 ;;
     --header|--connect-timeout|--max-time) shift 2 ;;
-    --location|--silent|--show-error) shift ;;
+    --location|--silent|--show-error|--head) shift ;;
     *) url="$1"; shift ;;
   esac
 done
 case "$url" in
   */appcast.xml\?run=*) name=stable ;;
   */appcast-beta.xml\?run=*) name=beta ;;
+  https://github.com/orthant-app/orthant/releases/download/v1.0.0/Orthant-1.0.0.dmg|\
+  https://github.com/orthant-app/orthant/releases/download/v1.0.1/Orthant-1.0.1.dmg|\
+  https://github.com/orthant-app/orthant/releases/download/v1.0.2-beta.1/Orthant-1.0.2-beta.1.dmg) name=history ;;
   *) printf 'unexpected fake curl URL: %s\n' "$url" >&2; exit 96 ;;
 esac
 exit_code="$(<"$FIXTURES/curl_${name}_exit")"
@@ -283,6 +286,9 @@ ENTRY
   printf '404\n' >"$FIXTURES/curl_beta_status"
   printf '0\n' >"$FIXTURES/curl_beta_exit"
   : >"$FIXTURES/curl_beta_body"
+  printf '200\n' >"$FIXTURES/curl_history_status"
+  printf '0\n' >"$FIXTURES/curl_history_exit"
+  : >"$FIXTURES/curl_history_body"
 }
 
 run_workflow() {
@@ -521,7 +527,7 @@ assert_not_contains 'beta restore skips prior DMG download' 'gh <release> <downl
 
 reset_fixture
 mkdir -p "$WORKSPACE/dist"
-printf 'stable bytes\n' >"$WORKSPACE/dist/appcast.xml"
+printf '<rss><channel><title>Stable</title></channel></rss>\n' >"$WORKSPACE/dist/appcast.xml"
 assert_ok 'stable Pages assembly succeeds' \
   run_workflow assemble-pages stable "$WORKSPACE/dist" "$WORKSPACE/site"
 assert_file_eq 'stable assembly creates stable feed' "$WORKSPACE/dist/appcast.xml" "$WORKSPACE/site/appcast.xml"
@@ -529,8 +535,8 @@ assert_file_eq 'stable assembly creates identical beta feed' "$WORKSPACE/dist/ap
 
 reset_fixture
 mkdir -p "$WORKSPACE/dist" "$WORKSPACE/site"
-printf 'stable bytes\n' >"$WORKSPACE/dist/appcast.xml"
-printf 'beta bytes\n' >"$WORKSPACE/dist/appcast-beta.xml"
+printf '<rss><channel><title>Stable</title></channel></rss>\n' >"$WORKSPACE/dist/appcast.xml"
+printf '<rss><channel><title>Beta</title></channel></rss>\n' >"$WORKSPACE/dist/appcast-beta.xml"
 printf 'stale site\n' >"$WORKSPACE/site/stale"
 assert_ok 'beta Pages assembly preserves stable feed' \
   run_workflow assemble-pages beta "$WORKSPACE/dist" "$WORKSPACE/site"
@@ -544,7 +550,7 @@ fi
 
 reset_fixture
 mkdir -p "$WORKSPACE/dist"
-printf 'beta bytes\n' >"$WORKSPACE/dist/appcast-beta.xml"
+printf '<rss><channel><title>Beta</title></channel></rss>\n' >"$WORKSPACE/dist/appcast-beta.xml"
 assert_ok 'first beta Pages assembly permits absent stable feed' \
   run_workflow assemble-pages beta "$WORKSPACE/dist" "$WORKSPACE/site"
 if [[ ! -e "$WORKSPACE/site/appcast.xml" ]]; then
@@ -560,8 +566,8 @@ fi
 for cname_mode in stable dry-run beta; do
   reset_fixture
   mkdir -p "$WORKSPACE/dist"
-  printf 'stable bytes\n' >"$WORKSPACE/dist/appcast.xml"
-  printf 'beta bytes\n' >"$WORKSPACE/dist/appcast-beta.xml"
+  printf '<rss><channel><title>Stable</title></channel></rss>\n' >"$WORKSPACE/dist/appcast.xml"
+  printf '<rss><channel><title>Beta</title></channel></rss>\n' >"$WORKSPACE/dist/appcast-beta.xml"
   assert_ok "$cname_mode Pages assembly succeeds" \
     run_workflow assemble-pages "$cname_mode" "$WORKSPACE/dist" "$WORKSPACE/site"
   if [[ "$(cat "$WORKSPACE/site/CNAME" 2>/dev/null)" == 'updates.orthant.app' ]]; then
@@ -570,6 +576,133 @@ for cname_mode in stable dry-run beta; do
     fail "$cname_mode assembly emits CNAME for the shipped SUFeedURL host"
   fi
 done
+
+# A real generated feed combines this release's URL prefix with older DMGs.
+# The 1.0.0 URL was already corrupt in the feed restored from production, so
+# checking only the previous release's prefix would leave that entry broken.
+write_history_feed() {
+  cat >"$1" <<'FEED'
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+  <channel>
+    <title>Orthant</title>
+    <item>
+      <title>1.0.2</title><sparkle:version>6</sparkle:version>
+      <sparkle:shortVersionString>1.0.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Keep & preserve release notes.</p>]]></description>
+      <enclosure url="https://github.com/orthant-app/orthant/releases/download/v1.0.2/Orthant-1.0.2.dmg" length="21300000" sparkle:edSignature="new-full-signature" type="application/octet-stream"/>
+      <sparkle:deltas>
+        <enclosure url="https://github.com/orthant-app/orthant/releases/download/v1.0.2/Orthant6-5.delta" length="1200000" sparkle:deltaFrom="5" sparkle:edSignature="new-delta-signature" type="application/octet-stream"/>
+      </sparkle:deltas>
+    </item>
+    <item>
+      <title>1.0.1</title><sparkle:version>5</sparkle:version>
+      <enclosure url="https://github.com/orthant-app/orthant/releases/download/v1.0.2/Orthant-1.0.1.dmg" length="21257025" sparkle:edSignature="old-full-signature" type="application/octet-stream"/>
+    </item>
+    <item>
+      <title>1.0.0</title><sparkle:version>4</sparkle:version>
+      <enclosure url="https://github.com/orthant-app/orthant/releases/download/v1.0.1/Orthant-1.0.0.dmg" length="21253090" sparkle:edSignature="oldest-full-signature" type="application/octet-stream"/>
+    </item>
+  </channel>
+</rss>
+FEED
+}
+
+history_urls_are_correct() {
+  python3 - "$1" <<'PYTHON'
+import sys
+import xml.etree.ElementTree as ET
+urls = [node.attrib['url'] for node in ET.parse(sys.argv[1]).iter('enclosure')]
+assert urls == [
+    'https://github.com/orthant-app/orthant/releases/download/v1.0.2/Orthant-1.0.2.dmg',
+    'https://github.com/orthant-app/orthant/releases/download/v1.0.2/Orthant6-5.delta',
+    'https://github.com/orthant-app/orthant/releases/download/v1.0.1/Orthant-1.0.1.dmg',
+    'https://github.com/orthant-app/orthant/releases/download/v1.0.0/Orthant-1.0.0.dmg',
+], urls
+PYTHON
+}
+
+feed_metadata_is_unchanged() {
+  python3 - "$1" "$2" <<'PYTHON'
+import sys
+from xml.dom import minidom
+feeds = [minidom.parse(path) for path in sys.argv[1:]]
+for feed in feeds:
+    for node in feed.getElementsByTagName('enclosure'):
+        node.removeAttribute('url')
+assert feeds[0].toxml() == feeds[1].toxml()
+PYTHON
+}
+
+for history_mode in stable dry-run; do
+  reset_fixture
+  mkdir -p "$WORKSPACE/dist"
+  write_history_feed "$WORKSPACE/dist/appcast.xml"
+  assert_ok "$history_mode assembly repairs generated and already-corrupt history" \
+    run_workflow assemble-pages "$history_mode" "$WORKSPACE/dist" "$WORKSPACE/site"
+  assert_ok "$history_mode historical DMGs use their own tags; current DMG and delta stay put" \
+    history_urls_are_correct "$WORKSPACE/site/appcast.xml"
+  assert_ok "$history_mode feed signatures, versions and release notes are unchanged" \
+    feed_metadata_is_unchanged "$WORKSPACE/dist/appcast.xml" "$WORKSPACE/site/appcast.xml"
+  assert_file_eq "$history_mode publishes the same repaired feed to beta users" \
+    "$WORKSPACE/site/appcast.xml" "$WORKSPACE/site/appcast-beta.xml"
+  assert_contains "$history_mode checks the repaired historical asset before publishing" \
+    '<https://github.com/orthant-app/orthant/releases/download/v1.0.0/Orthant-1.0.0.dmg>' "$(<"$CALL_LOG")"
+  assert_not_contains "$history_mode does not probe the unpublished current release" \
+    '<https://github.com/orthant-app/orthant/releases/download/v1.0.2/Orthant-1.0.2.dmg>' "$(<"$CALL_LOG")"
+done
+
+reset_fixture
+mkdir -p "$WORKSPACE/dist"
+write_history_feed "$WORKSPACE/dist/appcast.xml"
+cat >"$WORKSPACE/dist/appcast-beta.xml" <<'FEED'
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0"><channel>
+  <item><title>1.1.0 beta</title><sparkle:version>7</sparkle:version><sparkle:shortVersionString>1.1.0</sparkle:shortVersionString><sparkle:channel>beta</sparkle:channel>
+    <enclosure url="https://github.com/orthant-app/orthant/releases/download/v1.1.0-beta.1/Orthant-1.1.0-beta.1.dmg" sparkle:edSignature="beta-signature" length="21400000"/>
+  </item>
+  <item><title>1.0.2 beta</title><sparkle:version>6</sparkle:version><sparkle:shortVersionString>1.0.2</sparkle:shortVersionString><sparkle:channel>beta</sparkle:channel>
+    <enclosure url="https://github.com/orthant-app/orthant/releases/download/v1.1.0-beta.1/Orthant-1.0.2-beta.1.dmg" sparkle:edSignature="old-beta-signature" length="21300000"/>
+  </item>
+</channel></rss>
+FEED
+beta_urls_are_correct() {
+  python3 - "$1" <<'PYTHON'
+import sys
+import xml.etree.ElementTree as ET
+urls = [node.attrib['url'] for node in ET.parse(sys.argv[1]).iter('enclosure')]
+assert urls == [
+    'https://github.com/orthant-app/orthant/releases/download/v1.1.0-beta.1/Orthant-1.1.0-beta.1.dmg',
+    'https://github.com/orthant-app/orthant/releases/download/v1.0.2-beta.1/Orthant-1.0.2-beta.1.dmg',
+], urls
+PYTHON
+}
+assert_ok 'beta assembly also heals the restored stable feed' \
+  run_workflow assemble-pages beta "$WORKSPACE/dist" "$WORKSPACE/site"
+assert_ok 'beta deployment repairs every restored stable full-DMG URL' \
+  history_urls_are_correct "$WORKSPACE/site/appcast.xml"
+assert_ok 'current and historical beta filenames retain their own prerelease tags' \
+  beta_urls_are_correct "$WORKSPACE/site/appcast-beta.xml"
+assert_ok 'beta feed signatures, versions and channel metadata are unchanged' \
+  feed_metadata_is_unchanged "$WORKSPACE/dist/appcast-beta.xml" "$WORKSPACE/site/appcast-beta.xml"
+
+# A missing old artifact must fail before Pages can be uploaded. A 200 on a
+# different (e.g. latest-release) URL cannot satisfy this fake: it rejects any
+# asset URL except the literal historical targets above.
+for history_status in 404 503; do
+  reset_fixture
+  mkdir -p "$WORKSPACE/dist"
+  write_history_feed "$WORKSPACE/dist/appcast.xml"
+  printf '%s\n' "$history_status" >"$FIXTURES/curl_history_status"
+  assert_fails "historical asset HTTP $history_status prevents Pages assembly" \
+    run_workflow assemble-pages stable "$WORKSPACE/dist" "$WORKSPACE/site"
+done
+reset_fixture
+mkdir -p "$WORKSPACE/dist"
+write_history_feed "$WORKSPACE/dist/appcast.xml"
+printf '7\n' >"$FIXTURES/curl_history_exit"
+assert_fails 'historical asset transport failure prevents Pages assembly' \
+  run_workflow assemble-pages stable "$WORKSPACE/dist" "$WORKSPACE/site"
 
 reset_fixture
 mkdir -p "$WORKSPACE/dist"

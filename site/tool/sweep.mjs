@@ -12,18 +12,44 @@
  * real time once already.
  */
 import { createServer } from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 import { chromium } from 'playwright';
 
 const DIST = new URL('../dist/', import.meta.url).pathname;
 const WIDTHS = [320, 360, 390, 414, 480, 600, 700, 768, 834, 900, 980, 1024, 1280, 1440, 1920, 2560];
-const PATHS = [
-  '/', '/docs/', '/docs/getting-started/', '/docs/shortcuts/', '/docs/grid-overlay/',
-  '/docs/custom-regions/', '/docs/multiple-displays/', '/docs/troubleshooting/',
-  '/docs/settings/', '/docs/updates/', '/docs/uninstall/',
-  '/compare/', '/faq/', '/changelog/', '/privacy/', '/404.html',
-];
+
+/**
+ * Every page the build produced, derived rather than listed.
+ *
+ * ⚠️ This was a hardcoded array of sixteen routes, and a page added later was
+ * silently not swept — a sweep that quietly narrows is worse than no sweep,
+ * because its green means less each time the site grows and nobody is told.
+ * Globbing what actually built is the only version whose coverage cannot rot.
+ *
+ * `/download` is deliberately absent and cannot appear here: it is a Worker
+ * route that 302s and emits no HTML, so the build never writes a file for it.
+ */
+async function builtPages() {
+  const files = await readdir(DIST, { recursive: true });
+  const routes = files
+    .filter((f) => f.endsWith('index.html'))
+    .map((f) => '/' + f.slice(0, -'index.html'.length).replaceAll('\\', '/'));
+  if (files.includes('404.html')) routes.push('/404.html');
+
+  // A glob that matches nothing sweeps nothing and passes, which is the same
+  // failing-toward-fine this function exists to remove. The floor is the count
+  // the hardcoded list carried, so shrinking coverage has to be deliberate.
+  if (routes.length < 16) {
+    throw new Error(
+      `only ${routes.length} pages found under dist/ - expected at least 16. ` +
+        'Run `npm run build` first; if the site genuinely shrank, lower this floor on purpose.',
+    );
+  }
+  return routes.sort();
+}
+
+const PATHS = await builtPages();
 const TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.webm': 'video/webm', '.mp4': 'video/mp4',
   '.xml': 'application/xml', '.txt': 'text/plain' };

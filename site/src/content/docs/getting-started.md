@@ -17,9 +17,13 @@ without a trip through System Settings. Orthant needs **macOS 13+**.
 
 ## Launch it
 
-Open Orthant from Applications, like any other app. Nothing appears, and that is correct:
-Orthant has no Dock icon and opens no window. Look for its icon in the **menu bar**, at
-the top of the screen, instead. That is Orthant, running.
+Open Orthant from Applications, like any other app. On this first launch it opens a small
+window to walk you through the next step. What it never does is appear in the Dock: look
+for its icon in the **menu bar**, at the top of the screen. That is Orthant, running.
+
+Every launch after this one is quieter: once permission is granted, Orthant starts
+straight into the menu bar and gets on with it, which is what you want from something
+that is always running.
 
 ## Grant Accessibility permission
 

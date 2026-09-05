@@ -1,0 +1,105 @@
+name: Deploy site
+
+# Push to main, NOT the release tag, and that is deliberate.
+#
+# A release writes its changelog entry with `published: false` in the same
+# commit as the pubspec bump, and only flips it to `published: true` in a
+# separate commit once the release is verified live. The homepage's version and
+# the /changelog/ page are baked from that entry at BUILD time, so a deploy
+# triggered by the tag would build with `published: false` and go on
+# advertising the previous version. The flip is the moment the site should
+# change, and the flip is a push to main.
+#
+# (/download does not depend on any of this: it resolves the appcast live on a
+# 5 minute TTL, so the download link is correct whether or not the site was
+# rebuilt. Only the displayed version and the changelog page go stale.)
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - '.github/workflows/deploy-site.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never let two deploys race. `cancel-in-progress: false` because a superseded
+# run may already have uploaded; let it finish rather than leave the Worker
+# half-updated.
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: site
+      url: https://orthant.app
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install
+        run: npm ci
+        working-directory: site
+
+      # Everything CI runs, run again here, so the deploy is self-gating: a
+      # commit cannot reach production by racing ahead of the CI job on the
+      # same SHA. The sweep is included because the reflow bug that shipped on
+      # launch day was caught by CI alone and would otherwise have been live
+      # for however long CI lagged.
+      - name: Build
+        run: npm run build
+        working-directory: site
+
+      - name: Typecheck
+        run: npm run typecheck
+        working-directory: site
+
+      - name: Test
+        run: npm test
+        working-directory: site
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: site
+
+      - name: Responsive sweep
+        run: npm run sweep
+        working-directory: site
+
+      # wrangler is already an exact-pinned devDependency, so this adds no new
+      # third-party action to trust or keep pinned.
+      - name: Deploy
+        run: npx wrangler deploy
+        working-directory: site
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # ⚠️ The step that exists because local checks provably cannot see two of
+      # the failures this site has already had.
+      #
+      # `wrangler dev` enforces neither workerd's `this` binding on the global
+      # fetch nor Cloudflare's asset-routing precedence, so both a /download
+      # that never resolved a DMG and a /download that served the 404 page to
+      # every real browser passed the whole local suite. This asks the live
+      # origin, in the shape a browser asks, and fails the job if the answer is
+      # wrong. It also asserts the appcast is still served by GitHub with no
+      # cf-ray, because updates.orthant.app is compiled into every installed
+      # copy as SUFeedURL and must never end up behind the proxy.
+      - name: Verify the deployment
+        run: |
+          sleep 10
+          npm run verify:live
+        working-directory: site

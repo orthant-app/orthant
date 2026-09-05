@@ -3,6 +3,18 @@
   "name": "orthant-site",
   "main": "worker/index.ts",
   "compatibility_date": "2026-08-01",
+  // The apex only. A Workers Custom Domain creates and manages its own
+  // PROXIED DNS record, which is what orthant.app needs.
+  //
+  // ⚠️ Do not add updates.orthant.app here or anywhere near it. That hostname
+  // is GitHub Pages behind a DNS-only (grey cloud) CNAME, it is compiled into
+  // every installed copy of the app as SUFeedURL, and proxying it breaks
+  // GitHub's certificate issuance. It is served by a different system on
+  // purpose.
+  //
+  // No www: a second custom domain would serve the whole site at a second
+  // hostname with no canonical redirect between them.
+  "routes": [{ "pattern": "orthant.app", "custom_domain": true }],
   "assets": {
     // No `run_worker_first`: assets are served directly, without invoking the
     // Worker. That is faster and cheaper, and it is why page security headers

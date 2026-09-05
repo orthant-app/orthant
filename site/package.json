@@ -8,6 +8,7 @@
     "preview": "astro preview",
     "test": "vitest run && npm run test:worker-smoke",
     "test:worker-smoke": "node worker/smoke-test.mjs",
+    "typecheck": "tsc --noEmit",
     "sweep": "node tool/sweep.mjs"
   },
   "dependencies": {

@@ -88,7 +88,8 @@ builds the site, and an entry that arrived later would mean a build that adverti
 version `/download` cannot serve yet.
 
 ```sh
-git commit -am "release: prepare X.Y.Z"
+git add pubspec.yaml site/src/content/changelog/X.Y.Z.md
+git commit -m "release: prepare X.Y.Z"
 git push origin main
 ```
 

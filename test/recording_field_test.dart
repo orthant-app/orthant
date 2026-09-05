@@ -86,6 +86,35 @@ void main() {
     expect(combos, isEmpty, reason: 'a global hotkey needs a modifier');
   });
 
+  for (final entry in <LogicalKeyboardKey, int>{
+    LogicalKeyboardKey.semicolon: 41,
+    LogicalKeyboardKey.bracketLeft: 33,
+    LogicalKeyboardKey.quote: 39,
+    LogicalKeyboardKey.backquote: 50,
+    LogicalKeyboardKey.f1: 122,
+    // F13-F20 are mapped too, but flutter_test's key simulator stops at F12.
+    LogicalKeyboardKey.f12: 111,
+    LogicalKeyboardKey.home: 115,
+    LogicalKeyboardKey.end: 119,
+    LogicalKeyboardKey.pageUp: 116,
+    LogicalKeyboardKey.pageDown: 121,
+    LogicalKeyboardKey.delete: 117,
+    LogicalKeyboardKey.backspace: 51,
+    LogicalKeyboardKey.numpadEnter: 76,
+    LogicalKeyboardKey.numpadDecimal: 65,
+    LogicalKeyboardKey.numpad1: 83,
+  }.entries) {
+    testWidgets('records modified ${entry.key.keyLabel}', (tester) async {
+      final combos = await pump(tester);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(entry.key);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      expect(combos, [(keyCode: entry.value, modifiers: kControlKey)]);
+      expect(formatCombo(entry.value, kControlKey), isNot(contains('key:')),
+          reason: 'every accepted key needs a usable fallback label');
+    });
+  }
+
   testWidgets('esc cancels rather than being recorded', (tester) async {
     var cancels = 0;
     final combos = await pump(tester, onCancel: () => cancels++);

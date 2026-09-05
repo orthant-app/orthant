@@ -50,6 +50,10 @@ class _OverlayAppState extends State<OverlayApp> {
   bool _visible = false;
   double? _triggerAtMs;
 
+  /// Set when this panel sent a commit or save, so the `hidden` that follows
+  /// is the end of a placement rather than a cancellation.
+  bool _placing = false;
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +81,15 @@ class _OverlayAppState extends State<OverlayApp> {
         _rows = a['rows'] as int? ?? _rows;
         _gap = (a['gap'] as num?)?.toDouble() ?? _gap;
         _saveHint = a['saveHint'] as bool? ?? false;
+        // One panel per display, and only the active one speaks: the others
+        // are the same grid, and a screen reader saying it three times is
+        // not three times as clear.
+        if (_active) {
+          GridOverlayState.announce(context,
+              'Grid open for ${_appName.isEmpty ? 'the captured window' : _appName}. '
+              '$_cols columns, $_rows rows. Arrow keys move, Shift and arrows '
+              'extend, Return places, Escape cancels.');
+        }
         assert(() {
           debugPrint('[orthant] overlay summon: saveHint=$_saveHint');
           return true;
@@ -113,6 +126,13 @@ class _OverlayAppState extends State<OverlayApp> {
         if (d == null) return null;
         _onGrid((g) => g.moveSelection(d, extend: a['extend'] == true));
       case 'hidden':
+        // Every way out arrives here — Esc and click-away are native grabs
+        // that never pass through Dart's cancel — so this is the one place a
+        // cancellation can be spoken. The active panel speaks for the set.
+        if (_visible && _active && !_placing) {
+          GridOverlayState.announce(context, 'Grid closed.');
+        }
+        _placing = false;
         // Drop the tree and let the controller go: zero tickers while hidden.
         _pending.clear();
         setState(() {
@@ -178,7 +198,13 @@ class _OverlayAppState extends State<OverlayApp> {
                   onEndDrag: () => _send('endDrag'),
                   onCancel: () => _send('hide'),
                   saveHint: _saveHint,
-                  onSave: (b, r) => _send('saveRegion', {
+                  // "Placing", not "placed": whether the window actually moved
+                  // is native's to know, and a failure takes the main window's
+                  // recovery path, which has its own semantics.
+                  onSave: (b, r) {
+                    _placing = true;
+                    GridOverlayState.announce(context, 'Placing window.');
+                    _send('saveRegion', {
                     'cols': _cols,
                     'rows': _rows,
                     'c0': b.c0,
@@ -189,13 +215,18 @@ class _OverlayAppState extends State<OverlayApp> {
                     'y': r.y,
                     'w': r.width,
                     'h': r.height,
-                  }),
-                  onCommit: (r) => _send('commit', {
-                    'x': r.x,
-                    'y': r.y,
-                    'w': r.width,
-                    'h': r.height,
-                  }),
+                    });
+                  },
+                  onCommit: (r) {
+                    _placing = true;
+                    GridOverlayState.announce(context, 'Placing window.');
+                    _send('commit', {
+                      'x': r.x,
+                      'y': r.y,
+                      'w': r.width,
+                      'h': r.height,
+                    });
+                  },
                 ),
               ),
       ),

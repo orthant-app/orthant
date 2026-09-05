@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/overlay/overlay_main.dart';
 
@@ -18,11 +19,25 @@ void main() {
   const channel = MethodChannel('app.orthant/overlay');
   late List<MethodCall> sent;
 
+  /// What a screen reader would be told, via Flutter's own accessibility
+  /// channel — the overlay never goes through native for this.
+  late List<String> announced;
+
   setUp(() {
     sent = [];
+    announced = [];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
       sent.add(call);
+      return null;
+    });
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockDecodedMessageHandler<dynamic>(SystemChannels.accessibility,
+            (message) async {
+      final m = message as Map;
+      if (m['type'] == 'announce') {
+        announced.add((m['data'] as Map)['message'] as String);
+      }
       return null;
     });
   });
@@ -30,6 +45,8 @@ void main() {
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockDecodedMessageHandler<dynamic>(SystemChannels.accessibility, null);
   });
 
   /// Deliver a call *to* the overlay, as native does.
@@ -151,5 +168,113 @@ void main() {
     await send('commitCurrent', 1);
     await tester.pump();
     expect(commitIn(sent), isNull);
+  });
+
+  testWidgets('the active panel announces the grid; the others stay silent',
+      (tester) async {
+    await tester.pumpWidget(const OverlayApp());
+    await send('summon', summon(active: false));
+    await tester.pump();
+    expect(announced, isEmpty,
+        reason: 'one grid per display must not be spoken once per display');
+    await send('summon', summon());
+    await tester.pump();
+    expect(announced, [
+      'Grid open for TextEdit. 6 columns, 6 rows. Arrow keys move, '
+          'Shift and arrows extend, Return places, Escape cancels.',
+    ]);
+    expect(sent.where((c) => c.method == 'announceSelection'), isEmpty,
+        reason: 'announcements are Flutter\'s, not a native hop');
+  });
+
+  testWidgets('keyboard selection announces its actual target once per change',
+      (tester) async {
+    await tester.pumpWidget(const OverlayApp());
+    await send('summon', summon());
+    await tester.pump();
+    announced.clear();
+    await send('moveSelection', {'sessionId': 1, 'direction': 'right'});
+    await tester.pump();
+    expect(announced, hasLength(1));
+    expect(announced.single, contains('Row 1, column 1'));
+    expect(announced.single, contains('x 0, y 0, width 200, height 100 points'));
+
+    announced.clear();
+    // Clamping at the edge is not a new selection, nor is a stale key.
+    await send('moveSelection', {'sessionId': 1, 'direction': 'left'});
+    await send('moveSelection', {'sessionId': 0, 'direction': 'down'});
+    await tester.pump();
+    expect(announced, isEmpty);
+    await send('hidden');
+    await tester.pump();
+    announced.clear(); // the dismissal itself is spoken — covered below
+    await send('moveSelection', {'sessionId': 1, 'direction': 'down'});
+    await tester.pump();
+    expect(announced, isEmpty);
+  });
+
+  testWidgets('semantic save and cancel use the live overlay session',
+      (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(const OverlayApp());
+    await send('summon', summon(session: 7));
+    await tester.pump();
+    final save = find.semantics.byLabel('Place window and save shortcut');
+    expect(save.evaluate().single.getSemanticsData()
+        .hasAction(SemanticsAction.tap), isFalse);
+    tester.semantics.performAction(
+        find.semantics.byLabel('Move right'), SemanticsAction.tap);
+    await tester.pump();
+    tester.semantics.performAction(
+        find.semantics.byLabel('Extend down'), SemanticsAction.tap);
+    await tester.pump();
+    announced.clear();
+    tester.semantics.performAction(save, SemanticsAction.tap);
+    await tester.pump();
+    expect(announced, ['Placing window.']);
+    expect(sent.where((c) => c.method == 'saveRegion').single.arguments, {
+      'sessionId': 7, 'cols': 6, 'rows': 6,
+      'c0': 0, 'c1': 0, 'r0': 0, 'r1': 1,
+      'x': 0.0, 'y': 0.0, 'w': 200.0, 'h': 200.0,
+    });
+    tester.semantics.performAction(
+        find.semantics.byLabel('Cancel grid'), SemanticsAction.tap);
+    await tester.pump();
+    expect(sent.where((c) => c.method == 'hide').single.arguments,
+        {'sessionId': 7});
+    semantics.dispose();
+  });
+
+  testWidgets('a dismissal is announced once, however it happened; a placement is not',
+      (tester) async {
+    await tester.pumpWidget(const OverlayApp());
+    // Esc and click-away are native grabs: Dart only ever sees `hidden`.
+    await send('summon', summon());
+    await tester.pump();
+    announced.clear();
+    await send('hidden');
+    await tester.pump();
+    expect(announced, ['Grid closed.']);
+
+    // A commit is followed by the same `hidden`, and must not be read as a
+    // cancellation on top of "Placing window.".
+    await send('summon', summon(session: 2));
+    await tester.pump();
+    announced.clear();
+    await send('moveSelection', {'sessionId': 2, 'direction': 'right'});
+    await send('commitCurrent', 2);
+    await tester.pump();
+    await send('hidden');
+    await tester.pump();
+    expect(announced.where((m) => m == 'Grid closed.'), isEmpty);
+    expect(announced.last, 'Placing window.');
+
+    // The other displays' panels are hidden too, and say nothing.
+    await send('summon', summon(session: 3, active: false));
+    await tester.pump();
+    announced.clear();
+    await send('hidden');
+    await tester.pump();
+    expect(announced, isEmpty);
   });
 }

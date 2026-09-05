@@ -240,6 +240,28 @@ enum Updater {
     return automaticallyChecksForUpdates
   }
 
+  /// Start Sparkle's scheduler. Call once, at launch.
+  ///
+  /// `controller` is a `static let`, so Sparkle only came into existence the
+  /// first time something read it, and until 1.0.3 nothing did at launch: the
+  /// first access was the Settings window's read of
+  /// `automaticallyChecksForUpdates`, or the tray's Check for Updates. A user
+  /// who launched Orthant at login and never opened Settings in that session
+  /// was therefore never offered an update, however long the app ran.
+  /// Measured on 2026-09-05 against the installed 1.0.1: a two-day-old
+  /// `SULastCheckTime`, six minutes running, no check; then a check within two
+  /// seconds of Settings opening.
+  ///
+  /// Reading the constant is what starts the update cycle (the controller is
+  /// built with `startingUpdater: true`). Arming `closeObserver` here too means
+  /// the `.accessory` backstop is in place before any window a scheduled
+  /// session might open, not only after the manual path below has run once.
+  /// Idempotent: a second call reads two already-initialised constants.
+  static func start() {
+    _ = controller
+    _ = closeObserver
+  }
+
   static func checkForUpdates() {
     // Forces `closeObserver` to register before this session's windows can
     // open and close — a `static let` initialises on first access, and

@@ -272,7 +272,7 @@ run_redacted_release_fixture() {
       BAD_APPCAST="$bad_appcast" \
       FAIL_CODESIGN_VERIFY="$fail_codesign_verify" \
       FAIL_STAPLER_VALIDATE="$fail_stapler_validate" \
-      bash "$REDACT_FIXTURE_ROOT/tool/release.sh" 1.2.3-beta.1 "${release_args[@]}" 2>&1)"; then
+      bash "$REDACT_FIXTURE_ROOT/tool/release.sh" 1.2.3-beta.1 ${release_args[@]+"${release_args[@]}"} 2>&1)"; then
     REDACT_FIXTURE_RC=0
   else
     REDACT_FIXTURE_RC=$?
@@ -380,8 +380,8 @@ sparkle_commands_with_ci_inputs_are_exact() {
   select_appcast_output '/tmp/dist' &&
     configure_sparkle_args || return 1
 
-  local sign_command=(sign_update "${SIGN_UPDATE_ARGS[@]}" /tmp/Orthant-1.2.3.dmg)
-  local generate_command=(generate_appcast "${GENERATE_APPCAST_ARGS[@]}" /tmp/dist)
+  local sign_command=(sign_update ${SIGN_UPDATE_ARGS[@]+"${SIGN_UPDATE_ARGS[@]}"} /tmp/Orthant-1.2.3.dmg)
+  local generate_command=(generate_appcast ${GENERATE_APPCAST_ARGS[@]+"${GENERATE_APPCAST_ARGS[@]}"} /tmp/dist)
   [[ "${sign_command[*]}" == 'sign_update -f /tmp/sparkle.key /tmp/Orthant-1.2.3.dmg' ]] &&
     [[ "${generate_command[*]}" == 'generate_appcast --ed-key-file /tmp/sparkle.key --download-url-prefix https://example.test/v1.2.3/ -o /tmp/dist/appcast-beta.xml /tmp/dist' ]]
 }
@@ -391,8 +391,8 @@ sparkle_commands_without_ci_inputs_are_legacy() {
   select_appcast_output '/tmp/dist' &&
     configure_sparkle_args || return 1
 
-  local sign_command=(sign_update "${SIGN_UPDATE_ARGS[@]}" /tmp/Orthant-1.2.3.dmg)
-  local generate_command=(generate_appcast "${GENERATE_APPCAST_ARGS[@]}" /tmp/dist)
+  local sign_command=(sign_update ${SIGN_UPDATE_ARGS[@]+"${SIGN_UPDATE_ARGS[@]}"} /tmp/Orthant-1.2.3.dmg)
+  local generate_command=(generate_appcast ${GENERATE_APPCAST_ARGS[@]+"${GENERATE_APPCAST_ARGS[@]}"} /tmp/dist)
   [[ "${sign_command[*]}" == 'sign_update /tmp/Orthant-1.2.3.dmg' ]] &&
     [[ "${generate_command[*]}" == 'generate_appcast /tmp/dist' ]] &&
     [[ "$APPCAST_FILE" == '/tmp/dist/appcast.xml' ]]
@@ -483,6 +483,23 @@ assert_ok 'redacted codesign verification failure remains fatal' \
   redacted_codesign_verification_failure_is_fatal
 assert_ok 'redacted stapler validation failure remains fatal' \
   redacted_stapler_validation_failure_is_fatal
+
+# tool/release.sh expands SIGN_UPDATE_ARGS and GENERATE_APPCAST_ARGS, which
+# configure_sparkle_args leaves EMPTY on the legacy path, under `set -euo
+# pipefail`. Before bash 4.4 that is an unbound-variable abort, and macOS ships
+# 3.2 as /bin/bash, including on the GitHub runner. The failure would land
+# after the build and after signing.
+#
+# Source-level, deliberately: the release fixture always supplies Sparkle
+# inputs, so no behavioural test here ever reaches the empty case. This pins
+# the `[@]+` guard itself and fails the moment either expansion is written the
+# bare way again. Weaker than a behavioural test, and it is the honest extent
+# of the coverage.
+RELEASE_SH="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/tool/release.sh"
+for arr in SIGN_UPDATE_ARGS GENERATE_APPCAST_ARGS; do
+  assert_ok "release.sh guards possibly-empty $arr for bash 3.2" \
+    grep -qF -- "${arr}[@]+" "$RELEASE_SH"
+done
 
 printf 'release_lib: %d passed, %d failed\n' "$PASS_COUNT" "$FAIL_COUNT"
 (( FAIL_COUNT == 0 ))

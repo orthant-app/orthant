@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../shortcuts/bindings.dart';
 import 'mac_theme.dart';
+import 'keyboard_labels.dart';
 
 /// A single physical-looking key, the way macOS renders shortcut glyphs.
 ///
@@ -63,7 +64,7 @@ class KeycapRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.mac;
-    final symbols = comboSymbols(keyCode, modifiers);
+    final symbols = comboSymbols(keyCode, modifiers, keyLabels: KeyboardLabels.of(context));
     if (symbols.isEmpty) {
       return Text(unsetLabel,
           style: TextStyle(fontSize: 12, color: t.labelTertiary));

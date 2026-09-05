@@ -32,7 +32,11 @@ class HotkeyService implements HotkeyRegistrar {
     this.onPlacementFailed,
     this.onConfigWindowClosed,
     this.onSaveRegion,
-  });
+    this.onKeyboardLayoutChanged,
+  }) {
+    // Layout changes and window closes also matter before permission is granted.
+    _channel.setMethodCallHandler(_handle);
+  }
 
   /// ⌘S on the grid: a block the user wants to keep. Native has already placed
   /// the window; what arrives here is the shape, needing a name and a combo.
@@ -56,6 +60,8 @@ class HotkeyService implements HotkeyRegistrar {
   /// Here for the same reason as [onPlacementFailed]: a MethodChannel has room
   /// for exactly one handler, and this class owns it for the shared channel.
   final void Function()? onConfigWindowClosed;
+
+  final void Function()? onKeyboardLayoutChanged;
 
   static const MethodChannel _channel = MethodChannel(kOrthantChannel);
 
@@ -82,8 +88,6 @@ class HotkeyService implements HotkeyRegistrar {
   /// exists to break.
   @override
   Future<Set<CommandRef>> apply(List<Binding> bindings) async {
-    _channel.setMethodCallHandler(_handle);
-
     final applied = <int, CommandRef>{};
     final payload = <Map<String, Object?>>[];
     for (var id = 0; id < bindings.length && id <= _maxId; id++) {
@@ -140,6 +144,8 @@ class HotkeyService implements HotkeyRegistrar {
     } else if (call.method == 'onSaveRegion') {
       final a = call.arguments;
       if (a is Map) onSaveRegion?.call(a);
+    } else if (call.method == kKeyboardLayoutChanged) {
+      onKeyboardLayoutChanged?.call();
     }
     return null;
   }

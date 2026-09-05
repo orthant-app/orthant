@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../shortcuts/bindings.dart';
 import 'key_capture.dart';
+import 'keyboard_labels.dart';
 import 'mac_theme.dart';
 
 /// The field while it is listening for a key combination.
@@ -96,7 +97,8 @@ class _RecordingFieldState extends State<RecordingField> {
     final t = context.mac;
     final pending = widget.pending;
     final symbols = pending != null
-        ? comboSymbols(pending.keyCode, pending.modifiers)
+        ? comboSymbols(pending.keyCode, pending.modifiers,
+            keyLabels: KeyboardLabels.of(context))
         : modifierSymbols(_held);
     return Focus(
       focusNode: _node,

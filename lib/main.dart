@@ -8,6 +8,7 @@ import 'permission/onboarding_screen.dart';
 import 'permission/permission_controller.dart';
 import 'permission/ready_screen.dart';
 import 'settings/mac_theme.dart';
+import 'settings/keyboard_labels.dart';
 import 'settings/settings_window.dart';
 import 'shortcuts/hotkey_service.dart';
 
@@ -40,6 +41,7 @@ Future<void> main() async {
     onPlacementFailed: () => app.recoverIfPermissionLost(),
     onConfigWindowClosed: () => app.onConfigWindowClosed(),
     onSaveRegion: (block) => app.requestSaveRegion(block),
+    onKeyboardLayoutChanged: () => app.refreshKeyboardLabels(),
   );
   app = OrthantCoordinator(
     wc: wc,
@@ -126,13 +128,15 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return ListenableBuilder(
+      listenable: app,
+      builder: (_, _) => KeyboardLabels(
+        labels: app.keyboardLabels,
+        child: MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: macTheme(Brightness.light),
       darkTheme: macTheme(Brightness.dark),
-      home: ListenableBuilder(
-        listenable: app,
-        builder: (_, _) => switch (app.screen) {
+      home: switch (app.screen) {
           AppScreen.onboarding => OnboardingScreen(
               controller: app.permissions,
               onOpenAccessibility: app.openAccessibility,
@@ -173,6 +177,7 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
             ),
           AppScreen.none => const SizedBox.shrink(),
         },
+        ),
       ),
     );
   }

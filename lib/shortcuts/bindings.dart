@@ -181,13 +181,28 @@ const Map<int, String> _keySymbols = {
   // Editing / navigation.
   123: '←', 124: '→', 125: '↓', 126: '↑',
   36: '↩', 49: '␣', 48: '⇥', 51: '⌫', 53: '⎋',
+  115: '↖', 119: '↘', 116: '⇞', 121: '⇟', 117: '⌦',
+  // ANSI fallbacks; the live input source supplies printable labels on macOS.
+  27: '-', 24: '=', 33: '[', 30: ']', 42: '\\', 41: ';', 39: "'",
+  50: '`', 43: ',', 47: '.', 44: '/', 10: '§', 93: '¥', 94: '_',
+  122: 'F1', 120: 'F2', 99: 'F3', 118: 'F4', 96: 'F5', 97: 'F6',
+  98: 'F7', 100: 'F8', 101: 'F9', 109: 'F10', 103: 'F11', 111: 'F12',
+  105: 'F13', 107: 'F14', 113: 'F15', 106: 'F16', 64: 'F17',
+  79: 'F18', 80: 'F19', 90: 'F20',
+  71: '⌧', 76: '⌤', 75: 'Num /', 67: 'Num *', 78: 'Num -',
+  69: 'Num +', 81: 'Num =', 65: 'Num .', 95: 'Num ,',
+  82: 'Num 0', 83: 'Num 1', 84: 'Num 2', 85: 'Num 3', 86: 'Num 4',
+  87: 'Num 5', 88: 'Num 6', 89: 'Num 7', 91: 'Num 8', 92: 'Num 9',
 };
 
 /// The combo as individual symbols, in macOS order (⌃⌥⇧⌘ then the key), for
 /// rendering one keycap per element. Empty when unbound.
-List<String> comboSymbols(int keyCode, int modifiers) {
+List<String> comboSymbols(int keyCode, int modifiers, {
+  Map<int, String> keyLabels = const {},
+}) {
   if (keyCode == kUnboundKey) return const [];
-  return [...modifierSymbols(modifiers), _keySymbols[keyCode] ?? 'key:$keyCode'];
+  return [...modifierSymbols(modifiers),
+    keyLabels[keyCode] ?? _keySymbols[keyCode] ?? 'key:$keyCode'];
 }
 
 /// The modifier glyphs held, in macOS's canonical order.
@@ -205,13 +220,15 @@ List<String> modifierSymbols(int modifiers) => [
 ];
 
 /// Human-readable combo, e.g. `⌃⌥←`. Falls back to `key:<code>` for unmapped keys.
-String formatCombo(int keyCode, int modifiers) {
+String formatCombo(int keyCode, int modifiers, {
+  Map<int, String> keyLabels = const {},
+}) {
   final b = StringBuffer();
   if (modifiers & kControlKey != 0) b.write('⌃');
   if (modifiers & kOptionKey != 0) b.write('⌥');
   if (modifiers & kShiftKey != 0) b.write('⇧');
   if (modifiers & kCmdKey != 0) b.write('⌘');
-  b.write(_keySymbols[keyCode] ?? 'key:$keyCode');
+  b.write(keyLabels[keyCode] ?? _keySymbols[keyCode] ?? 'key:$keyCode');
   return b.toString();
 }
 
@@ -226,11 +243,14 @@ String? comboLabelFor(
   List<Binding> bindings,
   CommandRef command, {
   Set<CommandRef> unavailable = const {},
+  Map<int, String> keyLabels = const {},
 }) {
   if (unavailable.contains(command)) return null;
   for (final b in bindings) {
     if (b.command != command) continue;
-    return b.isBound ? formatCombo(b.keyCode, b.modifiers) : null;
+    return b.isBound
+        ? formatCombo(b.keyCode, b.modifiers, keyLabels: keyLabels)
+        : null;
   }
   return null;
 }

@@ -5,6 +5,8 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
   private var windowControl = WindowControl()
   private var hotkeys: HotkeyManager?
   private var channel: FlutterMethodChannel?
+  /// Retains the input-source observer for the life of the window.
+  private var layoutObserver: NSObjectProtocol?
 
   /// The grid overlay's panels and session. Built at launch and kept resident —
   /// a warm engine and a pre-built window are what make the summon perceptually
@@ -130,6 +132,10 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       // the DMG name and the release title. The build number is what actually
       // distinguishes one beta from the next, which is why both halves are
       // returned rather than the marketing string alone.
+      // Display data only: what each key position prints under the layout the
+      // user has selected. Bindings keep their key codes; see KeyboardLayout.
+      case "keyboardLabels":
+        result(KeyboardLayout.labels())
       case "appVersion":
         let info = Bundle.main.infoDictionary
         result([
@@ -165,6 +171,12 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     // needs a name and a combo — neither of which a non-key panel can collect.
     overlays?.onSaveRegion = { block in
       channel.invokeMethod("onSaveRegion", arguments: block)
+    }
+    // A layout switch relabels every shortcut on screen without rebinding
+    // anything. Dart re-reads `keyboardLabels` on this signal, so a Cyrillic
+    // user who switches to Latin sees the pane change under them.
+    layoutObserver = KeyboardLayout.observeChanges {
+      channel.invokeMethod("onKeyboardLayoutChanged", arguments: nil)
     }
 
     super.awakeFromNib()

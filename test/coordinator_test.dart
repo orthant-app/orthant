@@ -81,6 +81,10 @@ class _FakeWc implements WindowController {
     calls.add('setOverlayGrid');
   }
 
+  Map<int, String> labels = const {};
+  @override
+  Future<Map<int, String>> keyboardLabels() async => labels;
+
   @override
   Future<AppVersion> appVersion() async => version;
 
@@ -158,6 +162,25 @@ void main() {
     built.add(app);
     return (app: app, wc: wc, keys: keys);
   }
+
+  test('input source changes update the tray without rebinding shortcuts', () async {
+    final t = build(granted: true);
+    t.wc.labels = const {31: 'R'};
+    await t.app.start();
+    expect(t.app.openGridLabel, 'Open Grid   ⌃⌥R');
+    final originalBindings = List<Binding>.of(t.app.bindings);
+    final registrations = t.keys.applied.length;
+
+    t.wc.labels = const {31: 'О'}; // Cyrillic O, a different input source.
+    await t.app.refreshKeyboardLabels();
+    expect(t.app.openGridLabel, 'Open Grid   ⌃⌥О');
+    expect(t.app.keyboardLabels, {31: 'О'});
+    expect(t.app.bindings, originalBindings);
+    expect(t.keys.applied.length, registrations,
+        reason: 'a label refresh must not suspend or re-register shortcuts');
+    expect((await BindingsStore().load()).bindings, originalBindings,
+        reason: 'the display-only change must not rewrite stored bindings');
+  });
 
   group('automatic update checks', () {
     test('read when the settings window opens, not at launch', () async {

@@ -229,3 +229,22 @@ pre {
   color: var(--label-secondary);
   letter-spacing: 0.01em;
 }
+
+/*
+ * Diagram grids used from MDX content files (shortcuts.mdx, custom-regions.mdx),
+ * so they cannot be Astro-scoped styles: a scoped <style> in RegionDiagram.astro
+ * or a page component never reaches markup written inside a content collection
+ * entry. `auto-fit` with a `minmax` floor rather than a fixed column count: the
+ * keymap holds 9 figures and the comparison holds 2, and both must collapse to
+ * one column under the 320px floor without a separate breakpoint per class.
+ */
+.keymap, .compare-grids {
+  display: grid; gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  margin-block: 24px;
+}
+.keymap figure, .compare-grids figure { margin: 0; }
+.keymap figcaption, .compare-grids figcaption {
+  margin-top: 6px; font-family: var(--font-mono);
+  font-size: 12px; color: var(--label-secondary);
+}

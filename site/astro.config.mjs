@@ -1,11 +1,12 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
+import mdx from '@astrojs/mdx';
 
 export default defineConfig({
   site: 'https://orthant.app',
   trailingSlash: 'always',
-  integrations: [sitemap()],
+  integrations: [sitemap(), mdx()],
   build: {
     // The site's CSP sets `style-src 'self'`, and Astro inlines stylesheets
     // under 4 KB by default. Leaving this at its default ships an unstyled
@@ -32,6 +33,14 @@ export default defineConfig({
     // containment the shared `pre` rule (styles/tokens.css) provides. Every
     // fenced block on the site is a shell one-liner, so highlighting buys
     // nothing worth losing that containment for.
+    //
+    // The MDX integration above has its OWN pipeline and does not read this
+    // object by default — it only extends it because `extendMarkdownConfig`
+    // defaults to true. Do not flip that default, and do not pass a
+    // `syntaxHighlight` override into `mdx()`: either one would silently
+    // bring Shiki (and its `style="…"`) back for the two `.mdx` pages.
+    // Verified against built output, not assumed: dist-csp.test.ts scans
+    // dist/**/*.html for `style="` after `npm run build`.
     syntaxHighlight: false,
   },
 });

@@ -23,7 +23,10 @@ void main() {
   String allSiteText() {
     final buffer = StringBuffer();
     for (final entity in Directory('site/src').listSync(recursive: true)) {
-      if (entity is File && (entity.path.endsWith('.md') || entity.path.endsWith('.astro'))) {
+      if (entity is File &&
+          (entity.path.endsWith('.md') ||
+              entity.path.endsWith('.mdx') ||
+              entity.path.endsWith('.astro'))) {
         buffer.writeln(entity.readAsStringSync());
       }
     }
@@ -36,7 +39,7 @@ void main() {
   // too. Map equality rejects missing rows, extra rows, wrong combos and
   // duplicates in one assertion.
   test('the shortcuts page lists exactly the default bindings', () {
-    final page = read('site/src/content/docs/shortcuts.md');
+    final page = read('site/src/content/docs/shortcuts.mdx');
     final documented = <String, String>{};
     final row = RegExp(r'^\|\s*([^|]+?)\s*\|\s*`([^`]+)`\s*\|\s*$', multiLine: true);
     for (final match in row.allMatches(page)) {

@@ -5,6 +5,9 @@ group: start
 order: 2
 ---
 
+import RegionDiagram from '../../components/RegionDiagram.astro';
+import { BINDINGS } from '../../lib/commands';
+
 Every shortcut below is rebindable in **Settings ▸ Shortcuts**, including the one that
 opens the grid.
 
@@ -21,6 +24,15 @@ opens the grid.
 | Bottom-right quarter | `⌃⌥K` |
 | Maximize | `⌃⌥↩` |
 | Center | `⌃⌥C` |
+
+<div class="keymap">
+  {BINDINGS.filter((b) => b.kind === 'block').map((b) => (
+    <figure>
+      <RegionDiagram cols={2} rows={2} {...b.block} title={b.label} />
+      <figcaption>{b.combo}</figcaption>
+    </figure>
+  ))}
+</div>
 
 `⌃` Control · `⌥` Option · `⇧` Shift · `⌘` Command · `↩` Return.
 

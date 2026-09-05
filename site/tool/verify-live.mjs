@@ -82,7 +82,12 @@ async function getPage(url) {
       }
       return res;
     }
-    console.log(`  retry ${url} returned ${res.status} (cf-ray: ${res.headers.get('cf-ray')})`);
+    // Full diagnostics on the FAILED attempt, not just the final one. Whether
+    // a 403 is a bot mitigation aimed at datacenter IPs (harness noise, no
+    // real visitor affected) or a bad response cached at one edge (a live
+    // outage for everyone routed there) is the whole question, and only
+    // cf-mitigated, cf-cache-status and the body can answer it.
+    console.log(`  retry ${url} -> ${await describe(res)}`);
     if (attempt < 3) await new Promise((r) => setTimeout(r, 2000 * attempt));
   }
   return res;

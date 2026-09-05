@@ -80,8 +80,17 @@ jobs:
       # `astro build` does NOT type-check: a .ts file with a type error builds
       # clean, proven by injecting one. Every type error caught during the site
       # redesign was caught by someone running tsc by hand, which is not a
-      # check. Runs after Build because tsc needs the `astro:content` types
-      # that the build generates into .astro/.
+      # check.
+      #
+      # Two checkers, because tsc's program contains no .astro or .mdx files at
+      # all — the templates that CONSUME these types were the one place nothing
+      # looked. Proven by injecting `cols={"three"}` into a RegionDiagram:
+      # tsc --noEmit passed, astro check reported ts(2322). That is the same
+      # blind spot that let a template change ship NaN geometry (see the
+      # built-output guard in src/lib/commands.test.ts).
+      #
+      # The script runs `astro sync` first, so it does not depend on Build
+      # having generated the astro:content types.
       - name: Typecheck
         run: npm run typecheck
         working-directory: site

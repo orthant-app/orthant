@@ -10,15 +10,16 @@
     "test:worker-smoke": "node worker/smoke-test.mjs"
   },
   "dependencies": {
-    "astro": "7.2.10",
-    "@astrojs/sitemap": "3.7.0"
+    "@astrojs/sitemap": "3.7.0",
+    "astro": "7.2.10"
   },
   "devDependencies": {
-    "vitest": "3.2.7",
-    "happy-dom": "20.12.0",
-    "wrangler": "4.127.1",
+    "@astrojs/mdx": "8.0.0",
     "@cloudflare/workers-types": "5.20260831.1",
+    "@resvg/resvg-js": "2.6.2",
+    "happy-dom": "20.12.0",
     "typescript": "5.9.2",
-    "@resvg/resvg-js": "2.6.2"
+    "vitest": "3.2.7",
+    "wrangler": "4.127.1"
   }
 }

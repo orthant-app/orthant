@@ -79,4 +79,48 @@ describe('the palette declared in tokens.css', () => {
     expect(rule, 'no bare `a { }` rule in tokens.css').not.toBeNull();
     expect(rule![2]).toContain('var(--accent-text)');
   });
+
+  /*
+   * The pairing the block above excludes on purpose, and was wrong to.
+   *
+   * "--accent is absent: it fills glyphs" was true of glyphs and false of
+   * .btn-primary, which paints #fff ON that fill. Measured before this test
+   * existed: 4.02:1 light and 3.65:1 dark, at 15px/550 — normal text, so the
+   * bar is 4.5:1. The download button, the site's single most important
+   * control, failed AA in both schemes on every page.
+   *
+   * Asserted against #fff rather than the surface, because a filled button is
+   * the one place the accent is a BACKGROUND. The scheme loop matters: dark
+   * mode was the worse of the two, and a light-only check would have passed a
+   * button that is still failing for half the visitors.
+   */
+  it.each(['light', 'dark'] as const)(
+    'clears 4.5:1 for white text on the %s primary button fill',
+    (scope) => {
+      const t = tokens(scope);
+      expect(t['--accent-fill'], '--accent-fill missing from tokens.css').toBeDefined();
+      expect(contrastRatio('#FFFFFF', toHex8(t['--accent-fill']))).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+
+  // A fill that clears 4.5:1 buys nothing if the button stops using it. Pins
+  // both halves: the declaration, and that it is not the bare --accent whose
+  // 4.02:1 this test exists to keep out.
+  it('paints the primary button with --accent-fill', () => {
+    const css = readFileSync('src/styles/tokens.css', 'utf8');
+    const rule = /\.btn-primary\s*\{([^}]*)\}/.exec(css);
+    expect(rule, 'no `.btn-primary { }` rule in tokens.css').not.toBeNull();
+    expect(rule![1]).toContain('var(--accent-fill)');
+    expect(rule![1]).not.toMatch(/background:\s*var\(--accent\)/);
+  });
+
+  // Non-text UI still has a floor: a button nobody can find is not an
+  // improvement on one whose label is hard to read. SC 1.4.11 is 3:1.
+  it.each(['light', 'dark'] as const)(
+    'keeps the %s primary button distinguishable from its surface',
+    (scope) => {
+      const t = tokens(scope);
+      expect(contrastRatio(toHex8(t['--accent-fill']), toHex8(t['--surface']))).toBeGreaterThanOrEqual(3);
+    },
+  );
 });

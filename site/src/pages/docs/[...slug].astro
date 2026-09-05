@@ -1,6 +1,7 @@
 ---
 import { getCollection, render } from 'astro:content';
 import Base from '../../layouts/Base.astro';
+import { docsGroups, docsSequence } from '../../lib/docs';
 
 export async function getStaticPaths() {
   const pages = await getCollection('docs');
@@ -14,23 +15,46 @@ const { Content } = await render(page);
 // sidebar can show where you are. A back link to the index was the only
 // navigation between nine pages: finding the page after this one meant going
 // up and coming back down.
-const pages = (await getCollection('docs')).sort((a, b) => a.data.order - b.data.order);
-const index = pages.findIndex((p) => p.id === page.id);
-const next = pages[index + 1];
+//
+// Both come from lib/docs, which the /docs/ index renders too, so the sidebar
+// and the index cannot disagree about order or membership.
+const all = await getCollection('docs');
+const groups = docsGroups(all);
+// NOT a flat `order` sort: `order` restarts inside each group, so sorting on
+// it alone interleaves the groups and sends the reader backwards. Measured
+// before this changed: 6 of 9 pages had a wrong "next".
+const sequence = docsSequence(all);
+const index = sequence.findIndex((p) => p.id === page.id);
+const next = sequence[index + 1];
 ---
 <Base title={`${page.data.title} · Orthant`} description={page.data.description} path={`/docs/${page.id}/`}>
   <div class="wrap docs">
+    {/* One nav, one list, in source order before the article: right for a
+        screen reader and for desktop. On a phone the <details> collapses it to
+        a single line, so a sibling page is reachable from the TOP of the page
+        without nine links standing between the reader and what they asked for.
+        No JavaScript: `script-src 'self'` has no unsafe-inline, and a script
+        for nine links would not earn its place. */}
     <nav class="toc" aria-label="Documentation">
-      <p class="toc-title">Documentation</p>
-      <ul>
-        {pages.map((p) => (
-          <li>
-            <a href={`/docs/${p.id}/`} aria-current={p.id === page.id ? 'page' : undefined}>
-              {p.data.title}
-            </a>
-          </li>
+      <details class="toc-disclosure">
+        {/* The count comes from the collection. Hardcoding "9" would quietly
+            start lying the first time a tenth page is added. */}
+        <summary>Documentation · {sequence.length} pages · you are on {page.data.title}</summary>
+        {groups.map((g) => (
+          <div class="toc-group">
+            <p class="toc-title">{g.title}</p>
+            <ul>
+              {g.pages.map((p) => (
+                <li>
+                  <a href={`/docs/${p.id}/`} aria-current={p.id === page.id ? 'page' : undefined}>
+                    {p.data.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
         ))}
-      </ul>
+      </details>
     </nav>
 
     <article class="prose">
@@ -55,24 +79,56 @@ const next = pages[index + 1];
   }
 
   /*
-   * On a phone the sidebar comes AFTER the article. In source order it is
-   * first — which is right for a screen reader and for the desktop layout —
-   * but rendered first on a narrow screen it puts nine links between the
-   * reader and the page they just asked for.
+   * The sidebar sits FIRST on a phone now, where it used to be pushed after
+   * the article with `order`. That earlier fix solved "nine links before the
+   * content you asked for" and created a worse problem: the only route to a
+   * sibling page was below the whole article. Collapsed to one line by the
+   * <details>, it costs a single row and is reachable immediately, so source
+   * order and visual order agree at every width.
    */
-  article { order: 1; }
-  .toc { order: 2; border-top: 1px solid var(--separator); padding-top: 24px; }
+  .toc { border-bottom: 1px solid var(--separator); padding-bottom: 16px; }
 
   @media (min-width: 900px) {
     .docs { grid-template-columns: 216px minmax(0, 1fr); gap: 48px; }
-    article { order: 0; }
     .toc {
-      order: 0; border-top: 0; padding-top: 0;
+      border-bottom: 0; padding-bottom: 0;
       /* Long pages scroll past the whole list otherwise, which is most of what
          a sidebar is for. */
       position: sticky; top: 24px; align-self: start;
     }
   }
+
+  /*
+   * ⚠️ The disclosure is a MOBILE control only. On desktop the summary is
+   * removed and the groups are forced visible, because a <details> that is not
+   * `open` hides its non-summary children through the UA stylesheet.
+   *
+   * Overriding that needs BOTH rules below, and which one does the work varies
+   * by engine: older engines respond to `display` on the children, while
+   * Chromium hides the content through the `::details-content` pseudo-element,
+   * which `display: block` on a child cannot reach. Verified in a real browser
+   * at 899 and 900 px rather than reasoned about, because the brief's own note
+   * says CSS-only reveal is not reliably portable and it is right to doubt it.
+   */
+  .toc-disclosure > summary {
+    /* A control, so it clears the 24 px minimum on BOTH axes, not just width. */
+    padding: 7px 10px;
+    margin-inline: -10px;
+    border-radius: 6px;
+    font-size: 14px;
+    color: var(--label-secondary);
+    cursor: pointer;
+  }
+  .toc-disclosure > summary:hover { background: var(--raised); color: var(--label); }
+  .toc-disclosure[open] > summary { margin-bottom: 8px; }
+
+  @media (min-width: 900px) {
+    .toc-disclosure > summary { display: none; }
+    .toc-disclosure > .toc-group { display: block; }
+    .toc-disclosure::details-content { content-visibility: visible; block-size: auto; }
+  }
+
+  .toc-group + .toc-group { margin-top: 18px; }
 
   .toc-title {
     margin: 0 0 10px;

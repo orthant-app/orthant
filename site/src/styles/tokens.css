@@ -135,6 +135,15 @@ a:hover { text-decoration-thickness: 2px; }
 
 code, kbd, pre { font-family: var(--font-mono); font-size: 0.9em; }
 
+/* An inline path or filename has no spaces for the browser's default line
+   breaking to use, so it stays one unbreakable token and pushes the page wider
+   than its viewport — found by the sweep on /docs/uninstall/'s
+   `~/Library/Preferences/app.orthant.orthant.plist`, a page-level horizontal
+   scrollbar from 320 to 414px. Scoped to inline code only (`:not(pre) > code`):
+   a `pre`'s own code already scrolls horizontally via `overflow-x: auto`
+   below, and breaking mid-token there would fight that instead of fixing it. */
+:not(pre) > code { overflow-wrap: break-word; }
+
 kbd {
   background: var(--keycap-fill);
   border: 1px solid var(--keycap-border);

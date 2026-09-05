@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import handler from './index';
-import { FALLBACK_URL, handleDownload, type CacheLike } from './download';
+import { FALLBACK_URL, SECURITY_HEADERS, handleDownload, type CacheLike } from './download';
 
 const GOOD = 'https://github.com/orthant-app/orthant/releases/download/v1.0.1/Orthant-1.0.1.dmg';
 
@@ -95,6 +96,40 @@ describe('handleDownload', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  /*
+   * The two copies of the policy must agree.
+   *
+   * download.ts says "matching public/_headers exactly - keep the two in sync
+   * by hand; nothing shares them at build time", and nothing did. They are
+   * genuinely two files (Cloudflare does not apply _headers to a Worker
+   * response, which is why the Worker carries its own set), so they cannot be
+   * collapsed into one - but they can be asserted equal, which is the part
+   * that was missing. Drift here means a page served through the Worker and
+   * the same page served as a static asset ship different policies, and only
+   * one of them gets reviewed.
+   */
+  it('declares the same CSP as public/_headers', () => {
+    const headers = readFileSync('public/_headers', 'utf8');
+    const line = /^\s*Content-Security-Policy:\s*(.+)$/m.exec(headers);
+    expect(line, 'no Content-Security-Policy line in public/_headers').not.toBeNull();
+    expect(SECURITY_HEADERS['content-security-policy']).toBe(line![1].trim());
+  });
+
+  // The privacy page makes a factual claim about this policy. It said the site
+  // used Cloudflare Web Analytics while the site had never been deployed, so
+  // the claim had never once been true; the beacon's origins are now out of
+  // the CSP and the claim is gone. Pinning both together means removing one
+  // without the other fails rather than quietly re-opening the permission.
+  it('permits no third-party script or connect origin', () => {
+    const csp = SECURITY_HEADERS['content-security-policy'];
+    expect(csp).toContain("script-src 'self';");
+    expect(csp).toContain("connect-src 'self';");
+    expect(csp).not.toContain('cloudflareinsights');
+
+    const privacy = readFileSync('src/pages/privacy.astro', 'utf8');
+    expect(privacy).not.toContain('Cloudflare Web Analytics');
   });
 
   it('falls back on a non-200 feed', async () => {

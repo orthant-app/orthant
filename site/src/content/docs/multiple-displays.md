@@ -22,7 +22,12 @@ A Retina display and an external monitor at a different scale can be mixed freel
 works in one coordinate space throughout and converts exactly once, natively, so a window moved
 between displays of different densities keeps the size you asked for.
 
-## The overlay covers every display
+## The overlay works the other way round
 
-`⌃⌥O` puts a grid on all of them at once, each sized to its own screen. Draw on whichever one
-you like.
+`⌃⌥O` puts a grid on all of them at once, each sized to its own screen. The window lands on
+**the display you draw on**, so drawing on a different screen from the one the window is
+currently on is how you move it there.
+
+That is the opposite of the shortcut rule above, and deliberately so. A shortcut is aimed with
+one keypress and should not depend on where the pointer drifted; a drawn selection is aimed at
+a specific place on a specific screen, and honouring that is the whole point of drawing it.

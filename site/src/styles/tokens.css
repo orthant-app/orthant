@@ -14,12 +14,23 @@
      separator weight disappears against it. */
   --rule: rgb(16 22 34 / 0.22);
 
-  /* Two accents, not one. --accent fills glyphs and buttons, where it sits
-     against white or a tint. --accent-text is for LINK TEXT, which must clear
-     4.5:1: #007AFF measures 4.02:1 on white and 3.85:1 on this paper. #0060D6
-     measures 5.52:1 and is already the app icon's gradient end. */
+  /* Three accents, not one, because "sits against white" and "has white text
+     ON it" are different requirements and only the first was written down.
+
+     --accent fills glyphs, tints and focus rings, where nothing is drawn on
+     top of it. Non-text UI, so its bar is 3:1.
+     --accent-text is LINK TEXT: #007AFF measures 4.02:1 on white and 3.85:1
+     on this paper, so links use #0060D6 at 5.52:1 (also the app icon's
+     gradient end).
+     --accent-fill is a BUTTON FILL with #fff on it. The same 4.02:1 that
+     disqualified #007AFF as link text disqualifies it here too, and for
+     exactly the same reason — the number was already recorded above, next to
+     the wrong conclusion, because a filled button is the one place the accent
+     is a background for text rather than a foreground. Measured 4.91:1 in
+     both schemes; contrast.test.ts asserts it against #fff, not the surface. */
   --accent: #007AFF;
   --accent-text: #0060D6;
+  --accent-fill: #006CE5;
 
   --raised: rgb(16 22 34 / 0.04);
   --raised-strong: rgb(16 22 34 / 0.08);
@@ -48,6 +59,13 @@
     --accent: #0A84FF;
     /* Measures 5.00:1 on #0E1524, so dark mode needs no separate link colour. */
     --accent-text: #0A84FF;
+    /* --accent-fill is deliberately NOT re-declared: it inherits the light
+       value. Dark mode wants a brighter accent, and #0A84FF is brighter, but
+       white on it measures 3.65:1 — worse than light mode, not better, because
+       raising a fill's luminance lowers its contrast with the white text on
+       top. The inherited fill still clears 3:1 against this surface (3.71:1),
+       so the button is plainly visible. Overriding it here to "match dark
+       mode" is how this defect comes back. */
 
     --raised: rgb(226 236 255 / 0.05);
     --raised-strong: rgb(226 236 255 / 0.10);
@@ -204,7 +222,7 @@ pre {
   text-decoration: none;
   cursor: pointer;
 }
-.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary { background: var(--accent-fill); color: #fff; }
 .btn-primary:hover { filter: brightness(1.08); }
 .btn-secondary {
   background: var(--raised);

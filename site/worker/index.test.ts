@@ -117,19 +117,22 @@ describe('handleDownload', () => {
     expect(SECURITY_HEADERS['content-security-policy']).toBe(line![1].trim());
   });
 
-  // The privacy page makes a factual claim about this policy. It said the site
-  // used Cloudflare Web Analytics while the site had never been deployed, so
-  // the claim had never once been true; the beacon's origins are now out of
-  // the CSP and the claim is gone. Pinning both together means removing one
-  // without the other fails rather than quietly re-opening the permission.
-  it('permits no third-party script or connect origin', () => {
+  // The privacy page makes a factual claim about this policy, and the two
+  // have disagreed before: for a while the page claimed Cloudflare Web
+  // Analytics while the CSP blocked its beacon, then the reverse. The beacon
+  // is the ONE third-party origin the policy admits (decided 2026-09-05: page
+  // views are wanted, and the beacon is cookieless), and the privacy page
+  // must say so. Pinning both together means changing one without the other
+  // fails rather than quietly making the page untrue in either direction.
+  it('permits exactly one third-party origin, the analytics beacon, and says so', () => {
     const csp = SECURITY_HEADERS['content-security-policy'];
-    expect(csp).toContain("script-src 'self';");
-    expect(csp).toContain("connect-src 'self';");
-    expect(csp).not.toContain('cloudflareinsights');
+    expect(csp).toContain("script-src 'self' https://static.cloudflareinsights.com;");
+    expect(csp).toContain("connect-src 'self' https://cloudflareinsights.com;");
+    // Nothing else third-party: every other directive is 'self' (plus data: images).
+    expect(csp.replace(/https:\/\/(static\.)?cloudflareinsights\.com/g, '')).not.toMatch(/https?:/);
 
     const privacy = readFileSync('src/pages/privacy.astro', 'utf8');
-    expect(privacy).not.toContain('Cloudflare Web Analytics');
+    expect(privacy).toContain('Cloudflare Web Analytics');
   });
 
   /*

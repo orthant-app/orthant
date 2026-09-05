@@ -156,8 +156,10 @@ for (const path of PAGES) {
 // them applies to any given response.
 {
   const csp = (await get(`${BASE}/`)).headers.get('content-security-policy') || '';
-  check(csp.includes("script-src 'self';"), 'CSP: script-src is self only', csp.slice(0, 60));
-  check(!csp.includes('cloudflareinsights'), 'CSP: no analytics beacon origin');
+  check(csp.includes("script-src 'self' https://static.cloudflareinsights.com;"),
+    'CSP: script-src is self plus the analytics beacon', csp.slice(0, 90));
+  check(csp.includes("connect-src 'self' https://cloudflareinsights.com;"),
+    'CSP: connect-src admits the beacon endpoint', csp.slice(0, 200));
   check(csp.includes("frame-ancestors 'none'"), 'CSP: frame-ancestors none');
 }
 

@@ -128,6 +128,11 @@ cd macos && xcodebuild test -workspace Runner.xcworkspace -scheme Runner \
 
 The Dart side (geometry, bindings, regions, coordinator, overlay model) is developed test-first. The native AX/AppKit layer can't be exercised headlessly, so it's verified by scripted and manual acceptance against real windows on real displays.
 
+## Releasing
+
+Maintainer process, including the changelog entry every release depends on:
+[RELEASING.md](RELEASING.md).
+
 ## Uninstall
 
 ```sh

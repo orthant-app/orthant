@@ -73,7 +73,16 @@ async function getPage(url) {
   let res;
   for (let attempt = 1; attempt <= 3; attempt++) {
     res = await get(url);
-    if (!TRANSIENT.has(res.status)) return res;
+    if (!TRANSIENT.has(res.status)) {
+      // ⚠️ A silent retry is a check that lies about how healthy its subject
+      // is: "green" and "green only on the third try" are different facts, and
+      // the second one is the interesting one. Say so.
+      if (attempt > 1) {
+        console.log(`  note  ${url} needed ${attempt} attempts (earlier: ${res.status})`);
+      }
+      return res;
+    }
+    console.log(`  retry ${url} returned ${res.status} (cf-ray: ${res.headers.get('cf-ray')})`);
     if (attempt < 3) await new Promise((r) => setTimeout(r, 2000 * attempt));
   }
   return res;

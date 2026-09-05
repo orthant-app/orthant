@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { GROUPS, docsGroups, docsSequence, type DocsPage } from './docs';
 
@@ -49,5 +50,32 @@ describe('docsSequence', () => {
       'grid-overlay', 'custom-regions', 'multiple-displays',
       'troubleshooting', 'settings', 'updates', 'uninstall',
     ]);
+  });
+});
+
+/*
+ * The tests above prove the FUNCTION is right. They do not prove the page
+ * calls it, and that gap shipped: grouping landed while [...slug].astro still
+ * sorted flat on `order`, which restarts per group, so 6 of 9 pages pointed at
+ * the wrong next page and every test here stayed green.
+ *
+ * Reads built output, so `npm run build` must have run. ⚠️ A source-level
+ * mutation is invisible to this test without a rebuild first.
+ */
+describe("the rendered docs pages' next links", () => {
+  const DIST = 'dist/docs';
+  const expected = docsSequence(pages).map((p) => p.id);
+
+  it('walk the group sequence, and stop at the last page', () => {
+    if (!existsSync(DIST)) throw new Error(`${DIST} missing - run \`npm run build\` first`);
+
+    const chain = expected.map((id) => {
+      const html = readFileSync(`${DIST}/${id}/index.html`, 'utf8');
+      const m = /class="next" href="\/docs\/([^/]+)\//.exec(html);
+      return m ? m[1] : null;
+    });
+
+    // Each page points at the one after it; the last points nowhere.
+    expect(chain).toEqual([...expected.slice(1), null]);
   });
 });

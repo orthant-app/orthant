@@ -74,14 +74,17 @@ const jsonLd = {
         <p><strong>Draw it.</strong> Drag across the grid.</p>
       </li>
       <li>
-        <RegionDiagram cols={12} rows={1} c0={0} c1={7} r0={0} r1={0}
-          title="The same two thirds on a twelve-column grid" label="8/12" />
-        <p><strong>It keeps its proportions.</strong> The same region on a finer grid.</p>
-      </li>
-      <li>
         <RegionDiagram cols={3} rows={1} c0={0} c1={1} r0={0} r1={0}
           title="Left two thirds, bound to a shortcut" label="2/3" combo="⌃⌥2" />
-        <p><strong>Bind it.</strong> Press <kbd>⌘S</kbd> on the overlay, name it, give it a key.</p>
+        <p><strong>Bind it.</strong> Press <kbd>⌘S</kbd> before you let go, name it, give it a
+          key.</p>
+      </li>
+      <li>
+        <RegionDiagram cols={12} rows={1} c0={0} c1={7} r0={0} r1={0}
+          title="The same two thirds on a twelve-column grid, on the same shortcut"
+          label="8/12" combo="⌃⌥2" />
+        <p><strong>Press it, from then on.</strong> Change your grid to twelfths later and the
+          same key still gives you two thirds.</p>
       </li>
     </ol>
     <p><a href="/docs/custom-regions/">How custom regions work →</a></p>
@@ -116,8 +119,9 @@ const jsonLd = {
       0 wake-ups.
     </p>
     <p>
-      A window snaps within its own display, not the one your pointer happens to be on. The
-      overlay appears on every screen at once.
+      A <em>shortcut</em> snaps a window within its own display, not the one your pointer happens
+      to be on. The overlay is the other way round: it appears on every screen at once, and the
+      window lands where you drew it, which is also how you send one to another display.
     </p>
   </section>
 

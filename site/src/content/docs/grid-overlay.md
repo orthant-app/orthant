@@ -22,15 +22,23 @@ more cells. `↩` places the window.
 
 ## Saving what you just drew
 
-`⌘S` on the overlay places the window *and* opens a shortcut picker pre-filled with the
-selection you made. Orthant suggests a name: draw the left two thirds and it offers
-"Left ⅔". You can bind it to a shortcut on the spot. See
-[custom regions](/docs/custom-regions/).
+`⌘S` places the window *and* opens a shortcut picker pre-filled with the selection you made.
+Orthant suggests a name: draw the left two thirds and it offers "Left ⅔".
+
+It has to be pressed **while the overlay is still up**, because releasing a drag places the
+window and dismisses the grid. So either:
+
+- keep the mouse button held down and press `⌘S` without releasing, or
+- select with the arrow keys (`⇧`-arrow extends), then press `⌘S` instead of `↩`.
+
+See [custom regions](/docs/custom-regions/).
 
 ## Notes
 
-- The grid appears on **every** display at once. Draw on whichever one you like; the window
-  moves within its own display.
+- The grid appears on **every** display at once, and the window lands on the display you drew
+  on. Drawing on another screen is how you move a window to it. (Direct shortcuts are the
+  other way round: they keep a window on its own display. See
+  [multiple displays](/docs/multiple-displays/).)
 - The overlay costs nothing while it is hidden: zero CPU, zero wake-ups.
 - `Esc`, `↩` and `⌘S` belong to the overlay only while it is on screen. Dismiss it and they
   go straight back to the app underneath.

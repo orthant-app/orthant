@@ -1,4 +1,4 @@
-import { handleDownload, runtimeCache, SECURITY_HEADERS } from './download';
+import { handleDownload, runtimeDeps, SECURITY_HEADERS } from './download';
 
 // This is the Worker's entry module (`main` in wrangler.jsonc). workerd
 // treats every NAMED export of the entry module as a candidate entrypoint,
@@ -16,7 +16,7 @@ export default {
   async fetch(request: Request, env: { ASSETS: { fetch: typeof fetch } }): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === '/download' || url.pathname === '/download/') {
-      return handleDownload({ fetch: globalThis.fetch, cache: runtimeCache() });
+      return handleDownload(runtimeDeps());
     }
     return withSecurityHeaders(await env.ASSETS.fetch(request));
   },

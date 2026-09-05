@@ -1,0 +1,59 @@
+---
+import type { DocsGroup } from '../lib/docs';
+
+interface Props {
+  groups: DocsGroup[];
+  /** The page currently being rendered, so its link can carry aria-current. */
+  current: string;
+}
+
+const { groups, current } = Astro.props;
+---
+{groups.map((g) => (
+  <div class="toc-group">
+    <p class="toc-title">{g.title}</p>
+    <ul>
+      {g.pages.map((p) => (
+        <li>
+          <a href={`/docs/${p.id}/`} aria-current={p.id === current ? 'page' : undefined}>
+            {p.data.title}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </div>
+))}
+
+<style>
+  /*
+   * These live here, not in the page that uses this component. An Astro scoped
+   * style only reaches markup written in its OWN template, so the page's
+   * `.toc a` rules never applied to links rendered through here — the same trap
+   * tokens.css records for content-collection markup. Astro emits this block
+   * once no matter how many times the component is used.
+   */
+  .toc-group + .toc-group { margin-top: 18px; }
+
+  .toc-title {
+    margin: 0 0 10px;
+    font-size: 12px; font-weight: 590; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--label-secondary);
+  }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { margin-bottom: 2px; }
+  a {
+    display: block;
+    padding: 5px 10px;
+    margin-inline: -10px;
+    border-radius: 6px;
+    font-size: 15px;
+    color: var(--label-secondary);
+    text-decoration: none;
+  }
+  a:hover { background: var(--raised); color: var(--label); }
+  a[aria-current='page'] {
+    background: var(--raised-strong);
+    color: var(--label);
+    font-weight: 550;
+  }
+</style>

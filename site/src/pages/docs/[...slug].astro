@@ -1,6 +1,7 @@
 ---
 import { getCollection, render } from 'astro:content';
 import Base from '../../layouts/Base.astro';
+import DocsNavList from '../../components/DocsNavList.astro';
 import { docsGroups, docsSequence } from '../../lib/docs';
 
 export async function getStaticPaths() {
@@ -36,25 +37,31 @@ const next = sequence[index + 1];
         No JavaScript: `script-src 'self'` has no unsafe-inline, and a script
         for nine links would not earn its place. */}
     <nav class="toc" aria-label="Documentation">
+      {/* Two renderings of one list, with exactly one `display: none` at any
+          width. The list markup itself is not duplicated — DocsNavList is.
+
+          ⚠️ This replaced a single <details> that stayed CLOSED on desktop
+          while CSS (`::details-content { content-visibility: visible }`) forced
+          its contents visible. Measured: WebKit showed nine links on screen and
+          exposed ZERO of them in the accessibility tree; Chromium exposed all
+          nine. Setting `open` restored them in WebKit. The `open` attribute is
+          the element's own state, and an engine is free to derive semantics
+          from it rather than from computed style — so overriding the
+          appearance in CSS produced a nav that looked complete and was empty to
+          a screen reader, on the engine this audience actually uses.
+
+          `display: none` is the one hiding mechanism no engine disagrees
+          about. The cost is nine duplicated <a> elements in the HTML; if CSS
+          fails entirely both lists render, which is ugly but navigable. */}
       <details class="toc-disclosure">
         {/* The count comes from the collection. Hardcoding "9" would quietly
             start lying the first time a tenth page is added. */}
         <summary>Documentation · {sequence.length} pages · you are on {page.data.title}</summary>
-        {groups.map((g) => (
-          <div class="toc-group">
-            <p class="toc-title">{g.title}</p>
-            <ul>
-              {g.pages.map((p) => (
-                <li>
-                  <a href={`/docs/${p.id}/`} aria-current={p.id === page.id ? 'page' : undefined}>
-                    {p.data.title}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+        <DocsNavList groups={groups} current={page.id} />
       </details>
+      <div class="toc-static">
+        <DocsNavList groups={groups} current={page.id} />
+      </div>
     </nav>
 
     <article class="prose">
@@ -99,23 +106,22 @@ const next = sequence[index + 1];
   }
 
   /*
-   * ⚠️ The disclosure is a MOBILE control only. On desktop the summary is
-   * removed and the groups are forced visible, because a <details> that is not
-   * `open` hides its non-summary children.
+   * The disclosure is a MOBILE control only, and above 900px it is removed from
+   * the document rather than overridden — see the comment on the markup. The
+   * static list is its desktop counterpart, and the two are never both present.
    *
-   * `content-visibility` on `::details-content` is what does that, and it is
-   * the ONLY rule that does: browsers hide the content through that pseudo-
-   * element, which a `display` rule on a child cannot reach. An earlier version
-   * of this block also set `display: block` on `.toc-group` and claimed older
-   * engines needed it; deleting that rule live changed nothing in Chromium,
-   * Firefox or WebKit, so it went, rather than shipping a comment asserting a
-   * portability it had never been measured to buy.
-   *
-   * Checked at 899 and 900 px in a real browser. ⚠️ Use `checkVisibility()` to
-   * confirm, never `getBoundingClientRect()`: content inside a CLOSED <details>
-   * still reports a non-zero box, which reads as "the disclosure never
-   * collapses" when it collapses fine.
+   * ⚠️ Checking this by eye, or with `getBoundingClientRect()`, cannot see the
+   * bug this replaced: content inside a closed <details> still reports a
+   * non-zero box. Use `checkVisibility()` for what is on screen, and an ARIA
+   * snapshot in WebKit specifically for what a screen reader gets — they
+   * disagreed here, and only the second one noticed.
    */
+  .toc-static { display: none; }
+  @media (min-width: 900px) {
+    .toc-disclosure { display: none; }
+    .toc-static { display: block; }
+  }
+
   .toc-disclosure > summary {
     /* A control, so it clears the 24 px minimum on BOTH axes, not just width. */
     padding: 7px 10px;
@@ -127,36 +133,6 @@ const next = sequence[index + 1];
   }
   .toc-disclosure > summary:hover { background: var(--raised); color: var(--label); }
   .toc-disclosure[open] > summary { margin-bottom: 8px; }
-
-  @media (min-width: 900px) {
-    .toc-disclosure > summary { display: none; }
-    .toc-disclosure::details-content { content-visibility: visible; block-size: auto; }
-  }
-
-  .toc-group + .toc-group { margin-top: 18px; }
-
-  .toc-title {
-    margin: 0 0 10px;
-    font-size: 12px; font-weight: 590; letter-spacing: 0.05em; text-transform: uppercase;
-    color: var(--label-secondary);
-  }
-  .toc ul { list-style: none; margin: 0; padding: 0; }
-  .toc li { margin-bottom: 2px; }
-  .toc a {
-    display: block;
-    padding: 5px 10px;
-    margin-inline: -10px;
-    border-radius: 6px;
-    font-size: 15px;
-    color: var(--label-secondary);
-    text-decoration: none;
-  }
-  .toc a:hover { background: var(--raised); color: var(--label); }
-  .toc a[aria-current='page'] {
-    background: var(--raised-strong);
-    color: var(--label);
-    font-weight: 550;
-  }
 
   .next {
     display: block;

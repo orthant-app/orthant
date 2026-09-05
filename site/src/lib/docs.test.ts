@@ -79,3 +79,51 @@ describe("the rendered docs pages' next links", () => {
     expect(chain).toEqual([...expected.slice(1), null]);
   });
 });
+
+/*
+ * The desktop sidebar must not be a <details> that CSS forces open.
+ *
+ * It was, and the cost was invisible to every check this project had: at
+ * 1440px WebKit rendered all nine links and exposed ZERO of them to the
+ * accessibility tree, while Chromium exposed all nine. `checkVisibility()`
+ * said nine in both. The `open` attribute is the element's own state, and an
+ * engine may derive semantics from it rather than from computed style, so
+ * `::details-content { content-visibility: visible }` bought appearance
+ * without meaning.
+ *
+ * CI's responsive sweep runs Chromium, so no browser check here would have
+ * caught it either. These are structural instead: they assert the technique is
+ * gone and that the desktop list really is its own element.
+ */
+describe('the docs sidebar', () => {
+  const page = 'src/pages/docs/[...slug].astro';
+
+  it('never reveals collapsed <details> content with CSS', () => {
+    const source = readFileSync(page, 'utf8');
+    // The <style> block only, with CSS comments stripped. Both the template
+    // above it and the comment inside it explain the technique being forbidden
+    // by naming it, so scanning the whole file trips on its own prose — the
+    // same reason hero-default.test.ts scopes its `order:` check this way.
+    const style = /<style>([\s\S]*)<\/style>/.exec(source);
+    expect(style, '<style> block not found').not.toBeNull();
+    const css = style![1].replace(/\/\*[\s\S]*?\*\//g, '');
+
+    // Both halves of the old technique. Either one alone is enough to
+    // reintroduce the split between what is drawn and what is exposed.
+    expect(css).not.toContain('::details-content');
+    expect(css).not.toContain('content-visibility');
+  });
+
+  it('renders the desktop list outside the disclosure', () => {
+    const html = readFileSync('dist/docs/shortcuts/index.html', 'utf8');
+    const details = /<details[^>]*>[\s\S]*?<\/details>/.exec(html);
+    expect(details, 'no <details> in the built docs page').not.toBeNull();
+
+    // Every doc must be linked from markup that is NOT inside the disclosure.
+    const outside = html.replace(details![0], '');
+    for (const id of docsSequence(pages).map((p) => p.id)) {
+      expect(outside, `/docs/${id}/ is only reachable inside <details>`)
+        .toContain(`href="/docs/${id}/"`);
+    }
+  });
+});

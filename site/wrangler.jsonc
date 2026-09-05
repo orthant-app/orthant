@@ -16,9 +16,22 @@
   // hostname with no canonical redirect between them.
   "routes": [{ "pattern": "orthant.app", "custom_domain": true }],
   "assets": {
-    // No `run_worker_first`: assets are served directly, without invoking the
-    // Worker. That is faster and cheaper, and it is why page security headers
-    // come from public/_headers rather than from Worker code.
+    // Assets are served directly, without invoking the Worker. That is faster
+    // and cheaper, and it is why page security headers come from
+    // public/_headers rather than from Worker code.
+    //
+    // ⚠️ /download is the exception, and it MUST stay one. Asset routing runs
+    // BEFORE the Worker, and `not_found_handling: 404-page` answers a
+    // navigation request for a path with no asset by serving the 404 page
+    // itself — the Worker never runs. /download has no asset behind it, so
+    // every visitor who CLICKED the download button got "That page isn't
+    // here.", while `curl` got the correct 302: the fallthrough to the Worker
+    // happens for non-HTML requests, and curl sends `Accept: */*`.
+    //
+    // So every header-less check of this route reported success while the
+    // route was broken for its only real audience. Verified in both
+    // directions after this change, with and without `Accept: text/html`.
+    "run_worker_first": ["/download", "/download/"],
     "directory": "./dist",
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",

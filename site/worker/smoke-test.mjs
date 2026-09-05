@@ -129,8 +129,24 @@ async function waitForReady() {
   throw new Error(`wrangler dev did not become ready within ${READY_TIMEOUT_MS}ms.\nCaptured output:\n${output}`);
 }
 
+// A BROWSER'S Accept header, not Node's default `*/*`, so this at least asks
+// the same question a visitor does.
+//
+// ⚠️ But do not mistake it for a guard. Measured: `wrangler dev` does NOT
+// reproduce Cloudflare's asset-routing precedence, so deleting
+// `run_worker_first` from wrangler.jsonc leaves this test passing while the
+// deployed site serves the 404 page to everyone who clicks Download. That is
+// the second production-only failure mode this file cannot see (the first is
+// the fetch `this` binding, noted below). The check that catches both is
+// tool/verify-live.mjs, run against the deployment.
+const NAVIGATION_HEADERS = {
+  accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'sec-fetch-mode': 'navigate',
+  'sec-fetch-dest': 'document',
+};
+
 async function checkDownloadPath(pathname, strict) {
-  const res = await fetch(BASE + pathname, { redirect: 'manual' });
+  const res = await fetch(BASE + pathname, { redirect: 'manual', headers: NAVIGATION_HEADERS });
   if (res.status !== 302) {
     throw new Error(`GET ${pathname}: expected 302, got ${res.status}`);
   }

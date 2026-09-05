@@ -141,7 +141,23 @@ body {
    lands one pixel below it and draws a doubled hairline. */
 .band + .section { border-top: 0; }
 
-h1, h2, h3 { line-height: 1.2; letter-spacing: -0.015em; }
+/*
+ * `overflow-wrap` because a heading can be ONE WORD longer than the line.
+ *
+ * "Troubleshooting" is 15 characters with no break opportunity in it. At a
+ * 320px viewport the content box is 272px, and that word measures 304px in a
+ * font wider than SF Pro, so the h1 pushed the whole document 7px sideways and
+ * every paragraph on the page scrolled with it.
+ *
+ * ⚠️ Invisible on macOS, and this is the general trap: the local sweep renders
+ * in SF Pro, where the same word fits, so it passed 256 combinations while CI
+ * (Linux, DejaVu-class fallback) failed. Reproduced locally only by forcing a
+ * wide family through the CSSOM. Trust CI over a local sweep for reflow.
+ *
+ * `break-word` rather than `anywhere`: it only breaks a word that cannot fit
+ * on a line of its own, so nothing at normal widths moves.
+ */
+h1, h2, h3 { line-height: 1.2; letter-spacing: -0.015em; overflow-wrap: break-word; }
 h2 { font-size: 27px; margin-block: 0 16px; }
 h3 { font-size: 20px; margin-block: 28px 8px; }
 

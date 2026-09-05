@@ -9,7 +9,8 @@
     "test": "vitest run && npm run test:worker-smoke",
     "test:worker-smoke": "node worker/smoke-test.mjs",
     "typecheck": "astro sync && astro check && tsc --noEmit",
-    "sweep": "node tool/sweep.mjs"
+    "sweep": "node tool/sweep.mjs",
+    "verify:live": "node tool/verify-live.mjs"
   },
   "dependencies": {
     "@astrojs/sitemap": "3.7.0",

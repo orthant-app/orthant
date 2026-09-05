@@ -230,6 +230,10 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
 
     // Menu-bar app: never show the main window; the tray drives everything.
     self.orderOut(nil)
+
+    // Sparkle's scheduler runs from here on, whether or not Settings is ever
+    // opened. See `Updater.start()` for the release that shipped without it.
+    Updater.start()
   }
 
   /// The red button and ⌘W must land in exactly the same state as a Dart-driven

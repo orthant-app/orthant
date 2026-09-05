@@ -596,7 +596,19 @@ rm -f "$DIST"/Orthant-*.zip
 DMG_COUNT=0
 while IFS= read -r -d '' dmg; do
   info "Signing $(basename "$dmg") for the appcast…"
-  SIG="$("$SPARKLE_BIN/sign_update" "${SIGN_UPDATE_ARGS[@]}" "$dmg")" ||
+  # `${a[@]+"${a[@]}"}`, not `"${a[@]}"`. These arrays are EMPTY on the legacy
+  # path (no SPARKLE_ED_KEY_FILE), and bash before 4.4 treats an empty array's
+  # expansion as unset, so `set -u` aborts here — after the build and after
+  # signing, exactly like the `label<?>` scar documented in notarize() above.
+  # macOS ships bash 3.2 as /bin/bash, so this fires on any machine whose PATH
+  # bash is the system one, including the GitHub macOS runner.
+  #
+  # The legacy path is NOT exercised end to end by any test: the release
+  # fixture always supplies Sparkle inputs, so these arrays are never empty
+  # under it. test_release_lib.sh therefore pins the IDIOM at the source
+  # level instead, which is weaker than a behavioural test and is the
+  # honest extent of the coverage.
+  SIG="$("$SPARKLE_BIN/sign_update" ${SIGN_UPDATE_ARGS[@]+"${SIGN_UPDATE_ARGS[@]}"} "$dmg")" ||
     die "sign_update failed on $(basename "$dmg") — see output above"
   [[ -n "$SIG" ]] ||
     die "sign_update produced an empty signature for $(basename "$dmg")"
@@ -631,7 +643,8 @@ done < <(find "$DIST" -maxdepth 1 -name 'Orthant-*.dmg' -print0)
 # here once, during Task 7's acceptance) would be swept into a real, signed
 # feed alongside the intended ones.
 info "Regenerating the appcast…"
-"$SPARKLE_BIN/generate_appcast" "${GENERATE_APPCAST_ARGS[@]}" "$DIST" ||
+# Same empty-array guard as sign_update above; see the comment there.
+"$SPARKLE_BIN/generate_appcast" ${GENERATE_APPCAST_ARGS[@]+"${GENERATE_APPCAST_ARGS[@]}"} "$DIST" ||
   sensitive_die 'appcast generation paths' 'generate_appcast failed' \
     "generate_appcast failed over $DIST — see output above"
 

@@ -26,11 +26,23 @@ jobs:
       # remembered to. They take seconds, so running them ahead of the Flutter
       # build reports a release-tooling regression in half a minute rather than
       # after a full macOS build.
+      #
+      # ⚠️ /bin/bash EXPLICITLY, which on macOS is 3.2. That is not incidental:
+      # `#!/usr/bin/env bash` on this runner resolves to 3.2 as well, so 3.2 is
+      # the oldest bash the release actually runs under, and it is the one
+      # worth testing against. Before 4.4, expanding an EMPTY array under
+      # `set -u` is an unbound-variable error, and tool/release.sh does exactly
+      # that on the legacy (no Sparkle CI inputs) path — it would have died
+      # after building and signing. Adding this step is what found it.
+      #
+      # Naming /bin/bash rather than `bash` keeps the guard from silently
+      # weakening if a newer bash ever arrives earlier in PATH.
       - name: Release tooling tests
         run: |
+          /bin/bash --version | head -1
           for suite in tool/ci/test_*.sh; do
             echo "--- $suite"
-            bash "$suite"
+            /bin/bash "$suite"
           done
 
       - name: Resolve Flutter cache paths

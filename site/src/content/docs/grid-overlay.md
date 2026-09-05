@@ -36,9 +36,10 @@ See [custom regions](/docs/custom-regions/).
 ## Notes
 
 - The grid appears on **every** display at once, and the window lands on the display you drew
-  on. Drawing on another screen is how you move a window to it. (Direct shortcuts are the
-  other way round: they keep a window on its own display. See
-  [multiple displays](/docs/multiple-displays/).)
+  on. Drawing on another screen is how you move a window to it.
 - The overlay costs nothing while it is hidden: zero CPU, zero wake-ups.
 - `Esc`, `↩` and `⌘S` belong to the overlay only while it is on screen. Dismiss it and they
   go straight back to the app underneath.
+
+Direct shortcuts work the other way round: they keep a window on the display it is already on.
+See [multiple displays](/docs/multiple-displays/).

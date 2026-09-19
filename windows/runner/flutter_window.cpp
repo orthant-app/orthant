@@ -27,19 +27,18 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
-  flutter_controller_->engine()->SetNextFrameCallback([&]() {
-    this->Show();
-  });
+  window_channel_ = std::make_unique<WindowChannel>(
+      flutter_controller_->engine()->messenger(), GetHandle());
 
-  // Flutter can complete the first frame before the "show window" callback is
-  // registered. The following call ensures a frame is pending to ensure the
-  // window is shown. It is a no-op if the first frame hasn't completed yet.
-  flutter_controller_->ForceRedraw();
-
+  // The template shows the window on the engine's first frame. Orthant is a
+  // tray app: the window stays hidden until Dart asks for it over the channel
+  // (spec §5.5), so there is no first-frame reveal here. W5 adds the
+  // reveal-on-first-frame with a deadline for the first *show*.
   return true;
 }
 
 void FlutterWindow::OnDestroy() {
+  window_channel_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -51,6 +50,26 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  switch (message) {
+    case WM_CLOSE:
+      // Closing the settings window hides it. A tray app outlives its
+      // window; Quit is the tray item (spec §5.5). Handled ahead of the
+      // Flutter delegation so no plugin can turn this into a DestroyWindow.
+      ShowWindow(hwnd, SW_HIDE);
+      if (window_channel_) {
+        window_channel_->NotifyConfigWindowClosed();
+      }
+      return 0;
+    case WM_EXITMENULOOP:
+      // tray_manager tracks its menu with this window as owner but never
+      // posts the WM_NULL Microsoft prescribes after TrackPopupMenu for a
+      // notification icon's menu. Without it the second opening of the menu
+      // appears and immediately vanishes. Posted here, once the loop exits,
+      // and then falls through: Flutter and DefWindowProc still see it.
+      PostMessage(hwnd, WM_NULL, 0, 0);
+      break;
+  }
+
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =

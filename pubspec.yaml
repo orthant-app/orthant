@@ -73,6 +73,10 @@ flutter:
 
   assets:
     - assets/tray_icon.png
+    # Windows wants an .ico (tray_manager loads it with LoadImage) and cannot
+    # tint a template, so this is the app icon at tray sizes. Emitted by
+    # tool/make_app_icon.py with everything else.
+    - assets/tray_icon.ico
     # The About pane's icon. Both this and the .app's icon set are emitted by
     # tool/make_app_icon.py from one set of constants, so they cannot drift.
     - assets/app_icon.png

@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "app.orthant" "\0"
-            VALUE "FileDescription", "orthant" "\0"
+            VALUE "CompanyName", "Orthant" "\0"
+            VALUE "FileDescription", "Orthant" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "orthant" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 app.orthant. All rights reserved." "\0"
-            VALUE "OriginalFilename", "orthant.exe" "\0"
-            VALUE "ProductName", "orthant" "\0"
+            VALUE "InternalName", "Orthant" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Owen Ou. All rights reserved." "\0"
+            VALUE "OriginalFilename", "Orthant.exe" "\0"
+            VALUE "ProductName", "Orthant" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

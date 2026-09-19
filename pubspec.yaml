@@ -43,6 +43,12 @@ dependencies:
   # Persist settings (shortcut bindings, later grid/gap). First-party; pinned.
   shared_preferences: 2.5.5
 
+  # Win32 from Dart. Everything stateless on Windows is dart:ffi through this
+  # package (spec §5.1); only window creation, the hotkey message pump and the
+  # second engine are C++. Pinned exactly, like every other dependency here.
+  win32: 6.4.0
+  ffi: 2.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

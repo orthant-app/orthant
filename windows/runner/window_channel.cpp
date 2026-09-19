@@ -18,7 +18,10 @@ constexpr char kChannelName[] = "app.orthant/window";
 // null. The polarity matters: Dart's HotkeyService.apply treats any reply
 // that is not a list as "everything refused", but an EMPTY list as
 // "nothing refused", so returning an empty list here would report every
-// shortcut live when nothing is registered.
+// shortcut live when nothing is registered. The same polarity applies per
+// entry: Dart's whereType<int>() silently drops a non-int id, so an id of
+// the wrong type must not be let through either, or that shortcut is
+// reported as live when nothing is registered for it.
 std::optional<flutter::EncodableList> AllIdsRefused(
     const flutter::EncodableValue* arguments) {
   const auto* args = std::get_if<flutter::EncodableMap>(arguments);
@@ -33,6 +36,10 @@ std::optional<flutter::EncodableList> AllIdsRefused(
     if (!binding) return std::nullopt;
     const auto id = binding->find(flutter::EncodableValue("id"));
     if (id == binding->end()) return std::nullopt;
+    if (!std::get_if<int32_t>(&id->second) &&
+        !std::get_if<int64_t>(&id->second)) {
+      return std::nullopt;
+    }
     refused.push_back(id->second);
   }
   return refused;
@@ -74,6 +81,15 @@ void WindowChannel::HandleMethodCall(
     result->Success();
   } else if (method == "hideConfigWindow") {
     ShowWindow(config_window_, SW_HIDE);
+    result->Success();
+  } else if (method == "configFirstFrame") {
+    // On macOS this signal is load-bearing: native shows the window
+    // transparent and waits for Dart's first frame before revealing it, so
+    // the pane appears already painted instead of as a black rectangle
+    // filling in. W0's showConfigWindow shows the window directly, so there
+    // is nothing here to reveal yet, but the method must still be answered
+    // rather than refused, because the Dart caller does not catch. W5 owns
+    // the real reveal-on-first-frame, with a deadline.
     result->Success();
   } else if (method == "replaceHotkeys") {
     const auto refused = AllIdsRefused(call.arguments());

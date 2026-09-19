@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:tray_manager/tray_manager.dart';
@@ -49,10 +50,16 @@ Future<void> main() async {
     hotkeys: hotkeys,
   );
 
-  // isTemplate: the icon is solid black + alpha, so let macOS tint it for the
-  // current menu bar (white on dark, black on light). Without this it renders
-  // as-is and is effectively invisible on a dark menu bar.
-  await trayManager.setIcon('assets/tray_icon.png', isTemplate: true);
+  // macOS: isTemplate, because the icon is solid black + alpha and the menu
+  // bar tints it for the current appearance (white on dark, black on light);
+  // without it the icon is effectively invisible on a dark menu bar.
+  // Windows: an .ico of the app icon itself, because a taskbar cannot tint a
+  // template and a black glyph vanishes on a dark one.
+  if (Platform.isWindows) {
+    await trayManager.setIcon('assets/tray_icon.ico');
+  } else {
+    await trayManager.setIcon('assets/tray_icon.png', isTemplate: true);
+  }
   await _syncTray();
   // The tray follows every state change, so nothing has to remember to refresh
   // it after a rebind, a refusal or a permission transition — three places that
@@ -105,7 +112,13 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
   Future<void> onTrayIconMouseDown() async {
     await app.permissions.refresh();
     await _syncTray();
-    await trayManager.popUpContextMenu();
+    // Windows: a notification icon's menu only dismisses on an outside click
+    // if its owner is the foreground window, and tray_manager 0.5.3 calls
+    // SetForegroundWindow only when asked to. The parameter is deprecated in
+    // the Dart API, but it is what tray_manager 0.5.3 reads; the runner posts
+    // the WM_NULL that completes the sequence (FlutterWindow::MessageHandler).
+    // ignore: deprecated_member_use
+    await trayManager.popUpContextMenu(bringAppToFront: Platform.isWindows);
   }
 
   @override
@@ -122,7 +135,17 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
       case 'updates':
         await app.wc.checkForUpdates();
       case 'quit':
-        exit(0);
+        // Windows keeps a dead icon in the tray until the pointer sweeps it if
+        // the process exits without removing it, so it needs destroy() awaited
+        // ahead of exit(0). macOS never had that ghost-icon problem and takes
+        // the direct exit(0) that shipped in 1.0.3 unchanged: waiting on a
+        // platform-channel reply here would let a wedged platform thread make
+        // Quit do nothing, on the one platform with real users today.
+        if (Platform.isWindows) {
+          unawaited(trayManager.destroy().whenComplete(() => exit(0)));
+        } else {
+          exit(0);
+        }
     }
   }
 

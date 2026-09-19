@@ -62,7 +62,7 @@ All of these are rebindable in **Settings → Shortcuts**. (`⌃` Control, `⌥`
 | Platform | Status |
 | --- | --- |
 | **macOS 13+** | Works today |
-| **Windows** | Planned: the same Dart UI over a pure-Dart Win32 backend, behind the same `WindowController` seam |
+| **Windows** | In design: the same Dart UI behind the same `WindowController` seam, with Win32 called from Dart over FFI and a small C++ runner for the overlay windows, global hotkeys and the second Flutter engine |
 | **Linux** | Not supported |
 
 ## Permissions
@@ -115,7 +115,7 @@ The choices that matter:
 
 - **One coordinate system.** All window geometry is top-left-origin global points (the Accessibility/CoreGraphics space), converted from AppKit's bottom-left space exactly once, natively. Mixing the two spaces is the classic correctness bug in this category of app.
 - **The overlay is a non-activating `NSPanel`** on a second, resident Flutter engine. It appears without Orthant ever becoming the frontmost app, and idles at 0% CPU while hidden.
-- **Native handles never cross the platform channel.** Only plain data does, which is what keeps a second backend practical: the planned **Windows** port (pure-Dart Win32) implements the same `WindowController` seam behind the same UI. **Linux** is not supported.
+- **Native handles never cross the platform channel.** Only plain data does, which is what keeps a second backend practical: the planned **Windows** port implements the same `WindowController` seam behind the same UI, with Win32 called from Dart over FFI and C++ only where a window handle, a message pump or a Flutter engine is needed. **Linux** is not supported.
 
 ## Testing
 

@@ -85,6 +85,47 @@ jobs:
           -configuration Debug
           -destination 'platform=macOS'
 
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Resolve Flutter cache paths
+        id: flutter-meta
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: 3.47.2
+          channel: stable
+          dry-run: true
+
+      - name: Restore Flutter SDK
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.flutter-meta.outputs.CACHE-PATH }}
+          key: flutter-${{ runner.os }}-${{ runner.arch }}-3.47.2
+
+      - name: Restore pub cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.flutter-meta.outputs.PUB-CACHE-PATH }}
+          key: pub-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: pub-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: 3.47.2
+          channel: stable
+
+      - run: flutter pub get
+      # The same 500+ tests the macOS job runs, on the platform the Windows
+      # branch of the seam is compiled for. `flutter analyze` is not repeated:
+      # analysis is platform-independent and the macOS job already runs it.
+      - run: flutter test
+      - run: flutter build windows --debug
+
   site:
     runs-on: ubuntu-latest
     steps:

@@ -2,6 +2,7 @@
 
 #include <flutter/standard_method_codec.h>
 
+#include <cstdint>
 #include <optional>
 #include <string>
 

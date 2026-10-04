@@ -7,6 +7,11 @@ import 'windows_window_ops.dart';
 /// answers. A placement that crosses a DPI boundary can add two waits of
 /// [dpiSettleMs] (for the window's DPI to change, then for its own resize)
 /// and runs its correction to [crossingPassDeadlineMs]: about 2.2 s in all.
+/// The longest is a crossing first seen after the correction: a wait after
+/// pass 1 for a DPI change that did not come, the correction, the same two
+/// waits after it, and one more correction to [crossingPassDeadlineMs]. That
+/// is the restore, two pass deadlines, three of [dpiSettleMs] and one of
+/// [crossingPassDeadlineMs]: about 2.8 s.
 class PlacementTiming {
   const PlacementTiming({
     this.pollMs = 15,
@@ -105,12 +110,19 @@ bool frameMatches(PxRect landed, PxRect want) =>
 ///    [PlacementTiming.crossingPassDeadlineMs]. Only a window that matched on
 ///    pass 1 and kept that frame through the wait is placed without a
 ///    correction.
+/// 4c. A predicted crossing that pass 1 did not show is looked for again,
+///    the same way, after a correction that moved the window, and a window
+///    that crossed then gets one more correction, as in 4b. A window whose
+///    thread was busy for longer than pass 1 moves only once it gets to its
+///    queue, which by then holds the correction's write as well: its frame
+///    lands on the target, settles the correction, and only then changes DPI
+///    and resizes itself.
 /// 5. Placed if the final frame matches, or if the window demonstrably moved
 ///    and the final origin is where it was asked to be. Without a crossing,
 ///    moved means its frame changed at any point during the placement. After
-///    a crossing it means the correction pass itself moved the window: the
-///    window's own resize keeps its origin within tolerance of the target,
-///    so a change before the correction says nothing about it.
+///    a crossing it means the correction pass that followed it moved the
+///    window: the window's own resize keeps its origin within tolerance of
+///    the target, so a change before that correction says nothing about it.
 ///
 /// Never blocks on the target and never reports a frame it did not read. A
 /// window whose frame never changed and does not match is not placed even if
@@ -189,17 +201,144 @@ Future<PlacementResult> placeWindow(
   // its own minimum size" rather than "never moved", and only a window that
   // moved can have crossed onto another monitor.
   final responded = firstLanded != null && firstLanded != before;
-  // A per-monitor-aware window that moved onto a monitor of another scale has
-  // been sent WM_DPICHANGED and resizes itself in its own handler: a frame
-  // that matched a moment ago is not necessarily the frame that stays. Its
-  // DPI changes before that resize, which is what makes the crossing visible
-  // here, but not when its frame lands: Notepad's frame landed with its DPI
-  // unchanged, the DPI changed 30 to 50 ms later, and the resize followed
-  // (measured on the W1 rig). Pass 1 can settle in that gap, so when a
-  // crossing was predicted and pass 1 moved the window, placement waits,
-  // bounded, for the change; a window that did not move waits for nothing.
+  // Pass 1 is a hit only on the whole frame: a size miss is what the
+  // correction pass is for.
+  final firstHit = firstLanded != null && frameMatches(firstLanded, target);
+  trace.write(' pass1=${firstLanded == null ? 'unreadable' : firstHit ? 'hit' : 'miss'}');
+  // A crossing is waited for only when it was predicted and pass 1 moved the
+  // window; a window that did not move waits for nothing.
+  final afterFirst = await _observeCrossing(
+      placer, hwnd, firstLanded ?? before, dpiBefore, clock, timing, trace,
+      wait: expectCrossing && responded);
+  // GetDpiForWindow answers 0 only for a window that is not there, whether
+  // it went before the read after pass 1 or during the wait for its DPI to
+  // change. That is not "did not cross", which a hit would report placed.
+  if (afterFirst.gone) {
+    return done(PlacementOutcome.failed, 'final=none why=window-gone');
+  }
+  final firstSettle = afterFirst.settle;
+  var crossed = firstSettle != null;
+  // A hit stands if the window did not cross, or crossed and kept that frame
+  // through the wait for its own resize.
+  if (firstHit && (firstSettle == null || firstSettle.kept)) {
+    return done(PlacementOutcome.placed, 'final=$firstLanded');
+  }
+  // After a crossing the correction starts from the frame the window's own
+  // resize left, whatever pass 1 said: a pass that missed (settled on the
+  // app's minimum size, say) can still be followed by that resize, which the
+  // correction would otherwise take for its own movement. With no frame from
+  // pass 1, the wait was from the frame before it, the only one there is.
+  var correctFrom = firstLanded ?? before;
+  if (firstSettle != null) {
+    final resized = firstSettle.frame;
+    if (resized == null) {
+      return done(PlacementOutcome.failed, 'final=none why=frame-unreadable');
+    }
+    correctFrom = resized;
+  }
+
+  // At most two corrections. The second follows a predicted crossing that
+  // was first seen after the first correction: a window whose thread was busy
+  // for longer than pass 1 moves only once it gets to its queue, which by
+  // then holds the correction's write too, so its frame lands on the target,
+  // settles the correction, and only then changes DPI and resizes itself.
+  for (var name = 'correction';; name = 'correction2') {
+    // Origin settles a correction only from a window that [responded]. After
+    // a crossing, the starting frame is the one the window settled on after
+    // it, and an origin within tolerance of the target there is not this
+    // pass's write landing, so the pass waits for it, and for longer: a
+    // window still busy with its DPI relayout can take a while to get to the
+    // write.
+    final pass = await _pass(placer, hwnd, target, correctFrom, clock, timing,
+        deadlineMs:
+            crossed ? timing.crossingPassDeadlineMs : timing.passDeadlineMs,
+        originSettles: responded && !crossed);
+    if (pass.denied) {
+      trace.write(' $name=denied');
+      return elevated();
+    }
+    if (pass.unmeasured) {
+      // The correction wrote nothing, so whatever the window's frame is now
+      // is its own doing: after a crossing its own resize would pass for this
+      // pass's movement, and without one pass 1's response, or any change of
+      // its own since the placement began, would. An unmeasured pass 1 is
+      // different: it wrote nothing either, and the correction is a genuine
+      // retry.
+      return done(PlacementOutcome.failed,
+          '$name=unreadable final=none why=frame-unreadable');
+    }
+    final landed = pass.landed ?? placer.extendedFrame(hwnd);
+    // Origin is enough only from a window that moved, macOS's rule for a
+    // target at its own minimum size; a whole-frame match is enough from any
+    // window. After a crossing the movement has to be this pass's: the
+    // window's own DPI resize keeps its origin within tolerance of the
+    // target, so an earlier change says nothing about whether this pass
+    // landed.
+    final moved = crossed
+        ? (landed != null && landed != correctFrom)
+        : responded || (landed != null && landed != before);
+    final arrived = landed != null &&
+        (frameMatches(landed, target) ||
+            (moved && originMatches(landed, target)));
+    trace.write(' $name=${pass.error != null ? 'error${pass.error}' : landed == null ? 'unreadable' : arrived ? 'hit' : 'miss'}');
+    if (landed == null) {
+      return done(PlacementOutcome.failed, 'final=none why=frame-unreadable');
+    }
+    // Only a predicted crossing not yet seen, after a correction that moved
+    // the window, is looked for here: a same-display placement and a window
+    // that never moved wait for nothing more.
+    if (crossed || !expectCrossing || landed == correctFrom) {
+      return done(arrived ? PlacementOutcome.placed : PlacementOutcome.failed,
+          'final=$landed');
+    }
+    final afterCorrection = await _observeCrossing(
+        placer, hwnd, landed, dpiBefore, clock, timing, trace, wait: true);
+    if (afterCorrection.gone) {
+      return done(PlacementOutcome.failed, 'final=none why=window-gone');
+    }
+    final lateSettle = afterCorrection.settle;
+    if (lateSettle == null) {
+      return done(arrived ? PlacementOutcome.placed : PlacementOutcome.failed,
+          'final=$landed');
+    }
+    // As after pass 1: a hit that kept its frame stands, and otherwise the
+    // next correction starts from the frame the window's own resize left.
+    crossed = true;
+    if (lateSettle.kept && frameMatches(landed, target)) {
+      return done(PlacementOutcome.placed, 'final=$landed');
+    }
+    final resized = lateSettle.frame;
+    if (resized == null) {
+      return done(PlacementOutcome.failed, 'final=none why=frame-unreadable');
+    }
+    correctFrom = resized;
+  }
+}
+
+/// What [_observeCrossing] found: the window [gone], or, if its DPI changed,
+/// what its frame did while its own resize was awaited ([settle]; null when
+/// it did not cross).
+typedef _Crossing = ({bool gone, _Settle? settle});
+
+/// Looks for a crossing onto a monitor of another scale after a pass that
+/// left [hwnd] on [from], and writes what it saw to [trace] (`dpiflip=`,
+/// `dpi=`, `dpiwait=`).
+///
+/// A per-monitor-aware window that moved onto a monitor of another scale has
+/// been sent WM_DPICHANGED and resizes itself in its own handler: a frame
+/// that matched a moment ago is not necessarily the frame that stays. Its DPI
+/// changes before that resize, which is what makes the crossing visible here,
+/// but not when its frame lands: Notepad's frame landed with its DPI
+/// unchanged, the DPI changed 30 to 50 ms later, and the resize followed
+/// (measured on the W1 rig). A pass can settle in that gap, so with [wait] a
+/// window whose DPI has not changed yet is given, bounded, until it does.
+/// Once it has, the window's own resize is waited for too ([_awaitChange]).
+Future<_Crossing> _observeCrossing(Win32Placer placer, int hwnd, PxRect from,
+    int dpiBefore, PlacementClock clock, PlacementTiming timing,
+    StringBuffer trace,
+    {required bool wait}) async {
   var dpiAfter = placer.windowDpi(hwnd);
-  if (expectCrossing && responded && dpiAfter == dpiBefore) {
+  if (wait && dpiAfter == dpiBefore) {
     final started = clock.elapsedMs;
     while (dpiAfter == dpiBefore &&
         clock.elapsedMs - started < timing.dpiSettleMs) {
@@ -212,86 +351,18 @@ Future<PlacementResult> placeWindow(
             ? ' dpiflip=unreadable'
             : ' dpiflip=${clock.elapsedMs - started}ms');
   }
-  final crossed = dpiBefore != 0 && dpiAfter != 0 && dpiAfter != dpiBefore;
-  if (crossed) trace.write(' dpi=$dpiBefore->$dpiAfter');
-  // Pass 1 is a hit only on the whole frame: a size miss is what the
-  // correction pass is for.
-  final firstHit = firstLanded != null && frameMatches(firstLanded, target);
-  trace.write(' pass1=${firstLanded == null ? 'unreadable' : firstHit ? 'hit' : 'miss'}');
-  // GetDpiForWindow answers 0 only for a window that is not there, whether
-  // it went before the read after pass 1 or during the wait for its DPI to
-  // change. That is not "did not cross", which a hit would report placed.
-  if (dpiAfter == 0) {
-    return done(PlacementOutcome.failed, 'final=none why=window-gone');
+  if (dpiAfter == 0) return (gone: true, settle: null);
+  if (dpiBefore == 0 || dpiAfter == dpiBefore) {
+    return (gone: false, settle: null);
   }
-  if (firstHit && !crossed) {
-    return done(PlacementOutcome.placed, 'final=$firstLanded');
-  }
-  var correctFrom = firstLanded ?? before;
-  if (crossed) {
-    // Wait, bounded, for the window's own resize, then correct after it,
-    // whatever pass 1 said: a pass that missed (settled on the app's minimum
-    // size, say) can still be followed by that resize, which the correction
-    // would otherwise take for its own movement. With no frame from pass 1,
-    // the wait is from the frame before it, the only one there is.
-    final settle = await _awaitChange(placer, hwnd, correctFrom, clock, timing);
-    if (settle.kept) {
-      // It kept the frame: nothing to correct after a hit.
-      if (firstHit) {
-        return done(PlacementOutcome.placed, 'dpiwait=none final=$firstLanded');
-      }
-      trace.write(' dpiwait=none');
-    } else {
-      final resized = settle.frame;
-      if (resized == null) {
-        return done(PlacementOutcome.failed,
-            'dpiwait=unreadable final=none why=frame-unreadable');
-      }
-      trace.write(' dpiwait=resized');
-      correctFrom = resized;
-    }
-  }
-
-  // Origin settles the correction only from a window that [responded]. After
-  // a crossing, the starting frame is the one the window settled on after
-  // it, and an origin within tolerance of the target there is not this
-  // pass's write landing, so the pass waits for it, and for longer: a window
-  // still busy with its DPI relayout can take a while to get to the write.
-  final second = await _pass(placer, hwnd, target, correctFrom, clock, timing,
-      deadlineMs:
-          crossed ? timing.crossingPassDeadlineMs : timing.passDeadlineMs,
-      originSettles: responded && !crossed);
-  if (second.denied) {
-    trace.write(' correction=denied');
-    return elevated();
-  }
-  if (second.unmeasured) {
-    // The correction wrote nothing, so whatever the window's frame is now is
-    // its own doing: after a crossing its own resize would pass for this
-    // pass's movement, and without one pass 1's response, or any change of
-    // its own since the placement began, would. An unmeasured pass 1 is
-    // different: it wrote nothing either, and the correction is a genuine
-    // retry.
-    return done(PlacementOutcome.failed,
-        'correction=unreadable final=none why=frame-unreadable');
-  }
-  final landed = second.landed ?? placer.extendedFrame(hwnd);
-  // Origin is enough only from a window that moved, macOS's rule for a target
-  // at its own minimum size; a whole-frame match is enough from any window.
-  // After a crossing the movement has to be this pass's: the window's own DPI
-  // resize keeps its origin within tolerance of the target, so pass 1's change
-  // says nothing about whether the correction landed.
-  final moved = crossed
-      ? (landed != null && landed != correctFrom)
-      : responded || (landed != null && landed != before);
-  final arrived = landed != null &&
-      (frameMatches(landed, target) || (moved && originMatches(landed, target)));
-  trace.write(' correction=${second.error != null ? 'error${second.error}' : landed == null ? 'unreadable' : arrived ? 'hit' : 'miss'}');
-  if (landed == null) {
-    return done(PlacementOutcome.failed, 'final=none why=frame-unreadable');
-  }
-  return done(arrived ? PlacementOutcome.placed : PlacementOutcome.failed,
-      'final=$landed');
+  trace.write(' dpi=$dpiBefore->$dpiAfter');
+  final settle = await _awaitChange(placer, hwnd, from, clock, timing);
+  trace.write(settle.kept
+      ? ' dpiwait=none'
+      : settle.frame == null
+          ? ' dpiwait=unreadable'
+          : ' dpiwait=resized');
+  return (gone: false, settle: settle);
 }
 
 /// What [hwnd]'s frame did while a crossing's own resize was awaited: kept

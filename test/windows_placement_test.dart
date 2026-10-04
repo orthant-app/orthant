@@ -244,6 +244,139 @@ void main() {
     await expectFrameStays(r, w, leftHalf, clock);
   });
 
+  // A window whose thread is busy for longer than a pass when the first write
+  // is posted: pass 1 times out on an unchanged frame, so it shows no
+  // crossing to wait for. The correction's write queues behind the first,
+  // the thread works through both in order, and the frame lands exactly on
+  // the target, which settles the correction. Notepad's DPI change and its
+  // own 1.5x resize follow the landing by tens of milliseconds (measured on
+  // the W1 rig), after the correction has stopped looking. Busy for 21 and 30
+  // reads is about 330 and 465 ms at the default poll.
+  for (final busy in [21, 30]) {
+    test('a predicted crossing is watched for after a correction that moved '
+        'a window too busy for pass 1 (busy $busy reads)', () async {
+      final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+        ..dpiResize = 1.5
+        ..dpiBorder = const Border(10, 0, 10, 10)
+        ..lagReads = busy
+        ..dpiFlipReads = 3
+        ..dpiResizeDelayReads = 3
+        ..lagReadsAfterDpiResize = 17;
+      const target = PxRect(1920, 0, 3360, 1560);
+      final clock = FakeClock();
+      final r = await place(w, target, clock);
+      await expectFrameStays(r, w, target, clock);
+      expect(r.outcome, PlacementOutcome.placed,
+          reason: 'the window answers, late: once its crossing is observed, '
+              'one more correction lands it');
+      expect(r.trace, contains('pass1=miss'));
+      expect(r.trace, contains('dpi=96->144'));
+      expect(r.trace, contains('correction2=hit'));
+      expect(r.trace, contains('final=$target'));
+    });
+  }
+
+  test('a crossing seen only after the correction, Chrome-shaped, is corrected '
+      'once more', () async {
+    // Chrome resizes itself as it processes the move, so the queued
+    // correction lands on its new border: the origin is within tolerance, the
+    // size 4 px short, and its DPI has already changed.
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..dpiResize = 1.5
+      ..dpiBorder = const Border(9, 0, 9, 9)
+      ..lagReads = 21;
+    final clock = FakeClock();
+    final r = await place(w, leftHalf, clock);
+    await expectFrameStays(r, w, leftHalf, clock);
+    expect(r.outcome, PlacementOutcome.placed);
+    expect(r.trace, isNot(contains('dpiflip=')),
+        reason: 'the DPI had already changed: nothing to wait for');
+    expect(r.trace, contains('dpi=96->144'));
+    expect(r.trace, contains('dpiwait=none'));
+    expect(r.trace, contains('correction2=hit'));
+    expect(w.frame, leftHalf);
+  });
+
+  test('a crossing seen only after the correction, whose frame it keeps, is '
+      'placed without another pass', () async {
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..dpiResize = 1.0
+      ..lagReads = 21;
+    final clock = FakeClock();
+    final r = await place(w, leftHalf, clock);
+    expect(r.outcome, PlacementOutcome.placed);
+    expect(r.trace, contains('dpi=96->144'));
+    expect(r.trace, contains('dpiwait=none'));
+    expect(r.trace, isNot(contains('correction2=')));
+    expect(w.writes, hasLength(2));
+    await expectFrameStays(r, w, leftHalf, clock);
+  });
+
+  test('after a crossing seen only after the correction, a second correction '
+      'that never lands is not placed', () async {
+    // The window's own resize leaves [2,0,1445,1562], whose origin is within
+    // 2 px of the target's. Only the second correction's own movement can
+    // count, and the window stops answering before it.
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..dpiResize = 1.5
+      ..dpiBorder = const Border(9, 0, 9, 9)
+      ..lagReads = 21
+      ..dpiFlipReads = 3
+      ..dpiResizeDelayReads = 3
+      ..hangAfterWrites = 2;
+    final clock = FakeClock();
+    final r = await place(w, leftHalf, clock);
+    expect(r.outcome, PlacementOutcome.failed);
+    expect(r.trace, contains('dpiwait=resized'));
+    expect(r.trace, contains('correction2=miss'));
+    await expectFrameStays(r, w, leftHalf, clock);
+  });
+
+  test('a predicted crossing that never comes after the correction costs one '
+      'bounded wait, and is placed as before', () async {
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..targetMonitorDpi = 144
+      ..lagReads = 21;
+    final clock = FakeClock();
+    final r = await place(w, leftHalf, clock);
+    expect(r.outcome, PlacementOutcome.placed);
+    expect(r.trace, contains('correction=hit dpiflip=timeout'));
+    expect(r.trace, isNot(contains(' dpi=')));
+    expect(r.trace, isNot(contains('correction2=')));
+    expect(clock.elapsedMs,
+        lessThanOrEqualTo(2 * timing.passDeadlineMs + timing.dpiSettleMs));
+    await expectFrameStays(r, w, leftHalf, clock);
+  });
+
+  test('a window gone while its DPI change is awaited after the correction is '
+      'not placed', () async {
+    // DPI reads: before pass 1, after it, after the correction, then the
+    // wait's first poll, which finds the window gone. The correction had hit.
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..targetMonitorDpi = 144
+      ..lagReads = 21
+      ..goneAtDpiRead = 4;
+    final r = await place(w, leftHalf, FakeClock());
+    expect(r.outcome, PlacementOutcome.failed);
+    expect(r.trace, contains('correction=hit'));
+    expect(r.trace, contains('dpiflip=unreadable'));
+    expect(r.trace, contains('why=window-gone'));
+  });
+
+  test('a busy window on its own display gets no wait for a DPI change after '
+      'the correction', () async {
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..lagReads = 21;
+    final clock = FakeClock();
+    final r = await place(w, leftHalf, clock);
+    expect(r.outcome, PlacementOutcome.placed);
+    expect(r.trace, contains('pass1=miss'));
+    expect(r.trace, isNot(contains('dpiflip=')));
+    expect(clock.elapsedMs,
+        lessThanOrEqualTo(timing.passDeadlineMs + 2 * timing.pollMs));
+    await expectFrameStays(r, w, leftHalf, clock);
+  });
+
   test('a window that is not per-monitor aware is not waited on for a DPI '
       'change', () async {
     // Windows scales such a window's bitmap rather than telling it, so its

@@ -127,9 +127,16 @@ class Border {
 }
 
 /// One window, modelling what placement depends on: an outer rect around a
-/// visible frame, a maximized state that takes reads to restore, a write that
-/// lands after a delay or never (hung), a size floor, a self-resize after
-/// crossing a DPI boundary (WM_DPICHANGED), and UIPI.
+/// visible frame, a maximized state that takes reads to restore, writes that
+/// queue and land after a delay or never (hung), a size floor, a self-resize
+/// after crossing a DPI boundary (WM_DPICHANGED), and UIPI.
+///
+/// Writes queue, as Windows queues them: an asynchronous `SetWindowPos` is a
+/// message posted to the window's thread, so a second write does not replace
+/// the first, and a thread that was busy works through both, in order, once
+/// it gets to its queue. The fake applies the whole queue on one read: a
+/// thread drains its posted messages back to back, and a 15 ms poll from
+/// another process does not fall between two of them.
 class FakeWindow implements Win32Placer {
   FakeWindow({required PxRect frame, this.border = const Border(7, 0, 7, 7)})
       : outer = border.around(frame);
@@ -150,7 +157,10 @@ class FakeWindow implements Win32Placer {
   Border restoredBorder = const Border(7, 0, 7, 7);
   int restoreReads = 2;
 
-  /// A write lands on the extendedFrame read after this many.
+  /// Reads before the window's thread gets to its queue of writes: the queue
+  /// is applied on the extendedFrame read after this many, counted from the
+  /// write that found the queue empty. A write posted while the thread is
+  /// still busy joins the queue and does not restart the count.
   int lagReads = 0;
   int? minOuterWidth;
 
@@ -189,12 +199,12 @@ class FakeWindow implements Win32Placer {
   /// ([dpiResize] set) and the window's own [dpi] otherwise.
   int? targetMonitorDpi;
 
-  /// Writes posted after the window's own DPI resize land after this many
-  /// reads instead of [lagReads]: Notepad took 220 to 290 ms, measured on the
-  /// W1 rig, to process a write that followed its DPI relayout.
+  /// A queue started after the window's own DPI resize is applied after this
+  /// many reads instead of [lagReads]: Notepad took 220 to 290 ms, measured on
+  /// the W1 rig, to process a write that followed its DPI relayout.
   int? lagReadsAfterDpiResize;
   bool _dpiResized = false;
-  int _pendingLag = 0;
+  int _queueLag = 0;
 
   /// The crossing's own resize in two steps, as an app whose layout after
   /// WM_DPICHANGED takes two passes: the first step's frame is read this many
@@ -203,7 +213,7 @@ class FakeWindow implements Win32Placer {
   bool _secondStepArmed = false;
 
   /// After this many writes have been applied, the window stops applying
-  /// writes, as if it hung.
+  /// writes, as if it hung: the rest of its queue stays queued.
   int? hangAfterWrites;
 
   /// After this many `extendedFrame` reads, the window no longer exists.
@@ -227,8 +237,9 @@ class FakeWindow implements Win32Placer {
   bool restoreRequested = false;
   int? lastHwnd;
 
-  PxRect? _pending;
-  int _pendingReads = 0;
+  /// Writes posted and not yet applied, oldest first.
+  final List<PxRect> _queue = [];
+  int _queueReads = 0;
   int _zoomReads = 0;
   int _applied = 0;
   int _reads = 0;
@@ -268,9 +279,10 @@ class FakeWindow implements Win32Placer {
     final goneAfter = goneAfterReads;
     if (goneAfter != null && _reads > goneAfter) exists = false;
     if (!exists || !frameReadable) return null;
-    if (_pending != null && !hung && ++_pendingReads > _pendingLag) {
-      _apply(_pending!);
-      _pending = null;
+    if (_queue.isNotEmpty && !hung && ++_queueReads > _queueLag) {
+      while (_queue.isNotEmpty && !hung) {
+        _apply(_queue.removeAt(0));
+      }
     } else if (_flipCountdown > 0) {
       if (--_flipCountdown == 0) _cross();
     } else if (_resizeCountdown > 0 && --_resizeCountdown == 0) {
@@ -309,10 +321,12 @@ class FakeWindow implements Win32Placer {
     if (deniedWrite) return (ok: false, error: kErrorAccessDenied);
     final r = PxRect(x, y, x + width, y + height);
     writes.add(r);
-    _pending = r;
-    _pendingReads = 0;
-    final slow = lagReadsAfterDpiResize;
-    _pendingLag = _dpiResized && slow != null ? slow : lagReads;
+    if (_queue.isEmpty) {
+      _queueReads = 0;
+      final slow = lagReadsAfterDpiResize;
+      _queueLag = _dpiResized && slow != null ? slow : lagReads;
+    }
+    _queue.add(r);
     return (ok: true, error: 0);
   }
 

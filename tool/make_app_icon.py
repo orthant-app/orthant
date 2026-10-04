@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate macOS/Windows app icons from Orthant's own visual language.
+"""Generate the macOS, Windows and Flutter-asset app icons from Orthant's own visual language.
 
 Run:  python3 tool/make_app_icon.py
 
@@ -32,6 +32,19 @@ OUT = ROOT / "macos/Runner/Assets.xcassets/AppIcon.appiconset"
 FLUTTER_ASSET = ROOT / "assets/app_icon.png"
 FLUTTER_ASSET_SIZE = 256
 
+# Windows. Both are emitted from the same drawing as everything else, for the
+# same reason the Flutter asset is: a second icon maintained by hand is a
+# second icon that goes stale. Both crop to the plate: Windows icons fill
+# their canvas, and a 16 px tray icon with macOS's 20 % transparent padding
+# is a 13 px blob.
+WINDOWS_APP_ICON = ROOT / "windows/runner/resources/app_icon.ico"
+WINDOWS_APP_ICON_SIZES = [(s, s) for s in (16, 24, 32, 48, 64, 128, 256)]
+# The tray icon. Windows cannot tint a template the way the macOS menu bar
+# does, and the black-plus-alpha PNG vanishes on a dark taskbar, so the tray
+# shows the app icon itself at the sizes the shell asks for.
+WINDOWS_TRAY_ICON = ROOT / "assets/tray_icon.ico"
+WINDOWS_TRAY_ICON_SIZES = [(s, s) for s in (16, 20, 24, 32)]
+
 # Rendered large and downsampled — Pillow has no analytic antialiasing, so
 # supersampling is what keeps the 16 pt corners clean.
 CANVAS = 4096
@@ -57,6 +70,12 @@ def rounded(size: int, radius: int, fill) -> Image.Image:
         (0, 0, size - 1, size - 1), radius=radius, fill=fill
     )
     return layer
+
+
+def plate_only(icon: Image.Image) -> Image.Image:
+    """The icon without macOS's transparent margin, for canvases that fill."""
+    pad = round(CANVAS * (1 - PLATE_FRACTION) / 2)
+    return icon.crop((pad, pad, CANVAS - pad, CANVAS - pad))
 
 
 def build() -> Image.Image:
@@ -117,6 +136,16 @@ def main() -> None:
 
     icon.resize((FLUTTER_ASSET_SIZE,) * 2, Image.LANCZOS).save(FLUTTER_ASSET)
     print(f"wrote {FLUTTER_ASSET.relative_to(ROOT)}")
+
+    plate = plate_only(icon)
+    plate.resize((256, 256), Image.LANCZOS).save(
+        WINDOWS_APP_ICON, format="ICO", sizes=WINDOWS_APP_ICON_SIZES
+    )
+    print(f"wrote {WINDOWS_APP_ICON.relative_to(ROOT)}")
+    plate.resize((64, 64), Image.LANCZOS).save(
+        WINDOWS_TRAY_ICON, format="ICO", sizes=WINDOWS_TRAY_ICON_SIZES
+    )
+    print(f"wrote {WINDOWS_TRAY_ICON.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

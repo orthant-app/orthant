@@ -274,12 +274,33 @@ class _Pass {
   final int? error;
 }
 
+/// [hwnd]'s outer rect and DWM frame as one consistent pair, or null if a read
+/// fails or no pair is consistent in three tries.
+///
+/// The border is the difference of two reads, and a window that resizes
+/// itself between them (its own WM_DPICHANGED layout, say) tears it: an outer
+/// rect from before and a frame from after give borders hundreds of pixels
+/// off, and a write built on them is garbage that origin alone can call
+/// placed. So the outer rect is read on both sides of the frame, and the pair
+/// counts only when the two agree. A check on the deltas could not do this:
+/// with the outer rect read first, only a resize that grows the window makes
+/// one negative.
+({PxRect outer, PxRect inner})? _measure(Win32Placer placer, int hwnd) {
+  for (var tries = 0; tries < 3; tries++) {
+    final outer = placer.windowRect(hwnd);
+    final inner = placer.extendedFrame(hwnd);
+    if (outer == null || inner == null) return null;
+    if (placer.windowRect(hwnd) == outer) return (outer: outer, inner: inner);
+  }
+  return null;
+}
+
 Future<_Pass> _pass(Win32Placer placer, int hwnd, PxRect target,
     PxRect before, PlacementClock clock, PlacementTiming timing,
     {required bool originSettles}) async {
-  final outer = placer.windowRect(hwnd);
-  final inner = placer.extendedFrame(hwnd);
-  if (outer == null || inner == null) return const _Pass();
+  final measured = _measure(placer, hwnd);
+  if (measured == null) return const _Pass();
+  final (:outer, :inner) = measured;
   // The invisible border, per edge, as it is right now: it differs between a
   // maximized and a restored window and again across a DPI boundary (spec
   // §5.7), which is why each pass measures it afresh.

@@ -162,9 +162,10 @@ void main() {
   test('after a crossing, a resize in two steps is waited out to the second',
       () async {
     // The app resizes once, holds that frame for two reads, then resizes
-    // again. Two equal reads would end the wait on the first step, and the
-    // correction would measure and write while the app is still resizing;
-    // the third equal read is what carries the wait to the second step.
+    // again. The wait's third equal read carries it to the second step. A
+    // wait that ended on the first would have the correction's border
+    // measurement straddle the second, which _measure now re-reads too, so
+    // this pins the end state rather than the third read itself.
     final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
       ..dpiResize = 1.5
       ..dpiBorder = const Border(9, 0, 9, 9)
@@ -317,6 +318,41 @@ void main() {
     expect(r.trace, contains('correction=hit'));
     expect(clock.elapsedMs, lessThan(timing.passDeadlineMs),
         reason: 'a frame that settled at the right origin needs no more waiting');
+  });
+
+  test('a border measurement torn by the window\'s own resize is re-read, not '
+      'written', () async {
+    // The minimum width forces a correction pass, and the window resizes
+    // itself between that pass's two border reads: the outer rect is from
+    // before, the frame from after. Measured from that pair, the right and
+    // bottom borders are hundreds of pixels negative, the write is garbage,
+    // and origin alone would then call it placed.
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..minOuterWidth = 1214
+      ..tears.add(const PxRect(-7, 0, 1607, 1347));
+    final clock = FakeClock();
+    final r = await place(w, leftHalf, clock);
+    expect(r.outcome, PlacementOutcome.placed);
+    expect(w.frame, const PxRect(0, 0, 1200, 1040),
+        reason: 'its minimum width at the target height, not a size computed '
+            'from a torn border');
+    expect(r.trace, contains('final=${w.frame}'));
+    await expectFrameStays(r, w, leftHalf, clock);
+  });
+
+  test('a border measurement that never reads the same twice writes nothing',
+      () async {
+    // Three tries, each torn (two outer reads apiece, so six tears): the
+    // correction pass fails as unreadable rather than write from a border it
+    // could not measure. A fourth try would find the resizing over and write.
+    const a = PxRect(93, 100, 1407, 1107);
+    const b = PxRect(93, 100, 1507, 1207);
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..minOuterWidth = 1214
+      ..tears.addAll([a, b, a, b, a, b]);
+    final r = await place(w, leftHalf, FakeClock());
+    expect(r.outcome, PlacementOutcome.failed);
+    expect(w.writes, hasLength(1), reason: 'pass 1 wrote; the correction did not');
   });
 
   test('a write that lands late is waited for, not mistaken for settled',

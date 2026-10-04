@@ -180,6 +180,12 @@ class FakeWindow implements Win32Placer {
   /// After this many `extendedFrame` reads, the window no longer exists.
   int? goneAfterReads;
 
+  /// The window's own resizes, to these outer rects in order: once a write
+  /// has been made, each `windowRect` read is followed at once by the next
+  /// one, so a border measured across it (outer rect before, frame after) is
+  /// torn. Pass 1 measures before any write, so the correction is first hit.
+  final List<PxRect> tears = [];
+
   final List<PxRect> writes = [];
   int touches = 0;
   int beeps = 0;
@@ -214,7 +220,12 @@ class FakeWindow implements Win32Placer {
   }
 
   @override
-  PxRect? windowRect(int hwnd) => exists ? outer : null;
+  PxRect? windowRect(int hwnd) {
+    if (!exists) return null;
+    final read = outer;
+    if (writes.isNotEmpty && tears.isNotEmpty) outer = tears.removeAt(0);
+    return read;
+  }
 
   @override
   PxRect? extendedFrame(int hwnd) {

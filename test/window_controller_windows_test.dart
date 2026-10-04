@@ -170,6 +170,30 @@ void main() {
       expect(window.touches, 0);
     });
 
+    test('a handle that names another window by the time applyFrame runs is '
+        'not placed: the captured window closed and Windows reused its handle',
+        () async {
+      for (final (label, successor) in [
+        ('another process', windowFacts(0x10, pid: 9)),
+        ('the same process, another class',
+            windowFacts(0x10, pid: 7, className: 'NotepadPopup')),
+      ]) {
+        final desktop = FakeDesktop(ownPid: 1)
+          ..windows.add(windowFacts(0x10, pid: 7))
+          ..foreground = 0x10;
+        final window = FakeWindow(frame: const PxRect(0, 0, 800, 600));
+        final c = wc(desktop: desktop, placer: window);
+        expect(await c.captureFrontmost(), isNotNull, reason: label);
+        desktop.windows
+          ..clear()
+          ..add(successor);
+        expect(await c.applyFrame(const WinRect(0, 0, 960, 1040)), isFalse,
+            reason: label);
+        expect(window.writes, isEmpty, reason: label);
+        expect(window.touches, 0, reason: label);
+      }
+    });
+
     test('applyFrame with nothing captured is false and touches nothing',
         () async {
       final window = FakeWindow(frame: const PxRect(0, 0, 800, 600));

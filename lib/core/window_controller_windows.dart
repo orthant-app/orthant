@@ -61,8 +61,11 @@ class WindowsWindowController implements WindowController {
 
   /// The capture slot: the window the next [applyFrame] moves. A handle, so it
   /// stays here, private to this backend; the seam sees only the
-  /// [CapturedWindow] built from it (Windows design §5.1).
-  int? _captured;
+  /// [CapturedWindow] built from it (Windows design §5.1). The owning process
+  /// and class are kept beside it because Windows reuses handles: if the
+  /// window closes before [applyFrame], the same number can name a stranger's
+  /// window, which must fail rather than move.
+  ({int hwnd, int pid, String className})? _captured;
 
   static const MethodChannel _channel = MethodChannel(kOrthantChannel);
 
@@ -127,7 +130,8 @@ class WindowsWindowController implements WindowController {
             frame.width.toDouble(), frame.height.toDouble()),
       );
       // Last, so a throw anywhere above leaves nothing captured.
-      _captured = window.hwnd;
+      _captured =
+          (hwnd: window.hwnd, pid: window.pid, className: window.className);
       return captured;
     } catch (e) {
       // A boundary: whatever Win32 did, a failed capture is "nothing to
@@ -139,10 +143,17 @@ class WindowsWindowController implements WindowController {
 
   @override
   Future<bool> applyFrame(WinRect target) async {
-    final hwnd = _captured;
-    if (hwnd == null) return false;
+    final captured = _captured;
+    if (captured == null) return false;
+    final hwnd = captured.hwnd;
     final started = _clock.elapsedMs;
     try {
+      final now = _desktop.facts(hwnd);
+      if (now.pid != captured.pid || now.className != captured.className) {
+        _log('place: outcome=failed ms=0 why=window-changed '
+            '(pid ${now.pid}, class ${now.className})');
+        return false;
+      }
       final result =
           await placeWindow(_placer, hwnd, pxRectFor(target), clock: _clock);
       _log('place: outcome=${result.outcome.name} '

@@ -80,6 +80,8 @@ bool frameMatches(PxRect landed, PxRect want) =>
 ///    restore: a maximized window's invisible border is not a restored one's.
 /// 3. A pass: measure the border now, write the target grown by it with an
 ///    asynchronous `SetWindowPos`, and poll DWM's frame until it is stable.
+///    A border that cannot be measured means no write at all: a correction
+///    pass that could not measure is not placed, whatever the frame is now.
 /// 4. If the frame does not match, one correction pass with a re-measured
 ///    border. A window crossing to a monitor of another scale resizes itself
 ///    after the first write (`WM_DPICHANGED`), with a different border.
@@ -214,6 +216,15 @@ Future<PlacementResult> placeWindow(
     trace.write(' correction=denied');
     return elevated();
   }
+  if (second.unmeasured) {
+    // The correction wrote nothing, so whatever the window's frame is now is
+    // its own doing: after a crossing its own resize would pass for this
+    // pass's movement, and without one pass 1's response would. An unmeasured
+    // pass 1 is different: it wrote nothing either, and the correction is a
+    // genuine retry.
+    return done(PlacementOutcome.failed,
+        'correction=unreadable final=none why=frame-unreadable');
+  }
   final landed = second.landed ?? placer.extendedFrame(hwnd);
   // Origin is enough only from a window that moved, macOS's rule for a target
   // at its own minimum size; a whole-frame match is enough from any window.
@@ -265,13 +276,19 @@ Future<_Settle> _awaitChange(Win32Placer placer, int hwnd, PxRect from,
 }
 
 class _Pass {
-  const _Pass({this.landed, this.denied = false, this.error});
+  const _Pass(
+      {this.landed, this.denied = false, this.error, this.unmeasured = false});
 
   /// The frame the pass settled on, or the last one it read; null if DWM
-  /// answered none of its reads, or not the last one.
+  /// answered none of its reads, or not the last one, and null when the pass
+  /// could not measure the border, in which case it wrote nothing.
   final PxRect? landed;
   final bool denied;
   final int? error;
+
+  /// Nothing was written, because the border could not be measured: a read
+  /// failed, or no outer rect and frame agreed in [_measure]'s three tries.
+  final bool unmeasured;
 }
 
 /// [hwnd]'s outer rect and DWM frame as one consistent pair, or null if a read
@@ -299,7 +316,7 @@ Future<_Pass> _pass(Win32Placer placer, int hwnd, PxRect target,
     PxRect before, PlacementClock clock, PlacementTiming timing,
     {required bool originSettles}) async {
   final measured = _measure(placer, hwnd);
-  if (measured == null) return const _Pass();
+  if (measured == null) return const _Pass(unmeasured: true);
   final (:outer, :inner) = measured;
   // The invisible border, per edge, as it is right now: it differs between a
   // maximized and a restored window and again across a DPI boundary (spec

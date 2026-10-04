@@ -159,27 +159,35 @@ void main() {
     await expectFrameStays(r, w, target, clock);
   });
 
-  test('after a crossing, a resize in two steps is waited out to the second',
-      () async {
-    // The app resizes once, holds that frame for two reads, then resizes
-    // again. The wait's third equal read carries it to the second step. A
-    // wait that ended on the first would have the correction's border
-    // measurement straddle the second, which _measure now re-reads too, so
-    // this pins the end state rather than the third read itself.
-    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
-      ..dpiResize = 1.5
-      ..dpiBorder = const Border(9, 0, 9, 9)
-      ..dpiResizeDelayReads = 4
-      ..dpiSecondStepReads = 2;
-    final clock = FakeClock();
-    final r = await place(w, leftHalf, clock);
-    expect(r.outcome, PlacementOutcome.placed);
-    expect(r.trace, contains('pass1=hit'));
-    expect(r.trace, contains('dpiwait=resized'));
-    expect(r.trace, contains('final=$leftHalf'));
-    expect(w.frame, leftHalf);
-    await expectFrameStays(r, w, leftHalf, clock);
-  });
+  // The app resizes once, holds that frame for k reads, then resizes again.
+  // - k = 2: the wait's three equal reads carry it to the second step, and
+  //   the correction starts from there. This case pins only the end state: a
+  //   wait that ended after two reads would have the correction's border
+  //   measurement straddle the second step, which _measure re-reads.
+  // - k = 3: the wait ends on the first step, and the second lands on the
+  //   correction's border measurement, which _measure re-reads. This is the
+  //   case that pins the wait's third equal read: a wait that ended after two
+  //   would let the second step land after the correction's write, where it
+  //   passes for the correction's own movement, placed at 1.5 times the
+  //   target.
+  for (final k in [2, 3]) {
+    test('after a crossing, a resize in two steps still lands on the target '
+        '(first step held for $k reads)', () async {
+      final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+        ..dpiResize = 1.5
+        ..dpiBorder = const Border(9, 0, 9, 9)
+        ..dpiResizeDelayReads = 4
+        ..dpiSecondStepReads = k;
+      final clock = FakeClock();
+      final r = await place(w, leftHalf, clock);
+      expect(r.outcome, PlacementOutcome.placed);
+      expect(r.trace, contains('pass1=hit'));
+      expect(r.trace, contains('dpiwait=resized'));
+      expect(r.trace, contains('final=$leftHalf'));
+      expect(w.frame, leftHalf);
+      await expectFrameStays(r, w, leftHalf, clock);
+    });
+  }
 
   test('a window that crosses but keeps its frame is placed after a bounded '
       'wait', () async {
@@ -345,13 +353,39 @@ void main() {
     // Three tries, each torn (two outer reads apiece, so six tears): the
     // correction pass fails as unreadable rather than write from a border it
     // could not measure. A fourth try would find the resizing over and write.
-    const a = PxRect(93, 100, 1407, 1107);
-    const b = PxRect(93, 100, 1507, 1207);
+    // The tears keep the target's origin, so the frame they leave would pass
+    // the origin rule: the correction wrote nothing, so it is not placed.
+    const a = PxRect(-7, 0, 1307, 1147);
+    const b = PxRect(-7, 0, 1407, 1247);
     final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
       ..minOuterWidth = 1214
       ..tears.addAll([a, b, a, b, a, b]);
     final r = await place(w, leftHalf, FakeClock());
     expect(r.outcome, PlacementOutcome.failed);
+    expect(r.trace,
+        contains('correction=unreadable final=none why=frame-unreadable'));
+    expect(w.writes, hasLength(1), reason: 'pass 1 wrote; the correction did not');
+  });
+
+  test('after a crossing, a correction that cannot measure the border is not '
+      'placed', () async {
+    // Notepad-shaped: pass 1 hits, the window's own resize follows, and then
+    // every try at the correction's border measurement is torn. The tears keep
+    // the window's origin within tolerance of the target, and they differ
+    // from the frame the wait settled on, so they would pass for the
+    // correction's own movement.
+    const a = PxRect(-7, 0, 1500, 1600);
+    const b = PxRect(-7, 0, 1600, 1700);
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..dpiResize = 1.5
+      ..dpiBorder = const Border(9, 0, 9, 9)
+      ..dpiResizeDelayReads = 4
+      ..tears.addAll([a, b, a, b, a, b]);
+    final r = await place(w, leftHalf, FakeClock());
+    expect(r.outcome, PlacementOutcome.failed);
+    expect(r.trace, contains('dpiwait=resized'));
+    expect(r.trace,
+        contains('correction=unreadable final=none why=frame-unreadable'));
     expect(w.writes, hasLength(1), reason: 'pass 1 wrote; the correction did not');
   });
 

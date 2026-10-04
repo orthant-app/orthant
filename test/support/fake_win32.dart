@@ -98,6 +98,10 @@ class NoWindows implements Win32Desktop, Win32Placer {
   @override
   int windowDpi(int hwnd) => 0;
   @override
+  int monitorDpi(PxRect rect) => 0;
+  @override
+  bool perMonitorAware(int hwnd) => false;
+  @override
   SetPosResult setWindowPosAsync(int hwnd, int x, int y, int width, int height,
           {bool touchOnly = false}) =>
       (ok: false, error: 1400); // ERROR_INVALID_WINDOW_HANDLE
@@ -167,6 +171,29 @@ class FakeWindow implements Win32Placer {
   int dpiResizeDelayReads = 0;
   int _resizeCountdown = 0;
 
+  /// Reads after the crossing write lands before the window's DPI changes: 0
+  /// is at once, as this fake has always done; more is Notepad's shape, whose
+  /// DPI changed 30 to 50 ms after its frame landed (measured on the W1 rig).
+  /// Reads of the frame and of the DPI both count, and the window's own
+  /// resize ([dpiResizeDelayReads]) counts from the change, not the landing.
+  int dpiFlipReads = 0;
+  int _flipCountdown = 0;
+
+  /// What [perMonitorAware] answers.
+  bool perMonitorDpiAware = true;
+
+  /// What [monitorDpi] answers, for any rect: the fake has one target per
+  /// test. Unset, it is [dpiAfterMove] when the fake models a crossing
+  /// ([dpiResize] set) and the window's own [dpi] otherwise.
+  int? targetMonitorDpi;
+
+  /// Writes posted after the window's own DPI resize land after this many
+  /// reads instead of [lagReads]: Notepad took 220 to 290 ms, measured on the
+  /// W1 rig, to process a write that followed its DPI relayout.
+  int? lagReadsAfterDpiResize;
+  bool _dpiResized = false;
+  int _pendingLag = 0;
+
   /// The crossing's own resize in two steps, as an app whose layout after
   /// WM_DPICHANGED takes two passes: the first step's frame is read this many
   /// times, and the next read resizes the window by [dpiResize] again.
@@ -233,9 +260,11 @@ class FakeWindow implements Win32Placer {
     final goneAfter = goneAfterReads;
     if (goneAfter != null && _reads > goneAfter) exists = false;
     if (!exists || !frameReadable) return null;
-    if (_pending != null && !hung && ++_pendingReads > lagReads) {
+    if (_pending != null && !hung && ++_pendingReads > _pendingLag) {
       _apply(_pending!);
       _pending = null;
+    } else if (_flipCountdown > 0) {
+      if (--_flipCountdown == 0) _cross();
     } else if (_resizeCountdown > 0 && --_resizeCountdown == 0) {
       _dpiResize(dpiResize!);
     }
@@ -243,7 +272,18 @@ class FakeWindow implements Win32Placer {
   }
 
   @override
-  int windowDpi(int hwnd) => exists ? dpi : 0;
+  int windowDpi(int hwnd) {
+    if (!exists) return 0;
+    if (_flipCountdown > 0 && --_flipCountdown == 0) _cross();
+    return dpi;
+  }
+
+  @override
+  int monitorDpi(PxRect rect) =>
+      targetMonitorDpi ?? (dpiResize != null ? dpiAfterMove : dpi);
+
+  @override
+  bool perMonitorAware(int hwnd) => perMonitorDpiAware;
 
   @override
   SetPosResult setWindowPosAsync(int hwnd, int x, int y, int width, int height,
@@ -261,6 +301,8 @@ class FakeWindow implements Win32Placer {
     writes.add(r);
     _pending = r;
     _pendingReads = 0;
+    final slow = lagReadsAfterDpiResize;
+    _pendingLag = _dpiResized && slow != null ? slow : lagReads;
     return (ok: true, error: 0);
   }
 
@@ -280,19 +322,29 @@ class FakeWindow implements Win32Placer {
     outer = PxRect(r.left, top, r.left + w, top + r.height);
     final hangAfter = hangAfterWrites;
     if (hangAfter != null && ++_applied >= hangAfter) hung = true;
-    final factor = dpiResize;
-    if (factor != null && !_resized) {
+    if (dpiResize != null && !_resized) {
       _resized = true;
-      dpi = dpiAfterMove;
-      if (dpiResizeDelayReads == 0) {
-        _dpiResize(factor);
+      if (dpiFlipReads == 0) {
+        _cross();
       } else {
-        _resizeCountdown = dpiResizeDelayReads;
+        _flipCountdown = dpiFlipReads;
       }
     }
   }
 
+  /// The crossing as the window sees it: its DPI changes, and its own resize
+  /// follows, at once or [dpiResizeDelayReads] frame reads later.
+  void _cross() {
+    dpi = dpiAfterMove;
+    if (dpiResizeDelayReads == 0) {
+      _dpiResize(dpiResize!);
+    } else {
+      _resizeCountdown = dpiResizeDelayReads;
+    }
+  }
+
   void _dpiResize(double factor) {
+    _dpiResized = true;
     border = dpiBorder ?? border;
     outer = PxRect(outer.left, outer.top,
         outer.left + (outer.width * factor).round(),

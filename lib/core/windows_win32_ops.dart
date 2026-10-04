@@ -14,7 +14,9 @@ import 'windows_window_ops.dart';
 /// Every call here is thread-agnostic, and none sends the target window a
 /// message, which is what keeps a hung target from hanging Orthant:
 /// `GetClassName`, `IsWindowVisible`, `IsIconic`, `IsZoomed`,
-/// `GetWindowLongPtr` and `GetWindowRect` read window-manager state;
+/// `GetWindowLongPtr`, `GetWindowRect`, `GetDpiForWindow` and
+/// `GetWindowDpiAwarenessContext` read window-manager state; `MonitorFromRect`
+/// and `GetDpiForMonitor` read display state and name no window;
 /// `DwmGetWindowAttribute` asks DWM; `ShowWindowAsync` and `SetWindowPos`
 /// with `SWP_ASYNCWINDOWPOS` post; `SetForegroundWindow` on another thread's
 /// window queues the activation rather than waiting for it.
@@ -127,6 +129,39 @@ class FfiWin32WindowOps implements Win32Desktop, Win32Placer {
 
   @override
   int windowDpi(int hwnd) => GetDpiForWindow(_h(hwnd));
+
+  @override
+  int monitorDpi(PxRect rect) {
+    Pointer<RECT>? r;
+    Pointer<Uint32>? x;
+    Pointer<Uint32>? y;
+    try {
+      r = calloc<RECT>();
+      x = calloc<Uint32>();
+      y = calloc<Uint32>();
+      r.ref
+        ..left = rect.left
+        ..top = rect.top
+        ..right = rect.right
+        ..bottom = rect.bottom;
+      final monitor = MonitorFromRect(r, MONITOR_DEFAULTTONEAREST);
+      if (monitor.address == 0) return 0;
+      GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, x, y);
+      return x.value;
+    } on WindowsException {
+      return 0;
+    } finally {
+      if (y != null) calloc.free(y);
+      if (x != null) calloc.free(x);
+      if (r != null) calloc.free(r);
+    }
+  }
+
+  @override
+  bool perMonitorAware(int hwnd) =>
+      GetAwarenessFromDpiAwarenessContext(
+          GetWindowDpiAwarenessContext(_h(hwnd))) ==
+      DPI_AWARENESS_PER_MONITOR_AWARE;
 
   @override
   SetPosResult setWindowPosAsync(int hwnd, int x, int y, int width, int height,

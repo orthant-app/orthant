@@ -117,10 +117,20 @@ abstract interface class Win32Placer {
   PxRect? extendedFrame(int hwnd);
 
   /// `GetDpiForWindow` of the target: its DPI now, or 0 when unknown. For a
-  /// per-monitor-aware window this changes the moment it moves onto a monitor
-  /// of another scale, when the system sends it WM_DPICHANGED, and before the
-  /// window's own handling of that message resizes it.
+  /// per-monitor-aware window this changes when it moves onto a monitor of
+  /// another scale and the system sends it WM_DPICHANGED: not the moment its
+  /// frame lands (Notepad's trailed by 30 to 50 ms, measured on the W1 rig),
+  /// and before the window's own handling of that message resizes it.
   int windowDpi(int hwnd);
+
+  /// The effective DPI of the monitor that holds most of [rect], or the
+  /// nearest one (`MonitorFromRect` with `MONITOR_DEFAULTTONEAREST`, then
+  /// `GetDpiForMonitor` with `MDT_EFFECTIVE_DPI`), or 0 when unknown.
+  int monitorDpi(PxRect rect);
+
+  /// Whether [hwnd] is per-monitor DPI aware, v1 or v2: the only kind the
+  /// system sends WM_DPICHANGED, and whose DPI a crossing changes.
+  bool perMonitorAware(int hwnd);
 
   /// `SetWindowPos` with `SWP_NOACTIVATE | SWP_NOZORDER | SWP_ASYNCWINDOWPOS`.
   /// With [touchOnly], also `SWP_NOMOVE | SWP_NOSIZE`: a write that changes

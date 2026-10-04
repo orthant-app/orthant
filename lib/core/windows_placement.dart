@@ -4,20 +4,28 @@ import 'windows_window_ops.dart';
 /// How long placement waits, at most, and how often it looks. Each poll is a
 /// non-blocking read, so the worst case for a placement is the restore
 /// deadline plus two pass deadlines, about 1.1 s, against a target that never
-/// answers; a placement that crosses a DPI boundary can add [dpiSettleMs]
-/// (about 1.4 s in all).
+/// answers. A placement that crosses a DPI boundary can add two waits of
+/// [dpiSettleMs] (for the window's DPI to change, then for its own resize)
+/// and runs its correction to [crossingPassDeadlineMs]: about 2.2 s in all.
 class PlacementTiming {
   const PlacementTiming({
     this.pollMs = 15,
     this.restoreDeadlineMs = 500,
     this.passDeadlineMs = 300,
     this.dpiSettleMs = 300,
+    this.crossingPassDeadlineMs = 800,
   });
 
   final int pollMs;
   final int restoreDeadlineMs;
   final int passDeadlineMs;
   final int dpiSettleMs;
+
+  /// The correction pass's deadline after an observed DPI crossing. Measured
+  /// on the W1 rig: Notepad took 220 to 290 ms to process a write posted
+  /// after its own DPI relayout, which with the two reads that settle it does
+  /// not fit in [passDeadlineMs]. Every other pass keeps [passDeadlineMs].
+  final int crossingPassDeadlineMs;
 }
 
 enum PlacementOutcome {
@@ -85,11 +93,18 @@ bool frameMatches(PxRect landed, PxRect want) =>
 /// 4. If the frame does not match, one correction pass with a re-measured
 ///    border. A window crossing to a monitor of another scale resizes itself
 ///    after the first write (`WM_DPICHANGED`), with a different border.
-/// 4a. A window that crossed onto a monitor of another scale (its DPI changed)
-///    is given a bounded wait for its own `WM_DPICHANGED` resize, whether
-///    pass 1 matched or not, and the correction starts from the frame it
-///    settled on. Only a window that matched on pass 1 and kept that frame
-///    through the wait is placed without a correction.
+/// 4a. A crossing onto a monitor of another scale is predicted before pass 1,
+///    from the target's monitor DPI and the window's per-monitor awareness,
+///    and observed after it, when the window's DPI changes. The change can
+///    trail the frame landing by tens of milliseconds, so a predicted crossing
+///    whose pass 1 moved the window waits, bounded, for it. A window that did
+///    not move cannot have crossed, so a hung one waits for nothing.
+/// 4b. A window that crossed (its DPI changed) is given a bounded wait for
+///    its own `WM_DPICHANGED` resize, whether pass 1 matched or not, and the
+///    correction starts from the frame it settled on, with the longer
+///    [PlacementTiming.crossingPassDeadlineMs]. Only a window that matched on
+///    pass 1 and kept that frame through the wait is placed without a
+///    correction.
 /// 5. Placed if the final frame matches, or if the window demonstrably moved
 ///    and the final origin is where it was asked to be. Without a crossing,
 ///    moved means its frame changed at any point during the placement. After
@@ -151,9 +166,16 @@ Future<PlacementResult> placeWindow(
     return done(PlacementOutcome.failed, 'why=frame-unreadable');
   }
   final dpiBefore = placer.windowDpi(hwnd);
+  // A crossing predicted from the target: a per-monitor-aware window bound
+  // for a monitor of another DPI will be sent WM_DPICHANGED.
+  final targetDpi = placer.monitorDpi(target);
+  final expectCrossing = dpiBefore != 0 &&
+      targetDpi != 0 &&
+      targetDpi != dpiBefore &&
+      placer.perMonitorAware(hwnd);
 
   final first = await _pass(placer, hwnd, target, before, clock, timing,
-      originSettles: false);
+      deadlineMs: timing.passDeadlineMs, originSettles: false);
   if (first.denied) {
     trace.write(' pass1=denied');
     return elevated();
@@ -162,13 +184,34 @@ Future<PlacementResult> placeWindow(
     return done(PlacementOutcome.failed, 'pass1=error${first.error}');
   }
   final firstLanded = first.landed;
+  // Whether the window has shown it is processing our writes at all. Only
+  // then can an unchanged frame at the target's origin mean "pressed against
+  // its own minimum size" rather than "never moved", and only a window that
+  // moved can have crossed onto another monitor.
+  final responded = firstLanded != null && firstLanded != before;
   // A per-monitor-aware window that moved onto a monitor of another scale has
-  // been sent WM_DPICHANGED and resizes itself in its own handler, and some
-  // apps (Notepad, measured on the W1 rig) do that tens of milliseconds after
-  // the move lands: a frame that matched a moment ago is not necessarily the
-  // frame that stays. The window's DPI changes at the crossing, before that
-  // resize, which is what makes the crossing visible here.
-  final dpiAfter = placer.windowDpi(hwnd);
+  // been sent WM_DPICHANGED and resizes itself in its own handler: a frame
+  // that matched a moment ago is not necessarily the frame that stays. Its
+  // DPI changes before that resize, which is what makes the crossing visible
+  // here, but not when its frame lands: Notepad's frame landed with its DPI
+  // unchanged, the DPI changed 30 to 50 ms later, and the resize followed
+  // (measured on the W1 rig). Pass 1 can settle in that gap, so when a
+  // crossing was predicted and pass 1 moved the window, placement waits,
+  // bounded, for the change; a window that did not move waits for nothing.
+  var dpiAfter = placer.windowDpi(hwnd);
+  if (expectCrossing && responded && dpiAfter == dpiBefore) {
+    final started = clock.elapsedMs;
+    while (dpiAfter == dpiBefore &&
+        clock.elapsedMs - started < timing.dpiSettleMs) {
+      await clock.sleep(timing.pollMs);
+      dpiAfter = placer.windowDpi(hwnd);
+    }
+    trace.write(dpiAfter == dpiBefore
+        ? ' dpiflip=timeout'
+        : dpiAfter == 0
+            ? ' dpiflip=unreadable'
+            : ' dpiflip=${clock.elapsedMs - started}ms');
+  }
   final crossed = dpiBefore != 0 && dpiAfter != 0 && dpiAfter != dpiBefore;
   if (crossed) trace.write(' dpi=$dpiBefore->$dpiAfter');
   // Pass 1 is a hit only on the whole frame: a size miss is what the
@@ -203,14 +246,14 @@ Future<PlacementResult> placeWindow(
     }
   }
 
-  // Whether the window has shown it is processing our writes at all. Only
-  // then can an unchanged frame at the target's origin mean "pressed against
-  // its own minimum size" rather than "never moved". After a crossing, the
-  // starting frame is the one the window settled on after it, and an origin
-  // within tolerance of the target there is not this pass's write landing, so
-  // the pass waits for it.
-  final responded = firstLanded != null && firstLanded != before;
+  // Origin settles the correction only from a window that [responded]. After
+  // a crossing, the starting frame is the one the window settled on after
+  // it, and an origin within tolerance of the target there is not this
+  // pass's write landing, so the pass waits for it, and for longer: a window
+  // still busy with its DPI relayout can take a while to get to the write.
   final second = await _pass(placer, hwnd, target, correctFrom, clock, timing,
+      deadlineMs:
+          crossed ? timing.crossingPassDeadlineMs : timing.passDeadlineMs,
       originSettles: responded && !crossed);
   if (second.denied) {
     trace.write(' correction=denied');
@@ -315,7 +358,7 @@ class _Pass {
 
 Future<_Pass> _pass(Win32Placer placer, int hwnd, PxRect target,
     PxRect before, PlacementClock clock, PlacementTiming timing,
-    {required bool originSettles}) async {
+    {required int deadlineMs, required bool originSettles}) async {
   final measured = _measure(placer, hwnd);
   if (measured == null) return const _Pass(unmeasured: true);
   final (:outer, :inner) = measured;
@@ -346,7 +389,7 @@ Future<_Pass> _pass(Win32Placer placer, int hwnd, PxRect target,
   final started = clock.elapsedMs;
   PxRect? previous;
   PxRect? last;
-  while (clock.elapsedMs - started < timing.passDeadlineMs) {
+  while (clock.elapsedMs - started < deadlineMs) {
     await clock.sleep(timing.pollMs);
     final now = placer.extendedFrame(hwnd);
     if (now == null) {

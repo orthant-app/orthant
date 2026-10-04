@@ -203,6 +203,93 @@ void main() {
     await expectFrameStays(r, w, leftHalf, clock);
   });
 
+  test('a crossing whose DPI changes after pass 1 has settled is waited for, '
+      'then corrected', () async {
+    // Notepad's shape, measured on the W1 rig: the frame lands on the target
+    // with the DPI unchanged, the DPI changes 30 to 50 ms later, and the
+    // window's own 1.5x resize follows that. Pass 1 settles on two reads
+    // before the change, so its DPI alone cannot see the crossing; the
+    // target's monitor predicts it.
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..dpiResize = 1.5
+      ..dpiBorder = const Border(9, 0, 9, 9)
+      ..dpiFlipReads = 3
+      ..dpiResizeDelayReads = 3;
+    final clock = FakeClock();
+    final r = await place(w, leftHalf, clock);
+    expect(r.outcome, PlacementOutcome.placed);
+    await expectFrameStays(r, w, leftHalf, clock);
+    expect(r.trace, matches(RegExp(r'dpiflip=\d+ms')));
+    expect(r.trace, contains('dpi=96->144'));
+    expect(r.trace, contains('dpiwait=resized'));
+    expect(r.trace, contains('final=$leftHalf'));
+  });
+
+  test('after a crossing, the correction has time for a slow write', () async {
+    // Notepad took 220 to 290 ms, measured, to process a write posted after
+    // its own DPI relayout; real polls are coarser than 15 ms. Here the
+    // correction's write lands on the 21st read after it is posted (315 ms
+    // at the default poll), past passDeadlineMs and well inside the
+    // crossing's own deadline.
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..dpiResize = 1.5
+      ..dpiBorder = const Border(9, 0, 9, 9)
+      ..dpiResizeDelayReads = 4
+      ..lagReadsAfterDpiResize = 20;
+    final clock = FakeClock();
+    final r = await place(w, leftHalf, clock);
+    expect(r.outcome, PlacementOutcome.placed);
+    expect(r.trace, contains('correction=hit'));
+    expect(r.trace, contains('final=$leftHalf'));
+    await expectFrameStays(r, w, leftHalf, clock);
+  });
+
+  test('a window that is not per-monitor aware is not waited on for a DPI '
+      'change', () async {
+    // Windows scales such a window's bitmap rather than telling it, so its
+    // DPI never changes and there is no crossing to wait for.
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..perMonitorDpiAware = false
+      ..targetMonitorDpi = 144;
+    final clock = FakeClock();
+    final r = await place(w, leftHalf, clock);
+    expect(r.outcome, PlacementOutcome.placed);
+    expect(r.trace, isNot(contains('dpiflip=')));
+    expect(r.trace, isNot(contains(' dpi=')));
+    expect(clock.elapsedMs, lessThanOrEqualTo(2 * timing.pollMs),
+        reason: 'the bound of a same-display placement');
+  });
+
+  test('a hung window gets no wait for a DPI change, even with a crossing '
+      'predicted', () async {
+    // A window that did not move cannot have crossed.
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..hung = true
+      ..targetMonitorDpi = 144;
+    final clock = FakeClock();
+    final r = await place(w, leftHalf, clock);
+    expect(r.outcome, PlacementOutcome.failed);
+    expect(r.trace, isNot(contains('dpiflip=')));
+    expect(clock.elapsedMs,
+        lessThanOrEqualTo(2 * timing.passDeadlineMs + 2 * timing.pollMs));
+  });
+
+  test('a predicted crossing that never comes costs one bounded wait, and is '
+      'placed as before', () async {
+    // The prediction is wrong (the window's DPI never changes): the wait
+    // times out, and placement goes on as for a window that did not cross.
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..targetMonitorDpi = 144;
+    final clock = FakeClock();
+    final r = await place(w, leftHalf, clock);
+    expect(r.outcome, PlacementOutcome.placed);
+    expect(r.trace, contains('dpiflip=timeout'));
+    expect(r.trace, isNot(contains(' dpi=')));
+    expect(clock.elapsedMs,
+        lessThanOrEqualTo(2 * timing.pollMs + timing.dpiSettleMs));
+    await expectFrameStays(r, w, leftHalf, clock);
+  });
+
   test('after a crossing, the correction waits for its own write, not an '
       'origin within tolerance', () async {
     // The crossing resizes the window to [2,0,1202,1300]: its origin is within

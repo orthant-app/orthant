@@ -53,12 +53,13 @@ class _FakeWc implements WindowController {
   Future<CapturedWindow?> captureFrontmost() async => placementSucceeds
       ? const CapturedWindow('TextEdit', WinRect(0, 0, 100, 100))
       : null;
+  /// The displays the platform reports; one 1440x900 display unless a test
+  /// needs more.
+  List<Display> displays = const [Display(WinRect(0, 0, 1440, 900), 1)];
   @override
-  Future<WinRect> activeScreenFrame() async => const WinRect(0, 0, 1440, 900);
+  Future<Display?> activeScreenFrame() async => displays.first;
   @override
-  Future<List<WinRect>> screenFrames() async => const [
-    WinRect(0, 0, 1440, 900),
-  ];
+  Future<List<Display>> screenFrames() async => displays;
   /// The rect the last placement asked for — null if none landed.
   WinRect? placedRect;
   @override

@@ -67,14 +67,14 @@ class WindowsWindowController implements WindowController {
   }
 
   // W1: capture and placement over FFI. A null capture makes applyRegion
-  // return before it ever reads a screen frame, so the zero rect below is
-  // never compared against anything (the zero-rect lesson in CLAUDE.md).
+  // return before it ever reads a screen frame, and a display the platform
+  // cannot name is null, never a zero rect (the zero-rect lesson in CLAUDE.md).
   @override
   Future<CapturedWindow?> captureFrontmost() async => null;
   @override
-  Future<WinRect> activeScreenFrame() async => const WinRect(0, 0, 0, 0);
+  Future<Display?> activeScreenFrame() async => null;
   @override
-  Future<List<WinRect>> screenFrames() async => const [];
+  Future<List<Display>> screenFrames() async => const [];
   @override
   Future<bool> applyFrame(WinRect target) async => false;
 

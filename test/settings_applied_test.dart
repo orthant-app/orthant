@@ -15,10 +15,11 @@ class _RecordingWc implements WindowController {
   Future<CapturedWindow?> captureFrontmost() async =>
       const CapturedWindow('Safari', WinRect(100, 100, 400, 300));
   @override
-  Future<List<WinRect>> screenFrames() async =>
-      const [WinRect(0, 0, 1000, 1000)];
+  Future<List<Display>> screenFrames() async =>
+      const [Display(WinRect(0, 0, 1000, 1000), 1)];
   @override
-  Future<WinRect> activeScreenFrame() async => const WinRect(0, 0, 1000, 1000);
+  Future<Display?> activeScreenFrame() async =>
+      const Display(WinRect(0, 0, 1000, 1000), 1);
   @override
   Future<bool> applyFrame(WinRect target) async {
     applied = target;

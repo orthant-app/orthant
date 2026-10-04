@@ -66,8 +66,7 @@ cask "orthant" do
   version "$version"
   sha256 "$sha256"
 
-  url "https://github.com/orthant-app/orthant/releases/download/v#{version}/Orthant-#{version}.dmg",
-      verified: "github.com/orthant-app/orthant/"
+  url "https://github.com/orthant-app/orthant/releases/download/v#{version}/Orthant-#{version}.dmg"
   name "Orthant"
   desc "Grid-based window manager driven by shortcuts or a drag-on-a-grid overlay"
   homepage "https://github.com/orthant-app/orthant"

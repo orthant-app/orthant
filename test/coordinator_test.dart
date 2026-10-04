@@ -53,12 +53,13 @@ class _FakeWc implements WindowController {
   Future<CapturedWindow?> captureFrontmost() async => placementSucceeds
       ? const CapturedWindow('TextEdit', WinRect(0, 0, 100, 100))
       : null;
+  /// The displays the platform reports; one 1440x900 display unless a test
+  /// needs more.
+  List<Display> displays = const [Display(WinRect(0, 0, 1440, 900), 1)];
   @override
-  Future<WinRect> activeScreenFrame() async => const WinRect(0, 0, 1440, 900);
+  Future<Display?> activeScreenFrame() async => displays.first;
   @override
-  Future<List<WinRect>> screenFrames() async => const [
-    WinRect(0, 0, 1440, 900),
-  ];
+  Future<List<Display>> screenFrames() async => displays;
   /// The rect the last placement asked for — null if none landed.
   WinRect? placedRect;
   @override
@@ -148,6 +149,7 @@ void main() {
 
   ({OrthantCoordinator app, _FakeWc wc, _FakeRegistrar keys}) build({
     bool granted = false,
+    bool debugPlacementItems = false,
   }) {
     final wc = _FakeWc()..permission = granted;
     final keys = _FakeRegistrar();
@@ -158,6 +160,7 @@ void main() {
       // Long enough that the poll never fires during a test; the transitions
       // are driven by calling refresh directly.
       pollPeriod: const Duration(hours: 1),
+      debugPlacementItems: debugPlacementItems,
     );
     built.add(app);
     return (app: app, wc: wc, keys: keys);
@@ -1166,6 +1169,53 @@ void main() {
 
       expect(t.app.pendingRegion, isNull);
       expect(t.app.screen, isNot(AppScreen.settings));
+    });
+  });
+
+  group('W1 debug placement (Windows debug builds only)', () {
+    test('absent by default, so the macOS menu is unchanged', () async {
+      final t = build(granted: true);
+      await t.app.start();
+      expect(t.app.trayMenu.where((e) => e.key.startsWith('debug')), isEmpty);
+    });
+
+    test('present when asked for, after Check for Updates and before Quit',
+        () async {
+      final t = build(granted: true, debugPlacementItems: true);
+      await t.app.start();
+      final keys = t.app.trayMenu.map((e) => e.key).toList();
+      expect(keys.indexOf('debugSnapLeft'), greaterThan(keys.indexOf('updates')));
+      expect(keys.indexOf('debugSnapNext'), keys.indexOf('debugSnapLeft') + 1);
+      expect(keys.last, 'quit');
+      expect(t.app.trayMenu.where((e) => !e.isSeparator && e.disabled), isEmpty,
+          reason: 'a fully working app has nothing greyed out');
+    });
+
+    test('Snap Left Half is the left-half shortcut', () async {
+      final t = build(granted: true, debugPlacementItems: true);
+      await t.app.start();
+      await t.app.debugSnapLeft();
+      expect(t.wc.placedRect, const WinRect(0, 0, 720, 900));
+    });
+
+    test('the next-display item places on the following display, with its '
+        'scale', () async {
+      SharedPreferences.setMockInitialValues(
+          {'orthant.settings.v1': '{"gaps":true,"gapSize":10}'});
+      final t = build(granted: true, debugPlacementItems: true);
+      t.wc.displays = const [
+        Display(WinRect(0, 0, 1440, 900), 1),
+        Display(WinRect(1440, 0, 2880, 1800), 2),
+      ];
+      await t.app.start();
+      await t.app.debugSnapLeftOnNextDisplay();
+      // The fake captures a window at (0,0,100,100), on the first display; a
+      // 10-point gap on the second, scale-2 display is 20 pixels.
+      expect(
+        t.wc.placedRect,
+        gridBlock(const WinRect(1440, 0, 2880, 1800),
+            cols: 2, rows: 2, c0: 0, c1: 0, r0: 0, r1: 1, gap: 20),
+      );
     });
   });
 }

@@ -22,9 +22,9 @@ class _FakeWc implements WindowController {
   @override
   Future<CapturedWindow?> captureFrontmost() async => null;
   @override
-  Future<WinRect> activeScreenFrame() async => const WinRect(0, 0, 0, 0);
+  Future<Display?> activeScreenFrame() async => null;
   @override
-  Future<List<WinRect>> screenFrames() async => const [];
+  Future<List<Display>> screenFrames() async => const [];
   @override
   Future<bool> applyFrame(WinRect target) async => false;
   @override

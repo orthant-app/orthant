@@ -7,6 +7,8 @@ import 'package:orthant/permission/permission_controller.dart';
 import 'package:orthant/shortcuts/hotkey_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'support/fake_win32.dart';
+
 /// The W0 native contract, as `windows/runner/window_channel.cpp` answers it:
 /// the config window works, every hotkey is refused, unregistering is a
 /// no-op, and anything else is NotImplemented (a null reply, which Dart
@@ -50,7 +52,9 @@ void main() {
 
   test('a first launch completes with every shortcut unavailable', () async {
     final wc = WindowsWindowController.forTest(
-        readVersion: () => (short: '1.0.3', build: '7'));
+        readVersion: () => (short: '1.0.3', build: '7'),
+        desktop: NoWindows(),
+        placer: NoWindows());
     final app = OrthantCoordinator(
       wc: wc,
       permissions: PermissionController(wc),
@@ -91,7 +95,9 @@ void main() {
       throw MissingPluginException(call.method);
     });
     final wc = WindowsWindowController.forTest(
-        readVersion: () => (short: '1.0.3', build: '7'));
+        readVersion: () => (short: '1.0.3', build: '7'),
+        desktop: NoWindows(),
+        placer: NoWindows());
     final app = OrthantCoordinator(
       wc: wc,
       permissions: PermissionController(wc),

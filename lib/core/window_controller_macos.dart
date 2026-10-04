@@ -48,10 +48,14 @@ class MacosWindowController implements WindowController {
     );
   }
 
+  // macOS's placement space is points, so every display's scale is 1.0 by
+  // definition (Windows design §5.2): a gap the user picked in points is
+  // already in the units AX places in. Swift reports no scale and needs none.
   @override
-  Future<WinRect> activeScreenFrame() async {
-    final res = await _channel.invokeMapMethod<String, dynamic>(kActiveScreenFrame);
-    return _rectFromMap(res!);
+  Future<Display?> activeScreenFrame() async {
+    final res =
+        await _channel.invokeMapMethod<String, dynamic>(kActiveScreenFrame);
+    return res == null ? null : Display(_rectFromMap(res), 1.0);
   }
 
   @override
@@ -65,12 +69,13 @@ class MacosWindowController implements WindowController {
       false;
 
   @override
-  Future<List<WinRect>> screenFrames() async {
+  Future<List<Display>> screenFrames() async {
     final res = await _channel.invokeListMethod<dynamic>(kScreenFrames);
     if (res == null) return const [];
-    return res
-        .map((e) => _rectFromMap((e as Map).cast<String, dynamic>()))
-        .toList();
+    return [
+      for (final e in res)
+        Display(_rectFromMap((e as Map).cast<String, dynamic>()), 1.0),
+    ];
   }
 
   @override

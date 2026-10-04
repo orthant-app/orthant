@@ -156,4 +156,26 @@ void main() {
       expect(methods, [kOpenLoginItemsSettings]);
     });
   });
+
+  test('every macOS display reports scale 1.0, because AX places in points',
+      () async {
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      expect(call.method, kScreenFrames);
+      return [
+        {'x': 0, 'y': 0, 'w': 1512, 'h': 945},
+        {'x': 1512, 'y': 0, 'w': 2560, 'h': 1440},
+      ];
+    });
+    final displays = await const MacosWindowController().screenFrames();
+    expect(displays.map((d) => d.frame).toList(), [
+      const WinRect(0, 0, 1512, 945),
+      const WinRect(1512, 0, 2560, 1440),
+    ]);
+    expect(displays.map((d) => d.scale), everyElement(1.0));
+  });
+
+  test('a missing active display is null, not a zero rect', () async {
+    messenger.setMockMethodCallHandler(channel, (call) async => null);
+    expect(await const MacosWindowController().activeScreenFrame(), isNull);
+  });
 }

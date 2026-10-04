@@ -1,30 +1,60 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/channel.dart';
 import 'package:orthant/core/geometry.dart';
 import 'package:orthant/core/window_controller.dart';
 import 'package:orthant/core/window_controller_windows.dart';
+import 'package:orthant/core/windows_window_ops.dart';
+
+import 'support/fake_win32.dart';
+
+class _ThrowingDesktop extends FakeDesktop {
+  @override
+  int foregroundWindow() => throw StateError('user32 went away');
+}
+
+/// Throws only once capture has found its window: at the process name.
+class _NameThrowingDesktop extends FakeDesktop {
+  _NameThrowingDesktop() : super(ownPid: 1);
+
+  @override
+  String? processName(int pid) => throw StateError('OpenProcess went away');
+}
+
+// Built through functions so equality is tested, not const identity.
+Display display(double x, double y, double w, double h, double s) =>
+    Display(WinRect(x, y, w, h), s);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const channel = MethodChannel(kOrthantChannel);
+  final messenger =
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   final calls = <String>[];
+  Object? Function(MethodCall call) answer = (_) => null;
 
   setUp(() {
     calls.clear();
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (call) async {
+    answer = (_) => null;
+    messenger.setMockMethodCallHandler(channel, (call) async {
       calls.add(call.method);
-      return null;
+      return answer(call);
     });
   });
-  tearDown(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, null);
-  });
+  tearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
-  WindowsWindowController wc() => WindowsWindowController.forTest(
-      readVersion: () => (short: '1.0.3', build: '7'));
+  WindowsWindowController wc({
+    Win32Desktop? desktop,
+    Win32Placer? placer,
+    PlacementClock? clock,
+  }) =>
+      WindowsWindowController.forTest(
+        readVersion: () => (short: '1.0.3', build: '7'),
+        desktop: desktop ?? NoWindows(),
+        placer: placer ?? NoWindows(),
+        clock: clock ?? FakeClock(),
+      );
 
   test('permission is always granted and the prompts are no-ops', () async {
     final c = wc();
@@ -43,16 +73,13 @@ void main() {
 
   test('the version comes from the resource reader', () async {
     expect(await wc().appVersion(), const AppVersion('1.0.3', '7'));
-    final unreadable =
-        WindowsWindowController.forTest(readVersion: () => null);
+    final unreadable = WindowsWindowController.forTest(
+        readVersion: () => null, desktop: NoWindows(), placer: NoWindows());
     expect((await unreadable.appVersion()).isKnown, isFalse);
   });
 
-  test('stubs answer safely and never reach native', () async {
+  test('the remaining stubs answer safely and never reach native', () async {
     final c = wc();
-    expect(await c.captureFrontmost(), isNull);
-    expect(await c.screenFrames(), isEmpty);
-    expect(await c.applyFrame(const WinRect(0, 0, 10, 10)), isFalse);
     await c.setOverlayGrid(cols: 2, rows: 2, gap: 0, saveHint: false);
     await c.showOverlay();
     await c.hideOverlay();
@@ -65,6 +92,218 @@ void main() {
     await c.checkForUpdates();
     expect(calls, isEmpty,
         reason: 'a stub that reaches native hits a handler that does not '
-            'exist yet and throws MissingPluginException on the launch path');
+            'exist yet and throws MissingPluginException');
+  });
+
+  group('capture and placement', () {
+    test('captures the foreground window, named, at its DWM frame, and '
+        'places that window', () async {
+      final desktop = FakeDesktop(ownPid: 1)
+        ..windows.add(windowFacts(0x10, pid: 7, frame: const PxRect(100, 100, 900, 700)))
+        ..foreground = 0x10
+        ..names[7] = 'Notepad';
+      final window = FakeWindow(frame: const PxRect(100, 100, 900, 700));
+      final c = wc(desktop: desktop, placer: window);
+
+      final captured = await c.captureFrontmost();
+      expect(captured!.appName, 'Notepad');
+      expect(captured.frame, const WinRect(100, 100, 800, 600));
+      expect(await c.applyFrame(const WinRect(0, 0, 960, 1040)), isTrue);
+      expect(window.lastHwnd, 0x10);
+      expect(window.frame, const PxRect(0, 0, 960, 1040));
+      expect(desktop.reactivated, isEmpty,
+          reason: 'the foreground window already has focus');
+      expect(calls, isEmpty, reason: 'capture and placement are FFI, not the channel');
+    });
+
+    test('a tray-path capture reactivates the window it found beneath',
+        () async {
+      final desktop = FakeDesktop(ownPid: 1)
+        ..windows.addAll([
+          windowFacts(0x2, pid: 1, visible: false),
+          windowFacts(0x10, pid: 7),
+        ])
+        ..foreground = 0x2;
+      final c = wc(desktop: desktop, placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)));
+      expect(await c.captureFrontmost(), isNotNull);
+      expect(desktop.reactivated, [0x10]);
+    });
+
+    test('a refused reactivation still captures, and the log says refused',
+        () async {
+      final desktop = FakeDesktop(ownPid: 1)
+        ..windows.addAll([
+          windowFacts(0x2, pid: 1, visible: false),
+          windowFacts(0x10, pid: 7),
+        ])
+        ..foreground = 0x2
+        ..foregroundRefused = true;
+      final c = wc(desktop: desktop, placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)));
+      // The result has no field for it; the debug log the harness reads does.
+      final logged = <String>[];
+      final saved = debugPrint;
+      debugPrint = (String? message, {int? wrapWidth}) => logged.add('$message');
+      try {
+        expect(await c.captureFrontmost(), isNotNull);
+      } finally {
+        debugPrint = saved;
+      }
+      expect(desktop.reactivated, [0x10]);
+      expect(logged.where((l) => l.contains('capture: branch=beneath')).single,
+          contains('reactivated=refused'));
+    });
+
+    test('an unnamed process is captured with an empty name', () async {
+      final desktop = FakeDesktop(ownPid: 1)
+        ..windows.add(windowFacts(0x10, pid: 7))
+        ..foreground = 0x10;
+      expect((await wc(desktop: desktop).captureFrontmost())!.appName, '');
+    });
+
+    test('a failed capture empties the slot, so applyFrame cannot move an '
+        'earlier window', () async {
+      final desktop = FakeDesktop(ownPid: 1)
+        ..windows.addAll([
+          windowFacts(0x10, pid: 7),
+          windowFacts(0x5, pid: 9, className: 'Progman'),
+        ])
+        ..foreground = 0x10;
+      final window = FakeWindow(frame: const PxRect(0, 0, 800, 600));
+      final c = wc(desktop: desktop, placer: window);
+      expect(await c.captureFrontmost(), isNotNull);
+      desktop.foreground = 0x5;
+      expect(await c.captureFrontmost(), isNull);
+      expect(await c.applyFrame(const WinRect(0, 0, 960, 1040)), isFalse);
+      expect(window.writes, isEmpty);
+      expect(window.touches, 0);
+    });
+
+    test('a handle that names another window by the time applyFrame runs is '
+        'not placed: the captured window closed and Windows reused its handle',
+        () async {
+      for (final (label, successor) in <(String, WindowFacts?)>[
+        ('another process', windowFacts(0x10, pid: 9)),
+        ('the same process, another class',
+            windowFacts(0x10, pid: 7, className: 'NotepadPopup')),
+        ('nothing: the window is simply gone', null),
+      ]) {
+        final desktop = FakeDesktop(ownPid: 1)
+          ..windows.add(windowFacts(0x10, pid: 7))
+          ..foreground = 0x10;
+        final window = FakeWindow(frame: const PxRect(0, 0, 800, 600));
+        final c = wc(desktop: desktop, placer: window);
+        expect(await c.captureFrontmost(), isNotNull, reason: label);
+        desktop.windows.clear();
+        if (successor != null) desktop.windows.add(successor);
+        expect(await c.applyFrame(const WinRect(0, 0, 960, 1040)), isFalse,
+            reason: label);
+        expect(window.writes, isEmpty, reason: label);
+        expect(window.touches, 0, reason: label);
+      }
+    });
+
+    test('applyFrame with nothing captured is false and touches nothing',
+        () async {
+      final window = FakeWindow(frame: const PxRect(0, 0, 800, 600));
+      expect(await wc(placer: window).applyFrame(const WinRect(0, 0, 10, 10)),
+          isFalse);
+      expect(window.touches, 0);
+    });
+
+    test('a desktop that throws is a failed capture, not a crash', () async {
+      expect(await wc(desktop: _ThrowingDesktop()).captureFrontmost(), isNull);
+    });
+
+    test('a capture that throws after finding its window leaves nothing '
+        'captured, so applyFrame moves nothing', () async {
+      final desktop = _NameThrowingDesktop()
+        ..windows.add(windowFacts(0x10, pid: 7))
+        ..foreground = 0x10;
+      final window = FakeWindow(frame: const PxRect(0, 0, 800, 600));
+      final c = wc(desktop: desktop, placer: window);
+      expect(await c.captureFrontmost(), isNull);
+      expect(await c.applyFrame(const WinRect(0, 0, 960, 1040)), isFalse);
+      expect(window.writes, isEmpty);
+      expect(window.touches, 0);
+    });
+
+    test('an elevated target is not placed, and was beeped at', () async {
+      final desktop = FakeDesktop(ownPid: 1)
+        ..windows.add(windowFacts(0x10, pid: 7))
+        ..foreground = 0x10;
+      final window = FakeWindow(frame: const PxRect(0, 0, 800, 600))
+        ..deniedTouch = true;
+      final c = wc(desktop: desktop, placer: window);
+      await c.captureFrontmost();
+      expect(await c.applyFrame(const WinRect(0, 0, 960, 1040)), isFalse);
+      expect(window.beeps, 1);
+    });
+  });
+
+  group('displays', () {
+    test('screenFrames reads the runner reply, scale included', () async {
+      answer = (call) => call.method == kScreenFrames
+          ? [
+              {'x': 0.0, 'y': 0.0, 'w': 1920.0, 'h': 1040.0, 'scale': 1.0},
+              {'x': 1920.0, 'y': 0.0, 'w': 2880.0, 'h': 1560.0, 'scale': 1.5},
+            ]
+          : null;
+      expect(await wc().screenFrames(), [
+        display(0, 0, 1920, 1040, 1),
+        display(1920, 0, 2880, 1560, 1.5),
+      ]);
+      expect(calls, [kScreenFrames]);
+    });
+
+    test('activeScreenFrame reads one display, or null when the runner names '
+        'none', () async {
+      answer = (call) =>
+          {'x': -1920.0, 'y': 0.0, 'w': 1920.0, 'h': 1040.0, 'scale': 1.25};
+      expect(await wc().activeScreenFrame(), display(-1920, 0, 1920, 1040, 1.25));
+      answer = (call) => null;
+      expect(await wc().activeScreenFrame(), isNull);
+    });
+  });
+
+  group('displayFromReply', () {
+    Map<String, Object?> valid() =>
+        {'x': 0.0, 'y': 0.0, 'w': 100.0, 'h': 50.0, 'scale': 1.5};
+
+    test('reads a well-formed display, integers included', () {
+      expect(displayFromReply(valid()), display(0, 0, 100, 50, 1.5));
+      expect(displayFromReply({'x': 1, 'y': 2, 'w': 3, 'h': 4, 'scale': 2}),
+          display(1, 2, 3, 4, 2));
+    });
+
+    test('a missing, non-numeric or impossible field is no display', () {
+      for (final key in ['x', 'y', 'w', 'h', 'scale']) {
+        expect(displayFromReply(valid()..remove(key)), isNull, reason: 'no $key');
+        expect(displayFromReply(valid()..[key] = 'wide'), isNull, reason: key);
+      }
+      expect(displayFromReply(valid()..['w'] = 0.0), isNull);
+      expect(displayFromReply(valid()..['h'] = -1.0), isNull);
+      expect(displayFromReply(valid()..['scale'] = 0.0), isNull);
+      expect(displayFromReply(valid()..['scale'] = double.nan), isNull);
+      expect(displayFromReply(null), isNull);
+      expect(displayFromReply([1, 2]), isNull);
+    });
+  });
+
+  group('displaysFromReply', () {
+    test('one bad entry empties the list', () {
+      expect(
+          displaysFromReply([
+            {'x': 0.0, 'y': 0.0, 'w': 100.0, 'h': 50.0, 'scale': 1.0},
+            {'x': 100.0, 'y': 0.0, 'w': 100.0, 'h': 50.0},
+          ]),
+          isEmpty,
+          reason: 'displayContaining falls back to the first display, so a '
+              'list missing the window\'s own display would fling it away');
+    });
+
+    test('anything but a list is no displays', () {
+      expect(displaysFromReply(null), isEmpty);
+      expect(displaysFromReply({'x': 0}), isEmpty);
+    });
   });
 }

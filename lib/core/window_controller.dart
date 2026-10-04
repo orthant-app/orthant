@@ -106,17 +106,24 @@ abstract class WindowController {
   /// and current frame, or null if nothing is capturable.
   Future<CapturedWindow?> captureFrontmost();
 
-  /// Visible frame (excludes menu bar / Dock) of the display under the cursor,
-  /// in top-left global points. Used by the overlay, which is summoned where
-  /// the user is looking.
-  Future<WinRect> activeScreenFrame();
+  /// The display under the cursor: its visible frame (excluding the menu bar
+  /// and Dock on macOS, the taskbar on Windows) in global placement space, and
+  /// its scale. Used by the overlay, which is summoned where the user is
+  /// looking, and as `applyRegion`'s fallback when no displays are reported,
+  /// for a window that is on it.
+  ///
+  /// Null when the platform cannot say. Never a zero rect: a placement
+  /// computed against one puts the window at the origin with no size and
+  /// reports it as placed.
+  Future<Display?> activeScreenFrame();
 
-  /// Every display's visible frame, top-left global points. Callers choose the
-  /// relevant one (see [screenContaining]) — keyboard shortcuts pick the
-  /// display the target *window* is on, not the one under the cursor.
-  Future<List<WinRect>> screenFrames();
+  /// Every display, in global placement space. Callers choose the relevant one
+  /// (see [displayContaining]): keyboard shortcuts pick the display the target
+  /// *window* is on, not the one under the cursor.
+  Future<List<Display>> screenFrames();
 
-  /// Move + resize the captured window to [target]. Best-effort.
+  /// Move + resize the captured window to [target], in global placement space.
+  /// Best-effort; true only when the window demonstrably arrived.
   Future<bool> applyFrame(WinRect target);
 
   /// Open System Settings ▸ Privacy & Security ▸ Accessibility.

@@ -47,13 +47,14 @@ class _SlottedWc implements WindowController {
   }
 
   @override
-  Future<List<WinRect>> screenFrames() async {
+  Future<List<Display>> screenFrames() async {
     await Future<void>.delayed(lag);
-    return const [WinRect(0, 0, 1440, 900)];
+    return const [Display(WinRect(0, 0, 1440, 900), 1)];
   }
 
   @override
-  Future<WinRect> activeScreenFrame() async => const WinRect(0, 0, 1440, 900);
+  Future<Display?> activeScreenFrame() async =>
+      const Display(WinRect(0, 0, 1440, 900), 1);
   @override
   Future<bool> checkPermission() async => true;
   @override

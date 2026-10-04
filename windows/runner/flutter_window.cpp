@@ -27,8 +27,10 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
+  overlay_set_ = std::make_unique<WindowsOverlaySet>();
   window_channel_ = std::make_unique<WindowChannel>(
-      flutter_controller_->engine()->messenger(), GetHandle());
+      flutter_controller_->engine()->messenger(), GetHandle(),
+      overlay_set_.get());
 
   // The template shows the window on the engine's first frame. Orthant is a
   // tray app: the window stays hidden until Dart asks for it over the channel
@@ -39,6 +41,7 @@ bool FlutterWindow::OnCreate() {
 
 void FlutterWindow::OnDestroy() {
   window_channel_ = nullptr;
+  overlay_set_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -67,6 +70,15 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       // appears and immediately vanishes. Posted here, once the loop exits,
       // and then falls through: Flutter and DefWindowProc still see it.
       PostMessage(hwnd, WM_NULL, 0, 0);
+      break;
+    case WM_DISPLAYCHANGE:
+      // A monitor came, went or changed mode: rebuild the per-monitor
+      // windows screenFrames answers from (spec §5.2), then fall through so
+      // Flutter and DefWindowProc see the message too. Broadcast to every
+      // top-level window, hidden ones included.
+      if (overlay_set_) {
+        overlay_set_->Reconcile("WM_DISPLAYCHANGE");
+      }
       break;
   }
 

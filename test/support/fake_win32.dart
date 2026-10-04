@@ -1,0 +1,393 @@
+import 'package:orthant/core/windows_window_ops.dart';
+
+/// Facts for a test window: a placeable 800x600 Notepad of another process,
+/// unless a test says otherwise. Pass `frame: null` for a window DWM will not
+/// describe.
+WindowFacts windowFacts(
+  int hwnd, {
+  int pid = 200,
+  String className = 'Notepad',
+  bool visible = true,
+  bool cloaked = false,
+  bool iconic = false,
+  bool toolWindow = false,
+  bool topmost = false,
+  bool framed = true,
+  PxRect? frame = const PxRect(0, 0, 800, 600),
+}) =>
+    WindowFacts(
+      hwnd: hwnd,
+      pid: pid,
+      className: className,
+      visible: visible,
+      cloaked: cloaked,
+      iconic: iconic,
+      toolWindow: toolWindow,
+      topmost: topmost,
+      framed: framed,
+      frame: frame,
+    );
+
+/// A desktop as data: [windows] is the z-order, top first.
+class FakeDesktop implements Win32Desktop {
+  FakeDesktop({this.ownPid = 1});
+
+  final int ownPid;
+  int foreground = 0;
+  final List<WindowFacts> windows = [];
+  final Map<int, String> names = {};
+  final List<int> reactivated = [];
+  bool foregroundRefused = false;
+
+  /// How many z-order entries a walk has consumed.
+  int pulled = 0;
+
+  @override
+  int get currentProcessId => ownPid;
+
+  @override
+  int foregroundWindow() => foreground;
+
+  @override
+  Iterable<int> zOrder() sync* {
+    for (final w in windows) {
+      pulled++;
+      yield w.hwnd;
+    }
+  }
+
+  @override
+  WindowFacts facts(int hwnd) => windows.firstWhere((w) => w.hwnd == hwnd,
+      orElse: () => windowFacts(hwnd, pid: 0, visible: false, frame: null));
+
+  @override
+  String? processName(int pid) => names[pid];
+
+  @override
+  bool setForeground(int hwnd) {
+    reactivated.add(hwnd);
+    return !foregroundRefused;
+  }
+}
+
+/// A desktop with nothing on it, for tests about everything except capture and
+/// placement. Each answer is the one Win32 gives about a window that does not
+/// exist.
+class NoWindows implements Win32Desktop, Win32Placer {
+  @override
+  int get currentProcessId => 1;
+  @override
+  int foregroundWindow() => 0;
+  @override
+  Iterable<int> zOrder() => const [];
+  @override
+  WindowFacts facts(int hwnd) =>
+      windowFacts(hwnd, pid: 0, visible: false, frame: null);
+  @override
+  String? processName(int pid) => null;
+  @override
+  bool setForeground(int hwnd) => false;
+  @override
+  bool isWindow(int hwnd) => false;
+  @override
+  bool isZoomed(int hwnd) => false;
+  @override
+  bool restoreAsync(int hwnd) => false;
+  @override
+  PxRect? windowRect(int hwnd) => null;
+  @override
+  PxRect? extendedFrame(int hwnd) => null;
+  @override
+  int windowDpi(int hwnd) => 0;
+  @override
+  int monitorDpi(PxRect rect) => 0;
+  @override
+  bool perMonitorAware(int hwnd) => false;
+  @override
+  SetPosResult setWindowPosAsync(int hwnd, int x, int y, int width, int height,
+          {bool touchOnly = false}) =>
+      (ok: false, error: 1400); // ERROR_INVALID_WINDOW_HANDLE
+  @override
+  bool beep() => false;
+}
+
+/// The invisible resize border, per edge, between a window's outer rect
+/// (`GetWindowRect`) and the frame DWM draws.
+class Border {
+  const Border(this.left, this.top, this.right, this.bottom);
+  final int left;
+  final int top;
+  final int right;
+  final int bottom;
+
+  PxRect around(PxRect f) =>
+      PxRect(f.left - left, f.top - top, f.right + right, f.bottom + bottom);
+  PxRect inside(PxRect o) =>
+      PxRect(o.left + left, o.top + top, o.right - right, o.bottom - bottom);
+}
+
+/// One window, modelling what placement depends on: an outer rect around a
+/// visible frame, a maximized state that takes reads to restore, writes that
+/// queue and land after a delay or never (hung), a size floor, a self-resize
+/// after crossing a DPI boundary (WM_DPICHANGED), and UIPI.
+///
+/// Writes queue, as Windows queues them: an asynchronous `SetWindowPos` is a
+/// message posted to the window's thread, so a second write does not replace
+/// the first, and a thread that was busy works through both, in order, once
+/// it gets to its queue. The fake applies the whole queue on one read: a
+/// thread drains its posted messages back to back, and a 15 ms poll from
+/// another process does not fall between two of them.
+class FakeWindow implements Win32Placer {
+  FakeWindow({required PxRect frame, this.border = const Border(7, 0, 7, 7)})
+      : outer = border.around(frame);
+
+  PxRect outer;
+  Border border;
+  PxRect get frame => border.inside(outer);
+
+  bool exists = true;
+  bool frameReadable = true;
+  bool hung = false;
+  bool deniedTouch = false;
+  bool deniedWrite = false;
+
+  bool zoomed = false;
+  bool restorePostable = true;
+  PxRect? restoredFrame;
+  Border restoredBorder = const Border(7, 0, 7, 7);
+  int restoreReads = 2;
+
+  /// Reads before the window's thread gets to its queue of writes: the queue
+  /// is applied on the extendedFrame read after this many, counted from the
+  /// write that found the queue empty. A write posted while the thread is
+  /// still busy joins the queue and does not restart the count.
+  int lagReads = 0;
+  int? minOuterWidth;
+
+  /// The window refuses to go above this outer top, as a target app's own
+  /// WM_WINDOWPOSCHANGING handler can.
+  int? minOuterTop;
+
+  /// After the first write lands, the window resizes itself by this factor
+  /// about its top-left and its border becomes [dpiBorder].
+  double? dpiResize;
+  Border? dpiBorder;
+
+  /// The window's DPI; it becomes [dpiAfterMove] when its first write lands
+  /// with [dpiResize] set (the crossing).
+  int dpi = 96;
+  int dpiAfterMove = 144;
+
+  /// Reads after the crossing before the window's own resize applies: 0 is
+  /// at once (as Chrome does), more is late (as Notepad does).
+  int dpiResizeDelayReads = 0;
+  int _resizeCountdown = 0;
+
+  /// Reads after the crossing write lands before the window's DPI changes: 0
+  /// is at once, as this fake has always done; more is Notepad's shape, whose
+  /// DPI changed 30 to 50 ms after its frame landed (measured on the W1 rig).
+  /// Reads of the frame and of the DPI both count, and the window's own
+  /// resize ([dpiResizeDelayReads]) counts from the change, not the landing.
+  int dpiFlipReads = 0;
+  int _flipCountdown = 0;
+
+  /// What [perMonitorAware] answers.
+  bool perMonitorDpiAware = true;
+
+  /// What [monitorDpi] answers, for any rect: the fake has one target per
+  /// test. Unset, it is [dpiAfterMove] when the fake models a crossing
+  /// ([dpiResize] set) and the window's own [dpi] otherwise.
+  int? targetMonitorDpi;
+
+  /// A queue started after the window's own DPI resize is applied after this
+  /// many reads instead of [lagReads]: Notepad took 220 to 290 ms, measured on
+  /// the W1 rig, to process a write that followed its DPI relayout.
+  int? lagReadsAfterDpiResize;
+  bool _dpiResized = false;
+  int _queueLag = 0;
+
+  /// The crossing's own resize in two steps, as an app whose layout after
+  /// WM_DPICHANGED takes two passes: the first step's frame is read this many
+  /// times, and the next read resizes the window by [dpiResize] again.
+  int? dpiSecondStepReads;
+  bool _secondStepArmed = false;
+
+  /// After this many writes have been applied, the window stops applying
+  /// writes, as if it hung: the rest of its queue stays queued.
+  int? hangAfterWrites;
+
+  /// After this many `extendedFrame` reads, the window no longer exists.
+  int? goneAfterReads;
+
+  /// On this `windowDpi` call (the first is 1), the window no longer exists,
+  /// and that call answers 0. [goneAfterReads] counts frame reads only, which
+  /// placement does not make while it waits for a DPI change.
+  int? goneAtDpiRead;
+  int _dpiReads = 0;
+
+  /// The window's own resizes, to these outer rects in order: once a write
+  /// has been made, each `windowRect` read is followed at once by the next
+  /// one, so a border measured across it (outer rect before, frame after) is
+  /// torn. Pass 1 measures before any write, so the correction is first hit.
+  final List<PxRect> tears = [];
+
+  final List<PxRect> writes = [];
+  int touches = 0;
+  int beeps = 0;
+  bool restoreRequested = false;
+  int? lastHwnd;
+
+  /// Writes posted and not yet applied, oldest first.
+  final List<PxRect> _queue = [];
+  int _queueReads = 0;
+  int _zoomReads = 0;
+  int _applied = 0;
+  int _reads = 0;
+  bool _resized = false;
+
+  @override
+  bool isWindow(int hwnd) => exists;
+
+  @override
+  bool isZoomed(int hwnd) {
+    if (zoomed && restoreRequested && !hung && ++_zoomReads >= restoreReads) {
+      zoomed = false;
+      border = restoredBorder;
+      outer = restoredBorder.around(restoredFrame ?? frame);
+    }
+    return zoomed;
+  }
+
+  @override
+  bool restoreAsync(int hwnd) {
+    if (!restorePostable) return false;
+    restoreRequested = true;
+    return true;
+  }
+
+  @override
+  PxRect? windowRect(int hwnd) {
+    if (!exists) return null;
+    final read = outer;
+    if (writes.isNotEmpty && tears.isNotEmpty) outer = tears.removeAt(0);
+    return read;
+  }
+
+  @override
+  PxRect? extendedFrame(int hwnd) {
+    _reads++;
+    final goneAfter = goneAfterReads;
+    if (goneAfter != null && _reads > goneAfter) exists = false;
+    if (!exists || !frameReadable) return null;
+    if (_queue.isNotEmpty && !hung && ++_queueReads > _queueLag) {
+      while (_queue.isNotEmpty && !hung) {
+        _apply(_queue.removeAt(0));
+      }
+    } else if (_flipCountdown > 0) {
+      if (--_flipCountdown == 0) _cross();
+    } else if (_resizeCountdown > 0 && --_resizeCountdown == 0) {
+      _dpiResize(dpiResize!);
+    }
+    return frame;
+  }
+
+  @override
+  int windowDpi(int hwnd) {
+    final goneAt = goneAtDpiRead;
+    if (goneAt != null && ++_dpiReads >= goneAt) exists = false;
+    if (!exists) return 0;
+    if (_flipCountdown > 0 && --_flipCountdown == 0) _cross();
+    return dpi;
+  }
+
+  @override
+  int monitorDpi(PxRect rect) =>
+      targetMonitorDpi ?? (dpiResize != null ? dpiAfterMove : dpi);
+
+  @override
+  bool perMonitorAware(int hwnd) => perMonitorDpiAware;
+
+  @override
+  SetPosResult setWindowPosAsync(int hwnd, int x, int y, int width, int height,
+      {bool touchOnly = false}) {
+    lastHwnd = hwnd;
+    if (!exists) return (ok: false, error: 1400);
+    if (touchOnly) {
+      touches++;
+      return deniedTouch
+          ? (ok: false, error: kErrorAccessDenied)
+          : (ok: true, error: 0);
+    }
+    if (deniedWrite) return (ok: false, error: kErrorAccessDenied);
+    final r = PxRect(x, y, x + width, y + height);
+    writes.add(r);
+    if (_queue.isEmpty) {
+      _queueReads = 0;
+      final slow = lagReadsAfterDpiResize;
+      _queueLag = _dpiResized && slow != null ? slow : lagReads;
+    }
+    _queue.add(r);
+    return (ok: true, error: 0);
+  }
+
+  @override
+  bool beep() {
+    beeps++;
+    return true;
+  }
+
+  void _apply(PxRect r) {
+    var w = r.width;
+    final floor = minOuterWidth;
+    if (floor != null && w < floor) w = floor;
+    var top = r.top;
+    final topFloor = minOuterTop;
+    if (topFloor != null && top < topFloor) top = topFloor;
+    outer = PxRect(r.left, top, r.left + w, top + r.height);
+    final hangAfter = hangAfterWrites;
+    if (hangAfter != null && ++_applied >= hangAfter) hung = true;
+    if (dpiResize != null && !_resized) {
+      _resized = true;
+      if (dpiFlipReads == 0) {
+        _cross();
+      } else {
+        _flipCountdown = dpiFlipReads;
+      }
+    }
+  }
+
+  /// The crossing as the window sees it: its DPI changes, and its own resize
+  /// follows, at once or [dpiResizeDelayReads] frame reads later.
+  void _cross() {
+    dpi = dpiAfterMove;
+    if (dpiResizeDelayReads == 0) {
+      _dpiResize(dpiResize!);
+    } else {
+      _resizeCountdown = dpiResizeDelayReads;
+    }
+  }
+
+  void _dpiResize(double factor) {
+    _dpiResized = true;
+    border = dpiBorder ?? border;
+    outer = PxRect(outer.left, outer.top,
+        outer.left + (outer.width * factor).round(),
+        outer.top + (outer.height * factor).round());
+    final second = dpiSecondStepReads;
+    if (second != null && !_secondStepArmed) {
+      _secondStepArmed = true;
+      _resizeCountdown = second;
+    }
+  }
+}
+
+/// A clock whose sleeps take no time.
+class FakeClock implements PlacementClock {
+  @override
+  int elapsedMs = 0;
+
+  @override
+  Future<void> sleep(int ms) async {
+    elapsedMs += ms;
+  }
+}

@@ -121,6 +121,15 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
     await trayManager.popUpContextMenu(bringAppToFront: Platform.isWindows);
   }
 
+  // Windows: right-click is the platform's own gesture for a notification
+  // icon's menu, and tray_manager reports it as a separate callback
+  // (WM_RBUTTONUP), so without this a right-click does nothing. macOS keeps
+  // left-click only, exactly as 1.0.3 shipped it.
+  @override
+  Future<void> onTrayIconRightMouseDown() async {
+    if (Platform.isWindows) await onTrayIconMouseDown();
+  }
+
   @override
   Future<void> onTrayMenuItemClick(MenuItem item) async {
     switch (item.key) {

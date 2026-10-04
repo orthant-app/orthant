@@ -12,6 +12,34 @@ const leftHalf = PxRect(0, 0, 960, 1040);
 Future<PlacementResult> place(FakeWindow w, PxRect target, FakeClock clock) =>
     placeWindow(w, hwnd, target, clock: clock, timing: timing);
 
+/// What placement said, checked against what the window does once placement
+/// has stopped looking. The fake runs on, read past every delay knob (a
+/// lagging write, a late or second DPI resize), and then:
+/// - the frame the trace reports as `final=` is the frame that stays;
+/// - `placed` means the frame that stays is at the target's origin;
+/// - a placed window is a fixed point: placing it again moves nothing, so the
+///   placement had nothing left to correct when it stopped. Without this, a
+///   window that the app's own late resize carried to 1.5 times its minimum
+///   width passes the first two, since its origin stays within tolerance.
+Future<void> expectFrameStays(
+    PlacementResult r, FakeWindow w, PxRect target, FakeClock clock) async {
+  for (var i = 0; i < 64; i++) {
+    await clock.sleep(timing.pollMs);
+    w.extendedFrame(hwnd);
+  }
+  final real = w.frame;
+  final reported = RegExp(r'final=(\S+)').firstMatch(r.trace)?.group(1);
+  if (reported != 'none') {
+    expect(reported, '$real', reason: 'the frame reported is the one that stays');
+  }
+  if (!r.placed) return;
+  expect(originMatches(real, target), isTrue,
+      reason: 'placed, so the frame that stays is at the target\'s origin');
+  await place(w, target, clock);
+  expect(w.frame, real,
+      reason: 'placing a placed window again moves nothing');
+}
+
 void main() {
   test('a normal window lands in one pass, written through its border',
       () async {
@@ -69,15 +97,44 @@ void main() {
       ..dpiResize = 1.5
       ..dpiBorder = const Border(10, 0, 10, 10);
     const target = PxRect(1920, 0, 3360, 1560);
-    final r = await place(w, target, FakeClock());
+    final clock = FakeClock();
+    final r = await place(w, target, clock);
     expect(r.outcome, PlacementOutcome.placed);
     expect(w.frame, target);
     expect(w.writes, hasLength(2));
     expect(w.writes.last, const PxRect(1910, 0, 3370, 1570),
         reason: 'the second write uses the border measured after the resize');
     expect(r.trace, contains('pass1=miss'));
+    expect(r.trace, contains('dpiwait=none'),
+        reason: 'a miss waits for the crossing to settle too; this one had '
+            'already resized, so it corrects from where pass 1 landed');
     expect(r.trace, contains('correction=hit'));
     expect(r.trace, contains('dpi=96->144'));
+    await expectFrameStays(r, w, target, clock);
+  });
+
+  test('after a crossing whose first pass missed, a late resize is waited for '
+      'before the correction', () async {
+    // Pass 1 settles on the window's own minimum width before its
+    // WM_DPICHANGED resize arrives. Corrected at once, that resize lands
+    // during the correction and is taken for the correction's own movement:
+    // placed, at 1.5 times the window's minimum width.
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..minOuterWidth = 1214
+      ..dpiResize = 1.5
+      ..dpiBorder = const Border(9, 0, 9, 9)
+      ..dpiResizeDelayReads = 4;
+    final clock = FakeClock();
+    final r = await place(w, leftHalf, clock);
+    expect(r.outcome, PlacementOutcome.placed);
+    expect(r.trace, contains('dpi=96->144'));
+    expect(r.trace, contains('pass1=miss'));
+    expect(r.trace, contains('dpiwait=resized'));
+    expect(r.trace, contains('correction=hit'));
+    expect(w.frame, const PxRect(0, 0, 1196, 1040),
+        reason: 'corrected after the resize: back at its minimum width, '
+            'written through the border the resize left');
+    await expectFrameStays(r, w, leftHalf, clock);
   });
 
   test('a window that resizes itself late after crossing is waited for, then '
@@ -87,7 +144,8 @@ void main() {
       ..dpiBorder = const Border(10, 0, 10, 10)
       ..dpiResizeDelayReads = 4;
     const target = PxRect(1920, 0, 3360, 1560);
-    final r = await place(w, target, FakeClock());
+    final clock = FakeClock();
+    final r = await place(w, target, clock);
     expect(r.outcome, PlacementOutcome.placed);
     expect(r.trace, contains('pass1=hit'));
     expect(r.trace, contains('dpiwait=resized'));
@@ -98,6 +156,7 @@ void main() {
       w.extendedFrame(hwnd);
     }
     expect(w.frame, target);
+    await expectFrameStays(r, w, target, clock);
   });
 
   test('a window that crosses but keeps its frame is placed after a bounded '
@@ -111,6 +170,7 @@ void main() {
     expect(w.writes, hasLength(1));
     expect(clock.elapsedMs,
         lessThanOrEqualTo(2 * timing.pollMs + timing.dpiSettleMs + timing.pollMs));
+    await expectFrameStays(r, w, leftHalf, clock);
   });
 
   test('after a crossing, the correction waits for its own write, not an '
@@ -122,9 +182,11 @@ void main() {
       ..dpiResize = 1.25
       ..dpiBorder = const Border(9, 0, 9, 9)
       ..lagReads = 3;
-    final r = await place(w, leftHalf, FakeClock());
+    final clock = FakeClock();
+    final r = await place(w, leftHalf, clock);
     expect(r.outcome, PlacementOutcome.placed);
     expect(r.trace, contains('final=$leftHalf'));
+    await expectFrameStays(r, w, leftHalf, clock);
   });
 
   test('after a crossing, a correction that never lands is not placed (resized '
@@ -135,9 +197,11 @@ void main() {
       ..dpiResize = 1.5
       ..dpiBorder = const Border(9, 0, 9, 9)
       ..hangAfterWrites = 1;
-    final r = await place(w, leftHalf, FakeClock());
+    final clock = FakeClock();
+    final r = await place(w, leftHalf, clock);
     expect(r.outcome, PlacementOutcome.failed);
     expect(r.trace, contains('correction=miss'));
+    await expectFrameStays(r, w, leftHalf, clock);
   });
 
   test('after a crossing, a correction that never lands is not placed (resized '
@@ -147,14 +211,21 @@ void main() {
       ..dpiBorder = const Border(9, 0, 9, 9)
       ..dpiResizeDelayReads = 4
       ..hangAfterWrites = 1;
-    final r = await place(w, leftHalf, FakeClock());
+    final clock = FakeClock();
+    final r = await place(w, leftHalf, clock);
     expect(r.outcome, PlacementOutcome.failed);
     expect(r.trace, contains('pass1=hit'));
     expect(r.trace, contains('dpiwait=resized'));
+    await expectFrameStays(r, w, leftHalf, clock);
   });
 
   test('a window that goes away while its crossing resize is awaited is not '
       'placed', () async {
+    // Six reads: placement's first look at the frame, then pass 1's three
+    // (the border measurement, the poll its write lands on, the poll that
+    // confirms it), so the window goes after the wait has read its unchanged
+    // frame twice. Those good reads must not make a window that then vanished
+    // count as one that kept its frame.
     final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
       ..dpiResize = 1.5
       ..dpiResizeDelayReads = 50
@@ -163,6 +234,19 @@ void main() {
     expect(r.outcome, PlacementOutcome.failed);
     expect(r.trace, contains('pass1=hit'));
     expect(r.trace, contains('dpiwait=unreadable'));
+  });
+
+  test('a window that goes away after one good poll is not reported placed',
+      () async {
+    // Three reads: placement's first look at the frame, pass 1's border
+    // measurement, and the one poll its write lands on. Every read after that
+    // fails, so the frame the pass saw last belongs to a window that no longer
+    // exists, and one read is not a settled frame.
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..goneAfterReads = 3;
+    final r = await place(w, leftHalf, FakeClock());
+    expect(r.outcome, PlacementOutcome.failed);
+    expect(r.trace, contains('pass1=unreadable'));
   });
 
   test('a hung window fails within both pass deadlines, and is not beeped at',

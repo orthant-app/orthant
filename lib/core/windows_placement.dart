@@ -168,29 +168,40 @@ Future<PlacementResult> placeWindow(
   // correction pass is for.
   final firstHit = firstLanded != null && frameMatches(firstLanded, target);
   trace.write(' pass1=${firstLanded == null ? 'unreadable' : firstHit ? 'hit' : 'miss'}');
+  if (firstHit && !crossed) {
+    return done(PlacementOutcome.placed, 'final=$firstLanded');
+  }
   var correctFrom = firstLanded ?? before;
-  if (firstHit) {
-    if (!crossed) return done(PlacementOutcome.placed, 'final=$firstLanded');
-    // Wait, bounded, for the window's own resize, then correct after it.
-    final settle = await _awaitChange(placer, hwnd, firstLanded, clock, timing);
+  if (crossed) {
+    // Wait, bounded, for the window's own resize, then correct after it,
+    // whatever pass 1 said: a pass that missed (settled on the app's minimum
+    // size, say) can still be followed by that resize, which the correction
+    // would otherwise take for its own movement. With no frame from pass 1,
+    // the wait is from the frame before it, the only one there is.
+    final settle = await _awaitChange(placer, hwnd, correctFrom, clock, timing);
     if (settle.kept) {
-      // It kept the frame: nothing to correct.
-      return done(PlacementOutcome.placed, 'dpiwait=none final=$firstLanded');
+      // It kept the frame: nothing to correct after a hit.
+      if (firstHit) {
+        return done(PlacementOutcome.placed, 'dpiwait=none final=$firstLanded');
+      }
+      trace.write(' dpiwait=none');
+    } else {
+      final resized = settle.frame;
+      if (resized == null) {
+        return done(PlacementOutcome.failed,
+            'dpiwait=unreadable final=none why=frame-unreadable');
+      }
+      trace.write(' dpiwait=resized');
+      correctFrom = resized;
     }
-    final resized = settle.frame;
-    if (resized == null) {
-      return done(PlacementOutcome.failed,
-          'dpiwait=unreadable final=none why=frame-unreadable');
-    }
-    trace.write(' dpiwait=resized');
-    correctFrom = resized;
   }
 
   // Whether the window has shown it is processing our writes at all. Only
   // then can an unchanged frame at the target's origin mean "pressed against
   // its own minimum size" rather than "never moved". After a crossing, the
-  // starting frame is the window's own resize, and an origin within tolerance
-  // of the target is not this pass's write landing, so the pass waits for it.
+  // starting frame is the one the window settled on after it, and an origin
+  // within tolerance of the target there is not this pass's write landing, so
+  // the pass waits for it.
   final responded = firstLanded != null && firstLanded != before;
   final second = await _pass(placer, hwnd, target, correctFrom, clock, timing,
       originSettles: responded && !crossed);
@@ -252,7 +263,7 @@ class _Pass {
   const _Pass({this.landed, this.denied = false, this.error});
 
   /// The frame the pass settled on, or the last one it read; null if DWM
-  /// answered none of its reads.
+  /// answered none of its reads, or not the last one.
   final PxRect? landed;
   final bool denied;
   final int? error;
@@ -295,7 +306,10 @@ Future<_Pass> _pass(Win32Placer placer, int hwnd, PxRect target,
     await clock.sleep(timing.pollMs);
     final now = placer.extendedFrame(hwnd);
     if (now == null) {
+      // A failed read clears what the pass last saw, too: a window that
+      // vanished after one good poll has landed nowhere.
       previous = null;
+      last = null;
       continue;
     }
     last = now;

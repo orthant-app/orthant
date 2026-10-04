@@ -62,7 +62,7 @@ All of these are rebindable in **Settings → Shortcuts**. (`⌃` Control, `⌥`
 | Platform | Status |
 | --- | --- |
 | **macOS 13+** | Works today |
-| **Windows** | In design: the same Dart UI behind the same `WindowController` seam, with Win32 called from Dart over FFI and a small C++ runner for the overlay windows, global hotkeys and the second Flutter engine |
+| **Windows** | In development: the same Dart UI behind the same `WindowController` seam, with Win32 called from Dart over FFI and a small C++ runner for the overlay windows, global hotkeys and the second Flutter engine |
 | **Linux** | Not supported |
 
 ## Permissions

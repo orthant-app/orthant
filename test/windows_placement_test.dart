@@ -146,6 +146,16 @@ void main() {
     expect(r.trace, contains('correction=miss'));
   });
 
+  test('a window that moves but lands at the wrong origin is not placed',
+      () async {
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..minOuterTop = 50;
+    final r = await place(w, leftHalf, FakeClock());
+    expect(w.frame.top, 50, reason: 'it moved, just not where it was asked');
+    expect(r.outcome, PlacementOutcome.failed);
+    expect(r.trace, contains('correction=miss'));
+  });
+
   test('a slow window already at the target\'s origin is waited for in pass 1',
       () async {
     final w = FakeWindow(frame: const PxRect(0, 0, 800, 600))..lagReads = 3;

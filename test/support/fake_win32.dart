@@ -146,6 +146,10 @@ class FakeWindow implements Win32Placer {
   int lagReads = 0;
   int? minOuterWidth;
 
+  /// The window refuses to go above this outer top, as a target app's own
+  /// WM_WINDOWPOSCHANGING handler can.
+  int? minOuterTop;
+
   /// After the first write lands, the window resizes itself by this factor
   /// about its top-left and its border becomes [dpiBorder].
   double? dpiResize;
@@ -224,7 +228,10 @@ class FakeWindow implements Win32Placer {
     var w = r.width;
     final floor = minOuterWidth;
     if (floor != null && w < floor) w = floor;
-    outer = PxRect(r.left, r.top, r.left + w, r.bottom);
+    var top = r.top;
+    final topFloor = minOuterTop;
+    if (topFloor != null && top < topFloor) top = topFloor;
+    outer = PxRect(r.left, top, r.left + w, top + r.height);
     final factor = dpiResize;
     if (factor != null && !_resized) {
       _resized = true;

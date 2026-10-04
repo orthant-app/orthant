@@ -46,11 +46,33 @@ std::optional<flutter::EncodableList> AllIdsRefused(
   return refused;
 }
 
+// A display as Dart's displayFromReply reads it: the work area in physical
+// pixels, which is Windows' global placement space (spec §5.2), and the
+// scale that turns a device-independent gap into those pixels.
+flutter::EncodableValue DisplayToValue(
+    const WindowsOverlaySet::Display& display) {
+  const RECT& r = display.work;
+  return flutter::EncodableValue(flutter::EncodableMap{
+      {flutter::EncodableValue("x"),
+       flutter::EncodableValue(static_cast<double>(r.left))},
+      {flutter::EncodableValue("y"),
+       flutter::EncodableValue(static_cast<double>(r.top))},
+      {flutter::EncodableValue("w"),
+       flutter::EncodableValue(static_cast<double>(r.right - r.left))},
+      {flutter::EncodableValue("h"),
+       flutter::EncodableValue(static_cast<double>(r.bottom - r.top))},
+      {flutter::EncodableValue("scale"),
+       flutter::EncodableValue(static_cast<double>(display.dpi) /
+                               USER_DEFAULT_SCREEN_DPI)},
+  });
+}
+
 }  // namespace
 
 WindowChannel::WindowChannel(flutter::BinaryMessenger* messenger,
-                             HWND config_window)
-    : config_window_(config_window) {
+                             HWND config_window,
+                             const WindowsOverlaySet* displays)
+    : config_window_(config_window), displays_(displays) {
   channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
       messenger, kChannelName, &flutter::StandardMethodCodec::GetInstance());
   channel_->SetMethodCallHandler(
@@ -101,6 +123,19 @@ void WindowChannel::HandleMethodCall(
     }
   } else if (method == "unregisterAllHotkeys") {
     result->Success();
+  } else if (method == "getScreenFrames") {
+    flutter::EncodableList list;
+    for (const auto& display : displays_->Displays()) {
+      list.push_back(DisplayToValue(display));
+    }
+    result->Success(flutter::EncodableValue(list));
+  } else if (method == "getActiveScreenFrame") {
+    const auto display = displays_->DisplayUnderCursor();
+    if (display) {
+      result->Success(DisplayToValue(*display));
+    } else {
+      result->Success();  // null: Dart reads "no display", never a zero rect
+    }
   } else {
     result->NotImplemented();
   }

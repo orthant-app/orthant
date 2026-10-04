@@ -8,6 +8,7 @@
 
 #include "win32_window.h"
 #include "window_channel.h"
+#include "windows_overlay_set.h"
 
 // A window that does nothing but host a Flutter view.
 class FlutterWindow : public Win32Window {
@@ -29,6 +30,10 @@ class FlutterWindow : public Win32Window {
 
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
+
+  // One hidden window per monitor, the source of every display's DPI
+  // (spec §5.2). Created before the channel that reads it and destroyed after.
+  std::unique_ptr<WindowsOverlaySet> overlay_set_;
 
   // The Windows half of app.orthant/window. Owned here because it needs this
   // window's handle and the engine's messenger, both of which exist only

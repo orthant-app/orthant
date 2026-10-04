@@ -71,3 +71,55 @@ typedef VersionReader = ({String short, String build})? Function();
     if (pathPtr != null) calloc.free(pathPtr);
   }
 }
+
+/// The `FileDescription` string of the executable at [path] (what Task
+/// Manager names a process, and the name the overlay's app chip will show,
+/// spec §5.2), or null if it has none. Never throws, for the reason
+/// [readFixedFileVersion] gives, with the same allocation discipline: every
+/// pointer is allocated inside the try and freed in reverse in the finally.
+String? readFileDescription(String path) {
+  Pointer<Utf16>? pathPtr;
+  Pointer<Utf16>? translationKey;
+  Pointer<Utf16>? descriptionKey;
+  Pointer<Pointer>? value;
+  Pointer<Uint32>? len;
+  Pointer<Uint8>? buffer;
+  try {
+    pathPtr = path.toNativeUtf16();
+    translationKey = r'\VarFileInfo\Translation'.toNativeUtf16();
+    value = calloc<Pointer>();
+    len = calloc<Uint32>();
+    final file = PCWSTR(pathPtr);
+    final size = GetFileVersionInfoSize(file, null).value;
+    if (size == 0) return null;
+    buffer = calloc<Uint8>(size);
+    if (!GetFileVersionInfo(file, size, buffer).value) return null;
+    if (!VerQueryValue(buffer, PCWSTR(translationKey), value, len) ||
+        len.value < 4 ||
+        value.value == nullptr) {
+      return null;
+    }
+    // The first (language, code page) pair names the string table to read.
+    final pair = value.value.cast<Uint16>();
+    final table = pair[0].toRadixString(16).padLeft(4, '0') +
+        pair[1].toRadixString(16).padLeft(4, '0');
+    descriptionKey =
+        '\\StringFileInfo\\$table\\FileDescription'.toNativeUtf16();
+    if (!VerQueryValue(buffer, PCWSTR(descriptionKey), value, len) ||
+        len.value == 0 ||
+        value.value == nullptr) {
+      return null;
+    }
+    final description = value.value.cast<Utf16>().toDartString().trim();
+    return description.isEmpty ? null : description;
+  } catch (_) {
+    return null;
+  } finally {
+    if (buffer != null) calloc.free(buffer);
+    if (len != null) calloc.free(len);
+    if (value != null) calloc.free(value);
+    if (descriptionKey != null) calloc.free(descriptionKey);
+    if (translationKey != null) calloc.free(translationKey);
+    if (pathPtr != null) calloc.free(pathPtr);
+  }
+}

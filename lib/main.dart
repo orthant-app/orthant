@@ -1,5 +1,6 @@
 import 'dart:async' show unawaited;
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'app/coordinator.dart';
@@ -48,6 +49,7 @@ Future<void> main() async {
     wc: wc,
     permissions: PermissionController(wc),
     hotkeys: hotkeys,
+    debugPlacementItems: Platform.isWindows && !kReleaseMode,
   );
 
   // macOS: isTemplate, because the icon is solid black + alpha and the menu
@@ -143,6 +145,10 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
         await app.openSettings(tab: SettingsTab.about);
       case 'updates':
         await app.wc.checkForUpdates();
+      case 'debugSnapLeft':
+        await app.debugSnapLeft();
+      case 'debugSnapNext':
+        await app.debugSnapLeftOnNextDisplay();
       case 'quit':
         // Windows keeps a dead icon in the tray until the pointer sweeps it if
         // the process exits without removing it, so it needs destroy() awaited

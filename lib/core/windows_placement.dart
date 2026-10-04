@@ -219,9 +219,10 @@ Future<PlacementResult> placeWindow(
   if (second.unmeasured) {
     // The correction wrote nothing, so whatever the window's frame is now is
     // its own doing: after a crossing its own resize would pass for this
-    // pass's movement, and without one pass 1's response would. An unmeasured
-    // pass 1 is different: it wrote nothing either, and the correction is a
-    // genuine retry.
+    // pass's movement, and without one pass 1's response, or any change of
+    // its own since the placement began, would. An unmeasured pass 1 is
+    // different: it wrote nothing either, and the correction is a genuine
+    // retry.
     return done(PlacementOutcome.failed,
         'correction=unreadable final=none why=frame-unreadable');
   }

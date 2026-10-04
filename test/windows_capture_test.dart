@@ -153,6 +153,14 @@ void main() {
       windowFacts(5, className: 'Progman'),
     ], foreground: 2);
     expect(decideCapture(onlyPinned).window!.hwnd, 15);
+
+    final twoPinned = desktop([
+      windowFacts(2, pid: own, visible: false),
+      windowFacts(15, topmost: true),
+      windowFacts(16, topmost: true),
+    ], foreground: 2);
+    expect(decideCapture(twoPinned).window!.hwnd, 15,
+        reason: 'of two always-on-top windows, the higher one');
   });
 
   test('an always-on-top window in the foreground is captured as is: the user '

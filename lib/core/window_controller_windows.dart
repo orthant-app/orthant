@@ -63,8 +63,9 @@ class WindowsWindowController implements WindowController {
   /// stays here, private to this backend; the seam sees only the
   /// [CapturedWindow] built from it (Windows design §5.1). The owning process
   /// and class are kept beside it because Windows reuses handles: if the
-  /// window closes before [applyFrame], the same number can name a stranger's
-  /// window, which must fail rather than move.
+  /// window closes before [applyFrame], the same number can in principle name
+  /// a stranger's window (rare, as the handle's high word counts reuses),
+  /// which must fail rather than move.
   ({int hwnd, int pid, String className})? _captured;
 
   static const MethodChannel _channel = MethodChannel(kOrthantChannel);

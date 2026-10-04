@@ -76,18 +76,18 @@ bool isPlaceable(WindowFacts w, int ownPid) {
 /// click does on Windows: by the time Orthant's menu command runs, foreground
 /// belongs to the taskbar, the overflow flyout, or Orthant's own hidden window
 /// (tray_manager foregrounds it so the menu can dismiss), never to the window
-/// the user was working in. In those states the target is the topmost
-/// placeable window beneath (an always-on-top one only when nothing else is
-/// placeable), and it is reactivated, so the user's keyboard
-/// focus ends where it was before the tray took it. With Orthant's visible
-/// settings window in front, the window beneath is still the target (macOS
-/// captures nothing there; on Windows the tray itself puts that window in
-/// front), but focus stays with the settings window the user is looking at.
+/// the user was working in. In those states the target is the highest
+/// placeable window beneath, passing over always-on-top windows unless nothing
+/// else is placeable, and it is reactivated, so the user's keyboard focus ends
+/// where it was before the tray took it. With Orthant's visible settings
+/// window in front, the window beneath is still the target (macOS captures
+/// nothing there; on Windows the tray itself puts that window in front), but
+/// focus stays with the settings window the user is looking at.
 ///
 /// The desktop, and anything else unplaceable in front, capture nothing, as on
 /// macOS. Two consequences of the tray path that differ from macOS, accepted
 /// because a tray click erases what was in front before it: a user who clicked
-/// the desktop and then the tray gets the topmost window snapped, where macOS
+/// the desktop and then the tray gets the highest window snapped, where macOS
 /// would capture nothing; and with the settings window open, tray_manager
 /// raises it before the menu (so its menu can dismiss), so focus ends on
 /// Orthant's settings window rather than going back to the snapped one.

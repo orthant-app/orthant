@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/channel.dart';
@@ -118,6 +119,30 @@ void main() {
       final c = wc(desktop: desktop, placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)));
       expect(await c.captureFrontmost(), isNotNull);
       expect(desktop.reactivated, [0x10]);
+    });
+
+    test('a refused reactivation still captures, and the log says refused',
+        () async {
+      final desktop = FakeDesktop(ownPid: 1)
+        ..windows.addAll([
+          windowFacts(0x2, pid: 1, visible: false),
+          windowFacts(0x10, pid: 7),
+        ])
+        ..foreground = 0x2
+        ..foregroundRefused = true;
+      final c = wc(desktop: desktop, placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)));
+      // The result has no field for it; the debug log the harness reads does.
+      final logged = <String>[];
+      final saved = debugPrint;
+      debugPrint = (String? message, {int? wrapWidth}) => logged.add('$message');
+      try {
+        expect(await c.captureFrontmost(), isNotNull);
+      } finally {
+        debugPrint = saved;
+      }
+      expect(desktop.reactivated, [0x10]);
+      expect(logged.where((l) => l.contains('capture: branch=beneath')).single,
+          contains('reactivated=refused'));
     });
 
     test('an unnamed process is captured with an empty name', () async {

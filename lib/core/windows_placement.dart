@@ -84,11 +84,16 @@ bool frameMatches(PxRect landed, PxRect want) =>
 ///    border. A window crossing to a monitor of another scale resizes itself
 ///    after the first write (`WM_DPICHANGED`), with a different border.
 /// 4a. A window that crossed onto a monitor of another scale (its DPI changed)
-///    and matched on pass 1 is given a bounded wait for its own
-///    `WM_DPICHANGED` resize, then corrected after it.
-/// 5. Placed if the final frame matches, or if the window demonstrably
-///    responded (its frame changed during the placement) and the final
-///    origin is where it was asked to be.
+///    is given a bounded wait for its own `WM_DPICHANGED` resize, whether
+///    pass 1 matched or not, and the correction starts from the frame it
+///    settled on. Only a window that matched on pass 1 and kept that frame
+///    through the wait is placed without a correction.
+/// 5. Placed if the final frame matches, or if the window demonstrably moved
+///    and the final origin is where it was asked to be. Without a crossing,
+///    moved means its frame changed at any point during the placement. After
+///    a crossing it means the correction pass itself moved the window: the
+///    window's own resize keeps its origin within tolerance of the target,
+///    so a change before the correction says nothing about it.
 ///
 /// Never blocks on the target and never reports a frame it did not read. A
 /// window whose frame never changed and does not match is not placed even if

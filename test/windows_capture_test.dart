@@ -157,4 +157,21 @@ void main() {
     decideCapture(d);
     expect(d.pulled, 2, reason: 'zOrder is lazy, and the decision reads no further');
   });
+
+  test('the class-name sets hold the names Windows uses, spelled out', () {
+    // The tests above loop over the constants, so a deleted or misspelled
+    // entry would leave them green; these literals would not.
+    expect(kDesktopClasses, containsAll(['Progman', 'WorkerW']));
+    expect(kTrayClasses, containsAll([
+      'Shell_TrayWnd',
+      'Shell_SecondaryTrayWnd',
+      'NotifyIconOverflowWindow',
+      'TopLevelWindowForOverflowXamlIsland',
+    ]));
+    expect(kShellSurfaceClasses, containsAll([
+      'Windows.UI.Core.CoreWindow',
+      'XamlExplorerHostIslandWindow',
+      '#32768',
+    ]));
+  });
 }

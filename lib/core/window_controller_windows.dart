@@ -117,16 +117,18 @@ class WindowsWindowController implements WindowController {
         reactivated = _desktop.setForeground(window.hwnd) ? 'yes' : 'refused';
       }
       final name = _desktop.processName(window.pid) ?? '';
-      _captured = window.hwnd;
       _log('capture: branch=${decision.branch.name} '
           'hwnd=0x${window.hwnd.toRadixString(16)} class=${window.className} '
           'pid=${window.pid} frame=$frame reactivated=$reactivated '
           'reason=${decision.reason}');
-      return CapturedWindow(
+      final captured = CapturedWindow(
         name,
         WinRect(frame.left.toDouble(), frame.top.toDouble(),
             frame.width.toDouble(), frame.height.toDouble()),
       );
+      // Last, so a throw anywhere above leaves nothing captured.
+      _captured = window.hwnd;
+      return captured;
     } catch (e) {
       // A boundary: whatever Win32 did, a failed capture is "nothing to
       // place", never an exception escaping into the command queue.

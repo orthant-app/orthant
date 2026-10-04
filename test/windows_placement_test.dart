@@ -159,6 +159,27 @@ void main() {
     await expectFrameStays(r, w, target, clock);
   });
 
+  test('after a crossing, a resize in two steps is waited out to the second',
+      () async {
+    // The app resizes once, holds that frame for two reads, then resizes
+    // again. Two equal reads would end the wait on the first step, and the
+    // correction would measure and write while the app is still resizing;
+    // the third equal read is what carries the wait to the second step.
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..dpiResize = 1.5
+      ..dpiBorder = const Border(9, 0, 9, 9)
+      ..dpiResizeDelayReads = 4
+      ..dpiSecondStepReads = 2;
+    final clock = FakeClock();
+    final r = await place(w, leftHalf, clock);
+    expect(r.outcome, PlacementOutcome.placed);
+    expect(r.trace, contains('pass1=hit'));
+    expect(r.trace, contains('dpiwait=resized'));
+    expect(r.trace, contains('final=$leftHalf'));
+    expect(w.frame, leftHalf);
+    await expectFrameStays(r, w, leftHalf, clock);
+  });
+
   test('a window that crosses but keeps its frame is placed after a bounded '
       'wait', () async {
     final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))

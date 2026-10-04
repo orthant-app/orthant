@@ -28,7 +28,8 @@ WinRect rectForCommand(RegionCommand cmd, WinRect frame,
     case RegionCommand.maximize:    return block(0, 1, 0, 1);
     case RegionCommand.center:
       // The one placement not built from gridBlock, so it converts its own
-      // gap, the same way gapForPlacement does.
+      // gap by the display's scale, as gapForPlacement does. It does not
+      // apply gapForPlacement's minimum-size floor.
       final g = gap * scale;
       final usableW = frame.width - 2 * g;
       final usableH = frame.height - 2 * g;

@@ -2,6 +2,13 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+// The Dart-side patterns take either quote style: `prefer_single_quotes` is
+// off, so a double-quoted name must not escape the sweep without failing it.
+final _constant = RegExp(r'''const String (k\w+) = (['"])([^'"]+)\2;''');
+final _invoke = RegExp(
+    r'''invoke(?:List|Map)?Method(?:<[^(]*>)?\(\s*(k\w+|'[^']+'|"[^"]+")''');
+final _handled = RegExp(r'''call\.method == (k\w+|'[^']+'|"[^"]+")''');
+
 /// Every method Dart can send on `app.orthant/window` from code that runs on
 /// Windows must be answered by `windows/runner/window_channel.cpp`, and every
 /// callback the runner sends must be handled by Dart (Windows design §5.1). A
@@ -11,12 +18,12 @@ import 'package:flutter_test/flutter_test.dart';
 /// This test is that sweep, run on every change.
 void main() {
   final constants = <String, String>{
-    for (final m in RegExp(r"const String (k\w+) = '([^']+)';")
+    for (final m in _constant
         .allMatches(File('lib/core/channel.dart').readAsStringSync()))
-      m.group(1)!: m.group(2)!,
+      m.group(1)!: m.group(3)!,
   };
 
-  String resolve(String arg) => arg.startsWith("'")
+  String resolve(String arg) => arg.startsWith("'") || arg.startsWith('"')
       ? arg.substring(1, arg.length - 1)
       : constants[arg] ?? '<unknown constant $arg>';
 
@@ -28,8 +35,7 @@ void main() {
       if (f.path.endsWith('window_controller_macos.dart')) continue;
       final src = f.readAsStringSync();
       if (!src.contains('kOrthantChannel')) continue;
-      for (final m in RegExp(r"invoke(?:List|Map)?Method(?:<[^(]*>)?\(\s*(k\w+|'[^']+')")
-          .allMatches(src)) {
+      for (final m in _invoke.allMatches(src)) {
         calls.add(resolve(m.group(1)!));
       }
     }
@@ -51,6 +57,13 @@ void main() {
     expect(sent, isNotEmpty);
   });
 
+  test('the Dart-side patterns see a double-quoted name too', () {
+    expect(_invoke.firstMatch('invokeMethod("x")')?.group(1), '"x"');
+    expect(_constant.firstMatch('const String kX = "x";')?.group(3), 'x');
+    expect(_handled.firstMatch('call.method == "x"')?.group(1), '"x"');
+    expect(resolve('"x"'), 'x');
+  });
+
   test('every Dart call that can run on Windows is answered by the runner', () {
     final missing = dartCalls().difference(answered);
     expect(missing, isEmpty,
@@ -61,8 +74,7 @@ void main() {
   test('every runner callback is handled by Dart', () {
     final dart = File('lib/shortcuts/hotkey_service.dart').readAsStringSync();
     final handled = {
-      for (final m in RegExp(r"call\.method == (k\w+|'[^']+')").allMatches(dart))
-        resolve(m.group(1)!),
+      for (final m in _handled.allMatches(dart)) resolve(m.group(1)!),
     };
     expect(sent.difference(handled), isEmpty);
   });

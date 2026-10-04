@@ -167,6 +167,12 @@ class FakeWindow implements Win32Placer {
   int dpiResizeDelayReads = 0;
   int _resizeCountdown = 0;
 
+  /// The crossing's own resize in two steps, as an app whose layout after
+  /// WM_DPICHANGED takes two passes: the first step's frame is read this many
+  /// times, and the next read resizes the window by [dpiResize] again.
+  int? dpiSecondStepReads;
+  bool _secondStepArmed = false;
+
   /// After this many writes have been applied, the window stops applying
   /// writes, as if it hung.
   int? hangAfterWrites;
@@ -280,6 +286,11 @@ class FakeWindow implements Win32Placer {
     outer = PxRect(outer.left, outer.top,
         outer.left + (outer.width * factor).round(),
         outer.top + (outer.height * factor).round());
+    final second = dpiSecondStepReads;
+    if (second != null && !_secondStepArmed) {
+      _secondStepArmed = true;
+      _resizeCountdown = second;
+    }
   }
 }
 

@@ -218,6 +218,12 @@ Future<PlacementResult> placeWindow(
   // correction pass is for.
   final firstHit = firstLanded != null && frameMatches(firstLanded, target);
   trace.write(' pass1=${firstLanded == null ? 'unreadable' : firstHit ? 'hit' : 'miss'}');
+  // GetDpiForWindow answers 0 only for a window that is not there, whether
+  // it went before the read after pass 1 or during the wait for its DPI to
+  // change. That is not "did not cross", which a hit would report placed.
+  if (dpiAfter == 0) {
+    return done(PlacementOutcome.failed, 'final=none why=window-gone');
+  }
   if (firstHit && !crossed) {
     return done(PlacementOutcome.placed, 'final=$firstLanded');
   }

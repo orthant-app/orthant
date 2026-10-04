@@ -290,6 +290,27 @@ void main() {
     await expectFrameStays(r, w, leftHalf, clock);
   });
 
+  test('a window gone while its DPI change is awaited is not placed', () async {
+    // DPI reads: before pass 1, after it, then the wait's first poll, which
+    // finds the window gone. A DPI of 0 is not "not crossed".
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..targetMonitorDpi = 144
+      ..goneAtDpiRead = 3;
+    final r = await place(w, leftHalf, FakeClock());
+    expect(r.outcome, PlacementOutcome.failed);
+    expect(r.trace, contains('dpiflip=unreadable'));
+    expect(r.trace, contains('why=window-gone'));
+  });
+
+  test('a window gone when its DPI is read after pass 1 is not placed',
+      () async {
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..goneAtDpiRead = 2;
+    final r = await place(w, leftHalf, FakeClock());
+    expect(r.outcome, PlacementOutcome.failed);
+    expect(r.trace, contains('why=window-gone'));
+  });
+
   test('after a crossing, the correction waits for its own write, not an '
       'origin within tolerance', () async {
     // The crossing resizes the window to [2,0,1202,1300]: its origin is within

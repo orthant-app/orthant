@@ -207,6 +207,12 @@ class FakeWindow implements Win32Placer {
   /// After this many `extendedFrame` reads, the window no longer exists.
   int? goneAfterReads;
 
+  /// On this `windowDpi` call (the first is 1), the window no longer exists,
+  /// and that call answers 0. [goneAfterReads] counts frame reads only, which
+  /// placement does not make while it waits for a DPI change.
+  int? goneAtDpiRead;
+  int _dpiReads = 0;
+
   /// The window's own resizes, to these outer rects in order: once a write
   /// has been made, each `windowRect` read is followed at once by the next
   /// one, so a border measured across it (outer rect before, frame after) is
@@ -273,6 +279,8 @@ class FakeWindow implements Win32Placer {
 
   @override
   int windowDpi(int hwnd) {
+    final goneAt = goneAtDpiRead;
+    if (goneAt != null && ++_dpiReads >= goneAt) exists = false;
     if (!exists) return 0;
     if (_flipCountdown > 0 && --_flipCountdown == 0) _cross();
     return dpi;

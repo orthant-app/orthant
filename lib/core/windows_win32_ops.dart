@@ -148,7 +148,11 @@ class FfiWin32WindowOps implements Win32Desktop, Win32Placer {
       if (monitor.address == 0) return 0;
       GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, x, y);
       return x.value;
-    } on WindowsException {
+    } catch (_) {
+      // Any failure is "unknown": a failed HRESULT, or the API set's DLL,
+      // which loads lazily, failing to load (an ArgumentError). The answer
+      // only decides whether placement waits for a DPI change, so it must
+      // never fail the placement.
       return 0;
     } finally {
       if (y != null) calloc.free(y);

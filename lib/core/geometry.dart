@@ -1,4 +1,9 @@
-/// A rectangle in top-left-origin global points (CoreGraphics / AX space).
+/// A rectangle in the seam's global placement space, top-left origin.
+///
+/// Points on macOS (CoreGraphics / AX space); physical pixels on Windows,
+/// where a per-monitor-v2 process gets physical pixels from every Win32 call
+/// and those are the only coherent global space on a mixed-DPI desktop
+/// (Windows design §5.2, the coordinate contract).
 class WinRect {
   final double x;
   final double y;
@@ -20,6 +25,31 @@ class WinRect {
 
   @override
   String toString() => 'WinRect($x, $y, $width, $height)';
+}
+
+/// One display as the seam reports it: its usable frame in global placement
+/// space, and how many of those units make one device-independent pixel.
+///
+/// [scale] is 1.0 on macOS, whose placement space is already points. On
+/// Windows it is the display's DPI over 96, so a 16-point gap on a 150 %
+/// display is 24 physical pixels. Required rather than defaulted: a Windows
+/// display that lost its scale would place every gap and every size floor a
+/// third too small, a failure that looks exactly like a working build.
+class Display {
+  final WinRect frame;
+  final double scale;
+
+  const Display(this.frame, this.scale);
+
+  @override
+  bool operator ==(Object other) =>
+      other is Display && other.frame == frame && other.scale == scale;
+
+  @override
+  int get hashCode => Object.hash(frame, scale);
+
+  @override
+  String toString() => 'Display($frame, scale: $scale)';
 }
 
 /// The left half of [frame], in the same top-left global space.
@@ -58,6 +88,18 @@ double _overlap(double a0, double a1, double b0, double b1) {
   final lo = a0 > b0 ? a0 : b0;
   final hi = a1 < b1 ? a1 : b1;
   return hi > lo ? hi - lo : 0.0;
+}
+
+/// [screenContaining] over displays: the display [window] occupies the most,
+/// with its scale, or null if [displays] is empty.
+///
+/// A wrapper rather than a second overlap rule, so the two can never disagree
+/// about which display a straddling window belongs to. Ties go to the earlier
+/// display, as in [screenContaining].
+Display? displayContaining(WinRect window, List<Display> displays) {
+  final frames = [for (final d in displays) d.frame];
+  final best = screenContaining(window, frames);
+  return best == null ? null : displays[frames.indexOf(best)];
 }
 
 /// The smallest cell a placement may produce, in points.
@@ -100,6 +142,14 @@ const double kMinPlacedCell = 40;
 /// a 64 pt gap to 24.6 even for a half-screen window. Substituting `span = 1`
 /// here recovers the grid-wide formula exactly, which is what [effectiveGapFor]
 /// is: this clamp at its worst case.
+///
+/// [gap] and [kMinPlacedCell] are device-independent sizes, points on macOS and
+/// DIPs on Windows; [scale] (a [Display]'s) converts both into [frame]'s units,
+/// and the result is in [frame]'s units. This is the one place a size that is
+/// not a coordinate meets a global rect, so the shortcuts and the grid convert
+/// it identically by construction. The Windows design names two call sites for
+/// that multiplication (§5.2); a rule that has to be applied in two places to
+/// stay consistent is a rule in the wrong place.
 double gapForPlacement(
   WinRect frame, {
   required int cols,
@@ -109,18 +159,24 @@ double gapForPlacement(
   required int r0,
   required int r1,
   double gap = 0,
+  double scale = 1,
 }) {
   if (gap <= 0) return 0;
-  // Solve `span/n * extent - g * (span/n + 1) >= kMinPlacedCell` for g. Stated
-  // multiplied through by n, which is both tidier and — at span 1 — the exact
+  // Both sizes are device-independent and the frame is not, so each is
+  // converted once, here, where they meet it. At scale 1 both multiplications
+  // are exact, so macOS computes bit for bit what it always did.
+  final g = gap * scale;
+  final floor = kMinPlacedCell * scale;
+  // Solve `span/n * extent - g * (span/n + 1) >= floor` for g. Stated
+  // multiplied through by n, which is both tidier and, at span 1, the exact
   // expression this replaced, down to the floating-point operations.
   double limit(double extent, int n, int span) =>
-      (span * extent - kMinPlacedCell * n) / (span + n);
+      (span * extent - floor * n) / (span + n);
   final w = limit(frame.width, cols, c1 - c0 + 1);
   final h = limit(frame.height, rows, r1 - r0 + 1);
   final most = w < h ? w : h;
-  if (most <= 0) return 0; // even zero gap cannot reach the floor — cells still divide the frame
-  return gap < most ? gap : most;
+  if (most <= 0) return 0; // even zero gap cannot reach the floor; cells still divide the frame
+  return g < most ? g : most;
 }
 
 /// The gap a [cols]×[rows] grid can offer *every* one of its cells.
@@ -139,7 +195,8 @@ double effectiveGapFor(WinRect frame,
 /// gutters. All in top-left global points. This is the single placement formula
 /// shared by direct shortcuts (2×2) and the grid overlay (N×M).
 ///
-/// [gap] is a request, not a promise — see [gapForPlacement].
+/// [gap] is a request, not a promise — see [gapForPlacement]. It is
+/// device-independent; [scale] is the display's, and converts it.
 ///
 /// The result depends only on the *fractions* `c0/cols` and `(c1-c0+1)/cols`,
 /// never on `cols` itself, so the same rectangle written on any two grids lands
@@ -154,9 +211,11 @@ WinRect gridBlock(
   required int r0,
   required int r1,
   double gap = 0,
+  double scale = 1,
 }) {
   gap = gapForPlacement(frame,
-      cols: cols, rows: rows, c0: c0, c1: c1, r0: r0, r1: r1, gap: gap);
+      cols: cols, rows: rows, c0: c0, c1: c1, r0: r0, r1: r1,
+      gap: gap, scale: scale);
   final usableX = frame.x + gap;
   final usableY = frame.y + gap;
   final usableW = frame.width - 2 * gap;

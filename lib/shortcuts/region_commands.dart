@@ -10,10 +10,12 @@ enum RegionCommand {
 
 /// The target rect for [cmd] within visible screen [frame]. [current] is the
 /// captured window's current frame (used only by [RegionCommand.center]).
+/// [gap] is device-independent and [scale] is the display's, as in [gridBlock].
 WinRect rectForCommand(RegionCommand cmd, WinRect frame,
-    {required WinRect current, double gap = 0}) {
+    {required WinRect current, double gap = 0, double scale = 1}) {
   WinRect block(int c0, int c1, int r0, int r1) => gridBlock(frame,
-      cols: 2, rows: 2, c0: c0, c1: c1, r0: r0, r1: r1, gap: gap);
+      cols: 2, rows: 2, c0: c0, c1: c1, r0: r0, r1: r1,
+      gap: gap, scale: scale);
   switch (cmd) {
     case RegionCommand.leftHalf:    return block(0, 0, 0, 1);
     case RegionCommand.rightHalf:   return block(1, 1, 0, 1);
@@ -25,8 +27,11 @@ WinRect rectForCommand(RegionCommand cmd, WinRect frame,
     case RegionCommand.bottomRight: return block(1, 1, 1, 1);
     case RegionCommand.maximize:    return block(0, 1, 0, 1);
     case RegionCommand.center:
-      final usableW = frame.width - 2 * gap;
-      final usableH = frame.height - 2 * gap;
+      // The one placement not built from gridBlock, so it converts its own
+      // gap, the same way gapForPlacement does.
+      final g = gap * scale;
+      final usableW = frame.width - 2 * g;
+      final usableH = frame.height - 2 * g;
       final w = current.width <= usableW ? current.width : usableW;
       final h = current.height <= usableH ? current.height : usableH;
       return WinRect(
@@ -57,12 +62,14 @@ WinRect? rectFor(
   required WinRect current,
   required List<CustomRegion> regions,
   double gap = 0,
+  double scale = 1,
 }) {
   switch (ref) {
     case BuiltIn(:final command):
       final region = command.region;
       if (region == null) return null;
-      return rectForCommand(region, frame, current: current, gap: gap);
+      return rectForCommand(region, frame,
+          current: current, gap: gap, scale: scale);
     case Custom(:final id):
       for (final r in regions) {
         if (r.id != id) continue;
@@ -79,7 +86,8 @@ WinRect? rectFor(
             c1: r.c1,
             r0: r.r0,
             r1: r.r1,
-            gap: gap);
+            gap: gap,
+            scale: scale);
       }
       return null;
   }

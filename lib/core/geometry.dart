@@ -78,6 +78,9 @@ WinRect? screenContaining(WinRect window, List<WinRect> screens) {
   return best;
 }
 
+/// Whether [a] and [b] share any area; rects that only touch do not.
+bool overlaps(WinRect a, WinRect b) => _overlapArea(a, b) > 0;
+
 double _overlapArea(WinRect a, WinRect b) {
   final w = _overlap(a.x, a.x + a.width, b.x, b.x + b.width);
   final h = _overlap(a.y, a.y + a.height, b.y, b.y + b.height);

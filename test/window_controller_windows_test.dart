@@ -14,6 +14,14 @@ class _ThrowingDesktop extends FakeDesktop {
   int foregroundWindow() => throw StateError('user32 went away');
 }
 
+/// Throws only once capture has found its window: at the process name.
+class _NameThrowingDesktop extends FakeDesktop {
+  _NameThrowingDesktop() : super(ownPid: 1);
+
+  @override
+  String? processName(int pid) => throw StateError('OpenProcess went away');
+}
+
 // Built through functions so equality is tested, not const identity.
 Display display(double x, double y, double w, double h, double s) =>
     Display(WinRect(x, y, w, h), s);
@@ -204,6 +212,19 @@ void main() {
 
     test('a desktop that throws is a failed capture, not a crash', () async {
       expect(await wc(desktop: _ThrowingDesktop()).captureFrontmost(), isNull);
+    });
+
+    test('a capture that throws after finding its window leaves nothing '
+        'captured, so applyFrame moves nothing', () async {
+      final desktop = _NameThrowingDesktop()
+        ..windows.add(windowFacts(0x10, pid: 7))
+        ..foreground = 0x10;
+      final window = FakeWindow(frame: const PxRect(0, 0, 800, 600));
+      final c = wc(desktop: desktop, placer: window);
+      expect(await c.captureFrontmost(), isNull);
+      expect(await c.applyFrame(const WinRect(0, 0, 960, 1040)), isFalse);
+      expect(window.writes, isEmpty);
+      expect(window.touches, 0);
     });
 
     test('an elevated target is not placed, and was beeped at', () async {

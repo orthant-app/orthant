@@ -141,7 +141,8 @@ std::vector<WindowsOverlaySet::Display> WindowsOverlaySet::Displays() const {
   // place a window on the wrong monitor. A monitor that has gone is skipped,
   // since a WM_DISPLAYCHANGE and a reconcile follow; one still attached with
   // no working panel (never created, or destroyed: GetDpiForWindow answers 0)
-  // empties the list, and Dart falls back to the cursor's display.
+  // empties the list. Empty means "no display list", not "no displays": Dart
+  // then places only on the cursor's display, and only a window that is on it.
   for (HMONITOR monitor : unpanelled_) {
     if (MonitorExists(monitor)) {
       return {};

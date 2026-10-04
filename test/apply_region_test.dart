@@ -89,11 +89,41 @@ void main() {
     expect(wc.applied, const WinRect(1512, 0, 1280, 1440));
   });
 
-  test('falls back to the cursor display when no screens are reported',
-      () async {
+  test('with no display list, falls back to the cursor display when the '
+      'window is on it', () async {
     final wc = _FakeWc()..screens = const [];
     expect(await applyRegion(wc, const BuiltIn(ShortcutCommand.leftHalf)), isTrue);
     expect(wc.applied, const WinRect(0, 0, 720, 900));
+  });
+
+  test('with no display list, places nothing when the window is not on the '
+      'cursor display', () async {
+    // Windows answers an empty list when it cannot name its displays. The
+    // cursor's display is then all that is known, and snapping a window that
+    // sits on another monitor onto it would move it there.
+    final wc = _FakeWc()
+      ..screens = const []
+      ..screen = const Display(WinRect(0, 0, 1920, 1040), 1)
+      ..toCapture = const CapturedWindow('X', WinRect(2000, 100, 800, 600));
+    expect(await applyRegion(wc, const BuiltIn(ShortcutCommand.leftHalf)),
+        isFalse);
+    expect(wc.applied, isNull);
+  });
+
+  test('a window on none of the reported displays is placed on the first of '
+      'them, not the cursor\'s', () async {
+    // Today's rule for a non-empty list, pinned: screenContaining falls back
+    // to the first display when nothing overlaps, so the cursor display is
+    // never consulted while there is a list.
+    const a = Display(WinRect(0, 0, 1920, 1040), 1);
+    const b = Display(WinRect(1920, 0, 2560, 1440), 1);
+    final wc = _FakeWc()
+      ..screens = const [a, b]
+      ..screen = b
+      ..toCapture = const CapturedWindow('X', WinRect(-3000, 100, 800, 600));
+    expect(await applyRegion(wc, const BuiltIn(ShortcutCommand.leftHalf)),
+        isTrue);
+    expect(wc.applied, const WinRect(0, 0, 960, 1040));
   });
 
   test('returns false when no display can be named', () async {

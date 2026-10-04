@@ -251,6 +251,8 @@ Display? displayFromReply(Object? reply) {
 
 /// Every display, or none: a list with one entry dropped could place a window
 /// on the wrong display, since `displayContaining` falls back to the first.
+/// None means "no display list": `applyRegion` then places only on the
+/// cursor's display, and only a window that is on it.
 @visibleForTesting
 List<Display> displaysFromReply(Object? reply) {
   if (reply is! List) return const [];

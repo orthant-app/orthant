@@ -51,9 +51,11 @@ class FfiWin32WindowOps implements Win32Desktop, Win32Placer {
   @override
   WindowFacts facts(int hwnd) {
     final h = _h(hwnd);
-    final pid = calloc<Uint32>();
-    final cls = calloc<Uint16>(256).cast<Utf16>();
+    Pointer<Uint32>? pid;
+    Pointer<Utf16>? cls;
     try {
+      pid = calloc<Uint32>();
+      cls = calloc<Uint16>(256).cast<Utf16>();
       GetWindowThreadProcessId(h, pid);
       final n = GetClassName(h, PWSTR(cls), 256).value;
       final style = GetWindowLongPtr(h, GWL_STYLE).value;
@@ -66,12 +68,14 @@ class FfiWin32WindowOps implements Win32Desktop, Win32Placer {
         cloaked: _cloaked(h),
         iconic: IsIconic(h),
         toolWindow: (exStyle & WS_EX_TOOLWINDOW) != 0,
-        framed: (style & (WS_CAPTION | WS_THICKFRAME)) != 0,
+        // WS_CAPTION is two bits (WS_BORDER | WS_DLGFRAME); only both together
+        // are a title bar. A thin-border popup is not a window a user can move.
+        framed: (style & WS_CAPTION) == WS_CAPTION || (style & WS_THICKFRAME) != 0,
         frame: extendedFrame(hwnd),
       );
     } finally {
-      calloc.free(cls);
-      calloc.free(pid);
+      if (cls != null) calloc.free(cls);
+      if (pid != null) calloc.free(pid);
     }
   }
 
@@ -151,17 +155,19 @@ class FfiWin32WindowOps implements Win32Desktop, Win32Placer {
     final process =
         OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).value;
     if (process.address == 0) return null;
-    final buf = calloc<Uint16>(32768).cast<Utf16>();
-    final size = calloc<Uint32>()..value = 32768;
+    Pointer<Utf16>? buf;
+    Pointer<Uint32>? size;
     try {
+      buf = calloc<Uint16>(32768).cast<Utf16>();
+      size = calloc<Uint32>()..value = 32768;
       if (!QueryFullProcessImageName(process, PROCESS_NAME_WIN32, PWSTR(buf), size)
           .value) {
         return null;
       }
       return buf.toDartString(length: size.value);
     } finally {
-      calloc.free(size);
-      calloc.free(buf);
+      if (size != null) calloc.free(size);
+      if (buf != null) calloc.free(buf);
       CloseHandle(process);
     }
   }

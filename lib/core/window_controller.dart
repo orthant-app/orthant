@@ -109,11 +109,12 @@ abstract class WindowController {
   /// The display under the cursor: its visible frame (excluding the menu bar
   /// and Dock on macOS, the taskbar on Windows) in global placement space, and
   /// its scale. Used by the overlay, which is summoned where the user is
-  /// looking, and as `applyRegion`'s fallback when no displays are reported.
+  /// looking, and as `applyRegion`'s fallback when no displays are reported,
+  /// for a window that is on it.
   ///
   /// Null when the platform cannot say. Never a zero rect: a placement
   /// computed against one puts the window at the origin with no size and
-  /// reports it as placed (the zero-rect lesson in CLAUDE.md).
+  /// reports it as placed.
   Future<Display?> activeScreenFrame();
 
   /// Every display, in global placement space. Callers choose the relevant one

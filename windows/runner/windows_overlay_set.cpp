@@ -11,7 +11,8 @@ LRESULT CALLBACK PanelProc(HWND hwnd, UINT message, WPARAM wparam,
   switch (message) {
     case WM_MOUSEACTIVATE:
       // Never activate, even if a click ever reaches a panel. Orthant must
-      // never become the frontmost window (CLAUDE.md invariants).
+      // never become the frontmost window: it would take focus from the
+      // window the user is placing.
       return MA_NOACTIVATE;
     case WM_DPICHANGED:
       // A hidden panel keeps its rect: it exists to sit on its monitor and

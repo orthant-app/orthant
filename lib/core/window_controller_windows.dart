@@ -70,8 +70,9 @@ class WindowsWindowController implements WindowController {
 
   static const MethodChannel _channel = MethodChannel(kOrthantChannel);
 
-  /// Debug and Profile only. The acceptance harness reads these lines; their
-  /// formats are fixed in the W1 plan (Task 7's Interfaces).
+  /// Debug and Profile only. The acceptance harness parses these lines, so
+  /// their formats, the `key=value` tokens included, are an interface: change
+  /// one only together with the harness.
   static void _log(String message) {
     if (!kReleaseMode) debugPrint('[orthant] $message');
   }

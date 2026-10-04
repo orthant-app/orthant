@@ -148,11 +148,13 @@ const double kMinPlacedCell = 40;
 ///
 /// [gap] and [kMinPlacedCell] are device-independent sizes, points on macOS and
 /// DIPs on Windows; [scale] (a [Display]'s) converts both into [frame]'s units,
-/// and the result is in [frame]'s units. This is the one place a size that is
-/// not a coordinate meets a global rect, so the shortcuts and the grid convert
-/// it identically by construction. The Windows design names two call sites for
-/// that multiplication (§5.2); a rule that has to be applied in two places to
-/// stay consistent is a rule in the wrong place.
+/// and the result is in [frame]'s units. The conversion lives here, so every
+/// placement built from [gridBlock] (the direct shortcuts and custom regions)
+/// shares it rather than each call site multiplying on its own. Two
+/// exceptions: `center` (`region_commands.dart`) is not a block, and applies
+/// the same scale to its own gap itself, without this floor; and the overlay's
+/// `targetRect` (`grid_selection.dart`) does not take a scale yet, so its gap
+/// is converted at 1, which is right while the overlay runs only on macOS.
 double gapForPlacement(
   WinRect frame, {
   required int cols,

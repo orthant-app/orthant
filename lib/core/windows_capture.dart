@@ -1,7 +1,7 @@
 import 'windows_window_ops.dart';
 
 /// The shell's desktop. Never a target: macOS once captured an empty Desktop
-/// as a window, and the grid then appeared over nothing (CLAUDE.md, M5).
+/// as a window, and the grid then appeared over nothing.
 const Set<String> kDesktopClasses = {'Progman', 'WorkerW'};
 
 /// The taskbar and the notification area's overflow flyout (Windows 10 and

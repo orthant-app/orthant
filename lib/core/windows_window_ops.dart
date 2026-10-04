@@ -81,8 +81,8 @@ const int kErrorAccessDenied = 5;
 
 /// The part of the desktop that capture reads. `windows_win32_ops.dart` is the
 /// real one; the suite uses a fake, because which window to capture is a
-/// decision and decisions are tested (CLAUDE.md: macOS's placement retry loop
-/// went uncovered for a milestone for want of exactly this seam).
+/// decision and decisions are tested (macOS's placement retry loop went
+/// uncovered for a milestone for want of exactly this seam).
 ///
 /// Window handles are plain ints, private to the Windows backend. They never
 /// cross the method channel; the seam carries only plain data.

@@ -7,7 +7,7 @@ import 'package:orthant/shortcuts/shortcut_command.dart';
 
 // Built through functions, never as const literals: Dart canonicalizes const
 // instances, so an equality test written with them passes with operator ==
-// deleted (CLAUDE.md, M9 traps).
+// deleted.
 WinRect rect(double x, double y, double w, double h) => WinRect(x, y, w, h);
 Display display(WinRect frame, double scale) => Display(frame, scale);
 

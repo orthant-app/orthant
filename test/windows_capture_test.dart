@@ -64,8 +64,8 @@ void main() {
   });
 
   test('a foreground window DWM will not describe is not captured', () {
-    // An unreadable frame is not a frame at the origin: a zero rect would
-    // compare equal to a real window there.
+    // An unreadable frame is not a frame at the origin: a zero rect sits
+    // there, so it would pass the origin check for a target at the origin.
     expect(decideCapture(desktop([windowFacts(10, frame: null)], foreground: 10))
         .window, isNull);
     expect(

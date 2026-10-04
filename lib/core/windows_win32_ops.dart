@@ -121,7 +121,8 @@ class FfiWin32WindowOps implements Win32Desktop, Win32Placer {
       return PxRect(r.ref.left, r.ref.top, r.ref.right, r.ref.bottom);
     } on WindowsException {
       // A window that has gone, or one DWM will not describe. Null, never a
-      // zero rect, which would compare equal to a real window at the origin.
+      // zero rect: that sits at the origin, so it would pass the origin check
+      // for a target there and read as placed.
       return null;
     } finally {
       calloc.free(r);

@@ -18,6 +18,10 @@ LRESULT CALLBACK PanelProc(HWND hwnd, UINT message, WPARAM wparam,
       // report that monitor's DPI, which GetDpiForWindow now does. W3, which
       // shows these, owns resizing them.
       return 0;
+    case WM_CLOSE:
+      // Panels live until Reconcile or the destructor destroys them, and a
+      // graceful taskkill or a close-all-windows tool must not take one away.
+      return 0;
   }
   return DefWindowProc(hwnd, message, wparam, lparam);
 }
@@ -25,6 +29,14 @@ LRESULT CALLBACK PanelProc(HWND hwnd, UINT message, WPARAM wparam,
 BOOL CALLBACK CollectMonitor(HMONITOR monitor, HDC, LPRECT, LPARAM data) {
   reinterpret_cast<std::vector<HMONITOR>*>(data)->push_back(monitor);
   return TRUE;
+}
+
+// Whether `monitor` is still attached. GetMonitorInfoW fails for one that has
+// gone, between the change and the WM_DISPLAYCHANGE that reports it.
+bool MonitorExists(HMONITOR monitor) {
+  MONITORINFO info{};
+  info.cbSize = sizeof(info);
+  return GetMonitorInfoW(monitor, &info) != FALSE;
 }
 
 }  // namespace
@@ -35,7 +47,17 @@ WindowsOverlaySet::WindowsOverlaySet() : instance_(GetModuleHandle(nullptr)) {
   window_class.lpfnWndProc = PanelProc;
   window_class.hInstance = instance_;
   window_class.lpszClassName = kPanelClass;
-  RegisterClassExW(&window_class);
+  const ATOM registered = RegisterClassExW(&window_class);
+#ifndef NDEBUG
+  if (registered == 0) {
+    // Read before anything else runs: writing to cout can reset it.
+    const DWORD error = GetLastError();
+    std::cout << "[orthant] overlay panel class not registered, error "
+              << error << std::endl;
+  }
+#else
+  (void)registered;
+#endif
   Reconcile("launch");
 }
 
@@ -58,6 +80,7 @@ void WindowsOverlaySet::Reconcile(const char* reason) {
   // whose HMONITOR survives starts to pay when W3 attaches an engine to each,
   // and is W3's to add.
   DestroyPanels();
+  unpanelled_.clear();
   std::vector<HMONITOR> monitors;
   EnumDisplayMonitors(nullptr, nullptr, CollectMonitor,
                       reinterpret_cast<LPARAM>(&monitors));
@@ -74,6 +97,13 @@ void WindowsOverlaySet::Reconcile(const char* reason) {
         nullptr, nullptr, instance_, nullptr);
     if (hwnd) {
       panels_.push_back({monitor, hwnd});
+    } else {
+#ifndef NDEBUG
+      const DWORD error = GetLastError();
+      std::cout << "[orthant] overlay panel not created, error " << error
+                << std::endl;
+#endif
+      unpanelled_.push_back(monitor);
     }
   }
 #ifndef NDEBUG
@@ -106,10 +136,23 @@ std::optional<WindowsOverlaySet::Display> WindowsOverlaySet::DisplayFor(
 }
 
 std::vector<WindowsOverlaySet::Display> WindowsOverlaySet::Displays() const {
+  // All or none, the rule Dart's displaysFromReply applies to this reply: a
+  // shorter list lets displayContaining fall back to the first display and
+  // place a window on the wrong monitor. A monitor that has gone is skipped,
+  // since a WM_DISPLAYCHANGE and a reconcile follow; one still attached with
+  // no working panel (never created, or destroyed: GetDpiForWindow answers 0)
+  // empties the list, and Dart falls back to the cursor's display.
+  for (HMONITOR monitor : unpanelled_) {
+    if (MonitorExists(monitor)) {
+      return {};
+    }
+  }
   std::vector<Display> displays;
   for (const auto& panel : panels_) {
     if (auto display = DisplayFor(panel)) {
       displays.push_back(*display);
+    } else if (MonitorExists(panel.monitor)) {
+      return {};
     }
   }
   return displays;

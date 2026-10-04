@@ -38,7 +38,9 @@ class WindowsOverlaySet {
   // Every monitor's work area and DPI, in enumeration order. The work area is
   // read live, so a taskbar that moved is current without a reconcile. A
   // panel whose monitor has gone, between the change and the WM_DISPLAYCHANGE
-  // that reports it, is skipped rather than reported with a stale rect.
+  // that reports it, is skipped rather than reported with a stale rect. A
+  // monitor still attached with no working panel empties the list: all or
+  // none, as Dart's displaysFromReply.
   std::vector<Display> Displays() const;
 
   // The monitor under the cursor, or nullopt if it has no panel yet.
@@ -55,6 +57,8 @@ class WindowsOverlaySet {
 
   HINSTANCE instance_;
   std::vector<Panel> panels_;
+  // Monitors the last Reconcile could not create a panel for.
+  std::vector<HMONITOR> unpanelled_;
 };
 
 #endif  // RUNNER_WINDOWS_OVERLAY_SET_H_

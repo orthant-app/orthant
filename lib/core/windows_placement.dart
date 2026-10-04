@@ -128,9 +128,9 @@ bool frameMatches(PxRect landed, PxRect want) =>
 /// window whose frame never changed and does not match is not placed even if
 /// it already sits at the target's origin: from outside, a hung window there
 /// and one already pressed against its own minimum size there look identical,
-/// and a false "placed" is the worse error (the zero-rect lesson). The cost is
-/// a silent "not placed" for re-snapping a window to the spot it already
-/// occupies at its minimum size.
+/// and a false "placed" is the worse error. The cost is a silent "not placed"
+/// for re-snapping a window to the spot it already occupies at its minimum
+/// size.
 Future<PlacementResult> placeWindow(
   Win32Placer placer,
   int hwnd,

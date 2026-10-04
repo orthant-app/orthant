@@ -77,7 +77,8 @@ bool isPlaceable(WindowFacts w, int ownPid) {
 /// belongs to the taskbar, the overflow flyout, or Orthant's own hidden window
 /// (tray_manager foregrounds it so the menu can dismiss), never to the window
 /// the user was working in. In those states the target is the topmost
-/// placeable window beneath, and it is reactivated, so the user's keyboard
+/// placeable window beneath (an always-on-top one only when nothing else is
+/// placeable), and it is reactivated, so the user's keyboard
 /// focus ends where it was before the tray took it. With Orthant's visible
 /// settings window in front, the window beneath is still the target (macOS
 /// captures nothing there; on Windows the tray itself puts that window in
@@ -124,14 +125,23 @@ CaptureDecision decideCapture(Win32Desktop desktop) {
 
 CaptureDecision _beneath(Win32Desktop desktop, int ownPid, int fg,
     {required bool reactivate, required String reason}) {
+  CaptureDecision found(WindowFacts w) => CaptureDecision.capture(w,
+      branch: CaptureBranch.beneath, reactivate: reactivate, reason: reason);
+  // An always-on-top window (a pinned video, a sticky note) sits first in
+  // z-order whether or not the user was last working in it, so it is taken
+  // only when nothing below it is placeable. The topmost band comes first,
+  // so the walk still stops at the first ordinary placeable window.
+  WindowFacts? pinned;
   for (final hwnd in desktop.zOrder()) {
     if (hwnd == fg) continue;
     final w = desktop.facts(hwnd);
     // A guess, unlike the foreground window, so held to more: tool windows
     // (palettes, flyouts, tooltips) and borderless popups are passed over.
     if (w.toolWindow || !w.framed || !isPlaceable(w, ownPid)) continue;
-    return CaptureDecision.capture(w,
-        branch: CaptureBranch.beneath, reactivate: reactivate, reason: reason);
+    if (!w.topmost) return found(w);
+    pinned ??= w;
   }
-  return const CaptureDecision.none('nothing-placeable-beneath');
+  return pinned == null
+      ? const CaptureDecision.none('nothing-placeable-beneath')
+      : found(pinned);
 }

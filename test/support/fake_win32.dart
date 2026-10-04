@@ -11,6 +11,7 @@ WindowFacts windowFacts(
   bool cloaked = false,
   bool iconic = false,
   bool toolWindow = false,
+  bool topmost = false,
   bool framed = true,
   PxRect? frame = const PxRect(0, 0, 800, 600),
 }) =>
@@ -22,6 +23,7 @@ WindowFacts windowFacts(
       cloaked: cloaked,
       iconic: iconic,
       toolWindow: toolWindow,
+      topmost: topmost,
       framed: framed,
       frame: frame,
     );

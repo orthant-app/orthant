@@ -70,6 +70,7 @@ class FfiWin32WindowOps implements Win32Desktop, Win32Placer {
         cloaked: _cloaked(h),
         iconic: IsIconic(h),
         toolWindow: (exStyle & WS_EX_TOOLWINDOW) != 0,
+        topmost: (exStyle & WS_EX_TOPMOST) != 0,
         // WS_CAPTION is two bits (WS_BORDER | WS_DLGFRAME); only both together
         // are a title bar. A thin-border popup is not a window a user can move.
         framed: (style & WS_CAPTION) == WS_CAPTION || (style & WS_THICKFRAME) != 0,

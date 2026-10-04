@@ -137,6 +137,31 @@ void main() {
     expect(decideCapture(d).window!.hwnd, 30);
   });
 
+  test('beneath the tray, an always-on-top window (a pinned video, a sticky '
+      'note) is passed over for the window the user was working in, and taken '
+      'only when nothing else is placeable', () {
+    final d = desktop([
+      windowFacts(2, pid: own, visible: false),
+      windowFacts(15, topmost: true),
+      windowFacts(10),
+    ], foreground: 2);
+    expect(decideCapture(d).window!.hwnd, 10);
+
+    final onlyPinned = desktop([
+      windowFacts(2, pid: own, visible: false),
+      windowFacts(15, topmost: true),
+      windowFacts(5, className: 'Progman'),
+    ], foreground: 2);
+    expect(decideCapture(onlyPinned).window!.hwnd, 15);
+  });
+
+  test('an always-on-top window in the foreground is captured as is: the user '
+      'is working in it', () {
+    final c = decideCapture(desktop([windowFacts(15, topmost: true)], foreground: 15));
+    expect(c.branch, CaptureBranch.foreground);
+    expect(c.window!.hwnd, 15);
+  });
+
   test('nothing placeable beneath gives none, not a guess', () {
     final d = desktop([
       windowFacts(2, pid: own, visible: false),

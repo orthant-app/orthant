@@ -42,6 +42,7 @@ class WindowFacts {
     required this.cloaked,
     required this.iconic,
     required this.toolWindow,
+    required this.topmost,
     required this.framed,
     required this.frame,
   });
@@ -58,6 +59,10 @@ class WindowFacts {
 
   /// `WS_EX_TOOLWINDOW`: palettes, flyouts, tooltips. Not an app window.
   final bool toolWindow;
+
+  /// `WS_EX_TOPMOST`: always on top, so first in z-order whether or not the
+  /// user was last working in it.
+  final bool topmost;
 
   /// `WS_CAPTION` or `WS_THICKFRAME`: a window a user could move or resize.
   final bool framed;

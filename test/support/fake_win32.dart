@@ -96,6 +96,8 @@ class NoWindows implements Win32Desktop, Win32Placer {
   @override
   PxRect? extendedFrame(int hwnd) => null;
   @override
+  int windowDpi(int hwnd) => 0;
+  @override
   SetPosResult setWindowPosAsync(int hwnd, int x, int y, int width, int height,
           {bool touchOnly = false}) =>
       (ok: false, error: 1400); // ERROR_INVALID_WINDOW_HANDLE
@@ -155,6 +157,16 @@ class FakeWindow implements Win32Placer {
   double? dpiResize;
   Border? dpiBorder;
 
+  /// The window's DPI; it becomes [dpiAfterMove] when its first write lands
+  /// with [dpiResize] set (the crossing).
+  int dpi = 96;
+  int dpiAfterMove = 144;
+
+  /// Reads after the crossing before the window's own resize applies: 0 is
+  /// at once (as Chrome does), more is late (as Notepad does).
+  int dpiResizeDelayReads = 0;
+  int _resizeCountdown = 0;
+
   final List<PxRect> writes = [];
   int touches = 0;
   int beeps = 0;
@@ -195,9 +207,14 @@ class FakeWindow implements Win32Placer {
     if (_pending != null && !hung && ++_pendingReads > lagReads) {
       _apply(_pending!);
       _pending = null;
+    } else if (_resizeCountdown > 0 && --_resizeCountdown == 0) {
+      _dpiResize(dpiResize!);
     }
     return frame;
   }
+
+  @override
+  int windowDpi(int hwnd) => exists ? dpi : 0;
 
   @override
   SetPosResult setWindowPosAsync(int hwnd, int x, int y, int width, int height,
@@ -235,11 +252,20 @@ class FakeWindow implements Win32Placer {
     final factor = dpiResize;
     if (factor != null && !_resized) {
       _resized = true;
-      border = dpiBorder ?? border;
-      outer = PxRect(outer.left, outer.top,
-          outer.left + (outer.width * factor).round(),
-          outer.top + (outer.height * factor).round());
+      dpi = dpiAfterMove;
+      if (dpiResizeDelayReads == 0) {
+        _dpiResize(factor);
+      } else {
+        _resizeCountdown = dpiResizeDelayReads;
+      }
     }
+  }
+
+  void _dpiResize(double factor) {
+    border = dpiBorder ?? border;
+    outer = PxRect(outer.left, outer.top,
+        outer.left + (outer.width * factor).round(),
+        outer.top + (outer.height * factor).round());
   }
 }
 

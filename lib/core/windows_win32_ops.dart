@@ -126,6 +126,9 @@ class FfiWin32WindowOps implements Win32Desktop, Win32Placer {
   }
 
   @override
+  int windowDpi(int hwnd) => GetDpiForWindow(_h(hwnd));
+
+  @override
   SetPosResult setWindowPosAsync(int hwnd, int x, int y, int width, int height,
       {bool touchOnly = false}) {
     var flags = SWP_NOACTIVATE | SWP_NOZORDER | SWP_ASYNCWINDOWPOS;

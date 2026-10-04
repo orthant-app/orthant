@@ -116,6 +116,12 @@ abstract interface class Win32Placer {
   /// `DWMWA_EXTENDED_FRAME_BOUNDS`, the frame the user sees.
   PxRect? extendedFrame(int hwnd);
 
+  /// `GetDpiForWindow` of the target: its DPI now, or 0 when unknown. For a
+  /// per-monitor-aware window this changes the moment it moves onto a monitor
+  /// of another scale, when the system sends it WM_DPICHANGED, and before the
+  /// window's own handling of that message resizes it.
+  int windowDpi(int hwnd);
+
   /// `SetWindowPos` with `SWP_NOACTIVATE | SWP_NOZORDER | SWP_ASYNCWINDOWPOS`.
   /// With [touchOnly], also `SWP_NOMOVE | SWP_NOSIZE`: a write that changes
   /// nothing, whose only purpose is the access check UIPI applies to every

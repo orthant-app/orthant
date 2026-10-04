@@ -77,6 +77,54 @@ void main() {
         reason: 'the second write uses the border measured after the resize');
     expect(r.trace, contains('pass1=miss'));
     expect(r.trace, contains('correction=hit'));
+    expect(r.trace, contains('dpi=96->144'));
+  });
+
+  test('a window that resizes itself late after crossing is waited for, then '
+      'corrected', () async {
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..dpiResize = 1.5
+      ..dpiBorder = const Border(10, 0, 10, 10)
+      ..dpiResizeDelayReads = 4;
+    const target = PxRect(1920, 0, 3360, 1560);
+    final r = await place(w, target, FakeClock());
+    expect(r.outcome, PlacementOutcome.placed);
+    expect(r.trace, contains('pass1=hit'));
+    expect(r.trace, contains('dpiwait=resized'));
+    expect(r.trace, contains('correction=hit'));
+    expect(w.writes, hasLength(2));
+    // Let time pass: the frame that stays is the target, not the late resize.
+    for (var i = 0; i < 10; i++) {
+      w.extendedFrame(hwnd);
+    }
+    expect(w.frame, target);
+  });
+
+  test('a window that crosses but keeps its frame is placed after a bounded '
+      'wait', () async {
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..dpiResize = 1.0;
+    final clock = FakeClock();
+    final r = await place(w, leftHalf, clock);
+    expect(r.outcome, PlacementOutcome.placed);
+    expect(r.trace, contains('dpiwait=none'));
+    expect(w.writes, hasLength(1));
+    expect(clock.elapsedMs,
+        lessThanOrEqualTo(2 * timing.pollMs + timing.dpiSettleMs + timing.pollMs));
+  });
+
+  test('after a crossing, the correction waits for its own write, not an '
+      'origin within tolerance', () async {
+    // The crossing resizes the window to [2,0,1202,1300]: its origin is within
+    // 2 px of the target's, so an origin-settle would accept it before the
+    // correction's (lagging) write lands.
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..dpiResize = 1.25
+      ..dpiBorder = const Border(9, 0, 9, 9)
+      ..lagReads = 3;
+    final r = await place(w, leftHalf, FakeClock());
+    expect(r.outcome, PlacementOutcome.placed);
+    expect(r.trace, contains('final=$leftHalf'));
   });
 
   test('a hung window fails within both pass deadlines, and is not beeped at',

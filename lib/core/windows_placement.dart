@@ -172,10 +172,15 @@ Future<PlacementResult> placeWindow(
   if (firstHit) {
     if (!crossed) return done(PlacementOutcome.placed, 'final=$firstLanded');
     // Wait, bounded, for the window's own resize, then correct after it.
-    final resized = await _awaitChange(placer, hwnd, firstLanded, clock, timing);
-    if (resized == null) {
+    final settle = await _awaitChange(placer, hwnd, firstLanded, clock, timing);
+    if (settle.kept) {
       // It kept the frame: nothing to correct.
       return done(PlacementOutcome.placed, 'dpiwait=none final=$firstLanded');
+    }
+    final resized = settle.frame;
+    if (resized == null) {
+      return done(PlacementOutcome.failed,
+          'dpiwait=unreadable final=none why=frame-unreadable');
     }
     trace.write(' dpiwait=resized');
     correctFrom = resized;
@@ -196,7 +201,12 @@ Future<PlacementResult> placeWindow(
   final landed = second.landed ?? placer.extendedFrame(hwnd);
   // Origin is enough only from a window that moved, macOS's rule for a target
   // at its own minimum size; a whole-frame match is enough from any window.
-  final moved = responded || (landed != null && landed != before);
+  // After a crossing the movement has to be this pass's: the window's own DPI
+  // resize keeps its origin within tolerance of the target, so pass 1's change
+  // says nothing about whether the correction landed.
+  final moved = crossed
+      ? (landed != null && landed != correctFrom)
+      : responded || (landed != null && landed != before);
   final arrived = landed != null &&
       (frameMatches(landed, target) || (moved && originMatches(landed, target)));
   trace.write(' correction=${second.error != null ? 'error${second.error}' : landed == null ? 'unreadable' : arrived ? 'hit' : 'miss'}');
@@ -207,23 +217,35 @@ Future<PlacementResult> placeWindow(
       'final=$landed');
 }
 
-/// The frame [hwnd] settles on after leaving [from], or null if it has not
-/// left it within [PlacementTiming.dpiSettleMs].
-Future<PxRect?> _awaitChange(Win32Placer placer, int hwnd, PxRect from,
+/// What [hwnd]'s frame did while a crossing's own resize was awaited: kept
+/// [from] to the end ([kept]), or ended on [frame], which is null when the
+/// last read failed.
+typedef _Settle = ({bool kept, PxRect? frame});
+
+/// Waits, at most [PlacementTiming.dpiSettleMs], for [hwnd] to leave [from]
+/// and hold a new frame for three reads in a row: the app's own layout after
+/// WM_DPICHANGED can take more than one step, so two equal reads are not
+/// enough here.
+Future<_Settle> _awaitChange(Win32Placer placer, int hwnd, PxRect from,
     PlacementClock clock, PlacementTiming timing) async {
   final started = clock.elapsedMs;
+  PxRect? last = from;
   PxRect? previous;
+  var repeats = 0;
   while (clock.elapsedMs - started < timing.dpiSettleMs) {
     await clock.sleep(timing.pollMs);
     final now = placer.extendedFrame(hwnd);
+    last = now;
     if (now == null || now == from) {
       previous = null;
+      repeats = 0;
       continue;
     }
-    if (now == previous) return now;
+    repeats = now == previous ? repeats + 1 : 0;
+    if (repeats >= 2) return (kept: false, frame: now);
     previous = now;
   }
-  return previous;
+  return last == from ? (kept: true, frame: from) : (kept: false, frame: last);
 }
 
 class _Pass {
@@ -262,8 +284,10 @@ Future<_Pass> _pass(Win32Placer placer, int hwnd, PxRect target,
   // an unchanged frame is not settled: the target may not have processed the
   // asynchronous write yet, and a hung one never will, which the deadline
   // decides. Two reads 15 ms apart can in principle both catch a frame just
-  // before a WM_DPICHANGED resize; the acceptance reads every frame back
-  // independently, later, for that reason.
+  // before a WM_DPICHANGED resize, which is why [placeWindow] waits for a
+  // crossing's own resize before it trusts a pass; the acceptance's
+  // independent read-back, later, is still the backstop for an app that
+  // resizes more than once.
   final started = clock.elapsedMs;
   PxRect? previous;
   PxRect? last;

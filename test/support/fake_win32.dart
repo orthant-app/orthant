@@ -167,6 +167,13 @@ class FakeWindow implements Win32Placer {
   int dpiResizeDelayReads = 0;
   int _resizeCountdown = 0;
 
+  /// After this many writes have been applied, the window stops applying
+  /// writes, as if it hung.
+  int? hangAfterWrites;
+
+  /// After this many `extendedFrame` reads, the window no longer exists.
+  int? goneAfterReads;
+
   final List<PxRect> writes = [];
   int touches = 0;
   int beeps = 0;
@@ -176,6 +183,8 @@ class FakeWindow implements Win32Placer {
   PxRect? _pending;
   int _pendingReads = 0;
   int _zoomReads = 0;
+  int _applied = 0;
+  int _reads = 0;
   bool _resized = false;
 
   @override
@@ -203,6 +212,9 @@ class FakeWindow implements Win32Placer {
 
   @override
   PxRect? extendedFrame(int hwnd) {
+    _reads++;
+    final goneAfter = goneAfterReads;
+    if (goneAfter != null && _reads > goneAfter) exists = false;
     if (!exists || !frameReadable) return null;
     if (_pending != null && !hung && ++_pendingReads > lagReads) {
       _apply(_pending!);
@@ -249,6 +261,8 @@ class FakeWindow implements Win32Placer {
     final topFloor = minOuterTop;
     if (topFloor != null && top < topFloor) top = topFloor;
     outer = PxRect(r.left, top, r.left + w, top + r.height);
+    final hangAfter = hangAfterWrites;
+    if (hangAfter != null && ++_applied >= hangAfter) hung = true;
     final factor = dpiResize;
     if (factor != null && !_resized) {
       _resized = true;

@@ -127,6 +127,44 @@ void main() {
     expect(r.trace, contains('final=$leftHalf'));
   });
 
+  test('after a crossing, a correction that never lands is not placed (resized '
+      'at once)', () async {
+    // Pass 1 lands at [2,0,1445,1562]: the window's own resize, whose origin is
+    // within 2 px of the target's. That is not the correction landing.
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..dpiResize = 1.5
+      ..dpiBorder = const Border(9, 0, 9, 9)
+      ..hangAfterWrites = 1;
+    final r = await place(w, leftHalf, FakeClock());
+    expect(r.outcome, PlacementOutcome.failed);
+    expect(r.trace, contains('correction=miss'));
+  });
+
+  test('after a crossing, a correction that never lands is not placed (resized '
+      'late)', () async {
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..dpiResize = 1.5
+      ..dpiBorder = const Border(9, 0, 9, 9)
+      ..dpiResizeDelayReads = 4
+      ..hangAfterWrites = 1;
+    final r = await place(w, leftHalf, FakeClock());
+    expect(r.outcome, PlacementOutcome.failed);
+    expect(r.trace, contains('pass1=hit'));
+    expect(r.trace, contains('dpiwait=resized'));
+  });
+
+  test('a window that goes away while its crossing resize is awaited is not '
+      'placed', () async {
+    final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))
+      ..dpiResize = 1.5
+      ..dpiResizeDelayReads = 50
+      ..goneAfterReads = 6;
+    final r = await place(w, leftHalf, FakeClock());
+    expect(r.outcome, PlacementOutcome.failed);
+    expect(r.trace, contains('pass1=hit'));
+    expect(r.trace, contains('dpiwait=unreadable'));
+  });
+
   test('a hung window fails within both pass deadlines, and is not beeped at',
       () async {
     final w = FakeWindow(frame: const PxRect(100, 100, 900, 700))..hung = true;

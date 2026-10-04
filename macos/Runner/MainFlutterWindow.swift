@@ -41,7 +41,16 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
                           height: AppShell.configOpeningHeight)),
       display: false)
 
-    let flutterViewController = FlutterViewController()
+    // An engine of our own, run explicitly at the end of this method.
+    // `FlutterViewController()` launches the engine it creates only in
+    // `viewWillAppear`, so Dart could not start until this window was on
+    // screen: the nib showing it at launch was what started the app, and the
+    // window stayed up until Dart got round to hiding it — the flash on every
+    // launch in #6. The overlay engine is built the same way.
+    let engine = FlutterEngine(name: "orthant.main", project: nil,
+                               allowHeadlessExecution: true)
+    let flutterViewController =
+      FlutterViewController(engine: engine, nibName: nil, bundle: nil)
     self.contentViewController = flutterViewController
 
     let channel = FlutterMethodChannel(
@@ -228,12 +237,19 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     self.isRestorable = false
     self.delegate = self
 
-    // Menu-bar app: never show the main window; the tray drives everything.
-    self.orderOut(nil)
+    // Menu-bar app: the window stays hidden until Settings asks for it. That is
+    // `visibleAtLaunch="NO"` in MainMenu.xib, not anything here: the nib loader
+    // orders a visible-at-launch window front *after* `awakeFromNib` returns, so
+    // an `orderOut` in this method ran first and hid nothing.
 
     // Sparkle's scheduler runs from here on, whether or not Settings is ever
     // opened. See `Updater.start()` for the release that shipped without it.
     Updater.start()
+
+    // Last, which is where `viewWillAppear` used to launch it: after everything
+    // above is wired, and with no resize in this method left to wait on a
+    // running engine.
+    engine.run(withEntrypoint: nil)
   }
 
   /// The red button and ⌘W must land in exactly the same state as a Dart-driven

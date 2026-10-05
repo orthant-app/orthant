@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../core/geometry.dart';
 import '../core/window_controller.dart';
 import '../permission/permission_controller.dart';
 import '../settings/settings.dart';
@@ -408,6 +409,32 @@ class OrthantCoordinator extends ChangeNotifier {
             gap: _settings.effectiveGap,
             displayOffset: 1);
       });
+
+  /// Windows: the grid's commit, back from the runner.
+  ///
+  /// Through the command queue, serialised with the direct shortcuts over the
+  /// one capture slot, and applied only if [sessionId] still names the
+  /// current, unconsumed capture: the controller decides that. A commit that
+  /// did not land takes the shortcut path's recovery.
+  Future<void> overlayCommit(int sessionId, WinRect rect) =>
+      _commands.add(() async {
+        if (await wc.applyOverlayCommit(sessionId, rect)) return;
+        await recoverIfPermissionLost();
+      });
+
+  /// Windows: Ctrl+S on the grid. Place first; offer the shape as a shortcut
+  /// only if the window landed (macOS's rule: a failed placement offers
+  /// nothing). The picker opens outside the queue: it waits on the user, and
+  /// the queue must not.
+  Future<void> overlaySaveRegion(
+      int sessionId, WinRect rect, Map<Object?, Object?> block) async {
+    var placed = false;
+    await _commands.add(() async {
+      placed = await wc.applyOverlayCommit(sessionId, rect);
+      if (!placed) await recoverIfPermissionLost();
+    });
+    if (placed) await requestSaveRegion(block);
+  }
 
   // ------------------------------------------------------------------ tray
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/app/coordinator.dart';
 import 'package:orthant/core/geometry.dart';
@@ -27,8 +29,14 @@ class _FakeWc implements WindowController {
   final List<bool> autoUpdatesRequests = [];
   AppVersion version = const AppVersion('1.0.0', '2');
 
+  /// How many times the app asked for the grant: the recovery path's only
+  /// observable effect while it is held.
+  int permissionReads = 0;
   @override
-  Future<bool> checkPermission() async => permission;
+  Future<bool> checkPermission() async {
+    permissionReads++;
+    return permission;
+  }
   @override
   Future<void> requestPermission() async => calls.add('requestPermission');
   @override
@@ -67,8 +75,17 @@ class _FakeWc implements WindowController {
     if (placementSucceeds) placedRect = target;
     return placementSucceeds;
   }
+  /// What the overlay's commits asked for, in order, and what the platform
+  /// says to the next one. [onCommit] runs inside the call.
+  final List<(int, WinRect)> commits = [];
+  bool commitSucceeds = true;
+  Future<void> Function()? onCommit;
   @override
-  Future<bool> applyOverlayCommit(int sessionId, WinRect target) async => false;
+  Future<bool> applyOverlayCommit(int sessionId, WinRect target) async {
+    commits.add((sessionId, target));
+    await onCommit?.call();
+    return commitSucceeds;
+  }
   @override
   Future<void> showOverlay() async => calls.add('showOverlay');
   @override
@@ -1218,6 +1235,49 @@ void main() {
         gridBlock(const WinRect(1440, 0, 2880, 1800),
             cols: 2, rows: 2, c0: 0, c1: 0, r0: 0, r1: 1, gap: 20),
       );
+    });
+  });
+
+  group('the overlay commit', () {
+    test('runs through the command queue: nothing queued after it overtakes '
+        'it', () async {
+      final t = build(granted: true);
+      await t.app.start();
+      final release = Completer<void>();
+      t.wc.onCommit = () => release.future;
+      final commit = t.app.overlayCommit(5, const WinRect(0, 0, 10, 10));
+      final shortcut =
+          t.app.runCommand(const BuiltIn(ShortcutCommand.leftHalf));
+      await pumpEventQueue();
+      expect(t.wc.commits, [(5, const WinRect(0, 0, 10, 10))]);
+      expect(t.wc.placedRect, isNull,
+          reason: 'the shortcut must wait for the commit ahead of it');
+      release.complete();
+      await commit;
+      await shortcut;
+      expect(t.wc.placedRect, isNotNull);
+    });
+
+    test('a commit that did not land checks the grant, as a failed shortcut '
+        'does', () async {
+      final t = build(granted: true);
+      await t.app.start();
+      t.wc.commitSucceeds = false;
+      final before = t.wc.permissionReads;
+      await t.app.overlayCommit(5, const WinRect(0, 0, 10, 10));
+      expect(t.wc.permissionReads, greaterThan(before));
+    });
+
+    test('save-region opens the picker only after a placement', () async {
+      final t = build(granted: true);
+      await t.app.start();
+      const block = {'cols': 6, 'rows': 6, 'c0': 0, 'c1': 2, 'r0': 0, 'r1': 5};
+      t.wc.commitSucceeds = false;
+      await t.app.overlaySaveRegion(5, const WinRect(0, 0, 10, 10), block);
+      expect(t.app.pendingRegion, isNull, reason: 'nothing was placed');
+      t.wc.commitSucceeds = true;
+      await t.app.overlaySaveRegion(6, const WinRect(0, 0, 10, 10), block);
+      expect(t.app.pendingRegion?.c1, 2);
     });
   });
 }

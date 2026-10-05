@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/channel.dart';
+import 'package:orthant/core/geometry.dart';
 import 'package:orthant/shortcuts/bindings.dart';
 import 'package:orthant/shortcuts/command_ref.dart';
 import 'package:orthant/shortcuts/hotkey_service.dart';
@@ -306,5 +307,111 @@ void main() {
       await svc.debugHandle(0);
       expect(fired, 0);
     });
+  });
+
+  Future<void> fromNative(String method, [Object? arguments]) =>
+      messenger.handlePlatformMessage(
+        kOrthantChannel,
+        const StandardMethodCodec()
+            .encodeMethodCall(MethodCall(method, arguments)),
+        (_) {},
+      );
+
+  group('overlayCommitFrom', () {
+    test('reads a whole commit', () {
+      expect(
+          overlayCommitFrom(
+              {'sessionId': 7, 'x': 0.0, 'y': -2160.0, 'w': 1280.0, 'h': 1044.0}),
+          (sessionId: 7, rect: const WinRect(0, -2160, 1280, 1044)));
+    });
+
+    test('takes integral numbers as numbers', () {
+      expect(
+          overlayCommitFrom({'sessionId': 7, 'x': 0, 'y': 0, 'w': 10, 'h': 10})
+              ?.rect,
+          const WinRect(0, 0, 10, 10));
+    });
+
+    test('refuses anything missing, mistyped or impossible', () {
+      final whole = {'sessionId': 7, 'x': 0.0, 'y': 0.0, 'w': 10.0, 'h': 10.0};
+      for (final (label, bad) in <(String, Object?)>[
+        ('not a map', 7),
+        ('null', null),
+        ('no session', {...whole}..remove('sessionId')),
+        ('a string session', {...whole, 'sessionId': '7'}),
+        ('a double session', {...whole, 'sessionId': 7.0}),
+        ('no x', {...whole}..remove('x')),
+        ('a string width', {...whole, 'w': '10'}),
+        ('an infinite height', {...whole, 'h': double.infinity}),
+        ('a NaN x', {...whole, 'x': double.nan}),
+        ('a zero width', {...whole, 'w': 0.0}),
+        ('a negative height', {...whole, 'h': -1.0}),
+        // Finite, but no coordinate SetWindowPos can take: narrowed to 32 bits
+        // at the native boundary it would be a different, plausible rect.
+        ('an unrepresentable width', {...whole, 'w': 4294968096.0}),
+        ('an edge past the coordinate range',
+            {...whole, 'x': 1073741000.0, 'w': 10000.0}),
+      ]) {
+        expect(overlayCommitFrom(bad), isNull, reason: label);
+      }
+    });
+  });
+
+  test('a commit from the runner reaches onOverlayCommit; a bad one does not',
+      () async {
+    final got = <(int, WinRect)>[];
+    HotkeyService(
+        onCommand: (_) {}, onOverlayCommit: (id, r) => got.add((id, r)));
+    await fromNative(kOverlayCommit,
+        {'sessionId': 3, 'x': 10.0, 'y': 20.0, 'w': 300.0, 'h': 400.0});
+    await fromNative(kOverlayCommit, {'sessionId': 3, 'x': 10.0});
+    expect(got, [(3, const WinRect(10, 20, 300, 400))]);
+  });
+
+  test('a save-region from the runner carries its block; no block, no call',
+      () async {
+    final got = <(int, WinRect, Map<Object?, Object?>)>[];
+    HotkeyService(
+        onCommand: (_) {},
+        onOverlaySaveRegion: (id, r, b) => got.add((id, r, b)));
+    const block = {'cols': 6, 'rows': 6, 'c0': 0, 'c1': 2, 'r0': 0, 'r1': 5};
+    await fromNative(kOverlaySaveRegion, {
+      'sessionId': 4,
+      'block': block,
+      'x': 0.0,
+      'y': 0.0,
+      'w': 1280.0,
+      'h': 1392.0,
+    });
+    await fromNative(kOverlaySaveRegion,
+        {'sessionId': 4, 'x': 0.0, 'y': 0.0, 'w': 1280.0, 'h': 1392.0});
+    expect(got, hasLength(1));
+    expect(got.single.$1, 4);
+    expect(got.single.$2, const WinRect(0, 0, 1280, 1392));
+    expect(got.single.$3, block);
+  });
+
+  test('a save-region that is not a map is ignored, and answered', () async {
+    var calls = 0;
+    HotkeyService(
+        onCommand: (_) {}, onOverlaySaveRegion: (id, rect, block) => calls++);
+    ByteData? reply;
+    await messenger.handlePlatformMessage(
+      kOrthantChannel,
+      const StandardMethodCodec()
+          .encodeMethodCall(const MethodCall(kOverlaySaveRegion, 'garbage')),
+      (r) => reply = r,
+    );
+    expect(calls, 0);
+    // A handler that threw is answered with an error envelope, which throws
+    // here; a handled call decodes to null.
+    expect(const StandardMethodCodec().decodeEnvelope(reply!), isNull);
+  });
+
+  test('the debug summon summons', () async {
+    var summons = 0;
+    HotkeyService(onCommand: (_) {}, onSummon: () => summons++);
+    await fromNative(kDebugSummon);
+    expect(summons, 1);
   });
 }

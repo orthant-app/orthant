@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import '../core/channel.dart';
+import '../core/geometry.dart';
 import 'bindings.dart';
 import 'command_ref.dart';
 import 'shortcut_command.dart';
@@ -33,6 +35,8 @@ class HotkeyService implements HotkeyRegistrar {
     this.onConfigWindowClosed,
     this.onSaveRegion,
     this.onKeyboardLayoutChanged,
+    this.onOverlayCommit,
+    this.onOverlaySaveRegion,
   }) {
     // Layout changes and window closes also matter before permission is granted.
     _channel.setMethodCallHandler(_handle);
@@ -62,6 +66,16 @@ class HotkeyService implements HotkeyRegistrar {
   final void Function()? onConfigWindowClosed;
 
   final void Function()? onKeyboardLayoutChanged;
+
+  /// Windows: the overlay's commit, forwarded by the runner after it has
+  /// dismissed the panels. Here, like [onPlacementFailed],
+  /// because a MethodChannel has room for exactly one handler.
+  final void Function(int sessionId, WinRect rect)? onOverlayCommit;
+
+  /// Windows: Ctrl+S on the grid, forwarded the same way: place, then offer
+  /// the [block] as a shortcut.
+  final void Function(int sessionId, WinRect rect, Map<Object?, Object?> block)?
+      onOverlaySaveRegion;
 
   static const MethodChannel _channel = MethodChannel(kOrthantChannel);
 
@@ -144,6 +158,19 @@ class HotkeyService implements HotkeyRegistrar {
     } else if (call.method == 'onSaveRegion') {
       final a = call.arguments;
       if (a is Map) onSaveRegion?.call(a);
+    } else if (call.method == kOverlayCommit) {
+      final commit = overlayCommitFrom(call.arguments);
+      if (commit != null) onOverlayCommit?.call(commit.sessionId, commit.rect);
+    } else if (call.method == kOverlaySaveRegion) {
+      final commit = overlayCommitFrom(call.arguments);
+      final args = call.arguments;
+      final block = args is Map ? args['block'] : null;
+      if (commit != null && block is Map) {
+        onOverlaySaveRegion?.call(commit.sessionId, commit.rect, block);
+      }
+    } else if (call.method == kDebugSummon) {
+      // W3's temporary Ctrl+Shift+O, until W2 registers the real summon.
+      onSummon?.call();
     } else if (call.method == kKeyboardLayoutChanged) {
       onKeyboardLayoutChanged?.call();
     }
@@ -165,4 +192,34 @@ class HotkeyService implements HotkeyRegistrar {
     }
     onCommand(ref);
   }
+}
+
+/// The runner's commit, or null if any field is missing, mistyped, not finite
+/// or impossible. Strict for the reason `displayFromReply` is: a commit that
+/// guessed a field would move a window somewhere nobody chose.
+@visibleForTesting
+({int sessionId, WinRect rect})? overlayCommitFrom(Object? args) {
+  if (args is! Map) return null;
+  final id = args['sessionId'];
+  double? read(String key) {
+    final v = args[key];
+    return v is num && v.isFinite ? v.toDouble() : null;
+  }
+
+  final x = read('x');
+  final y = read('y');
+  final w = read('w');
+  final h = read('h');
+  if (id is! int || x == null || y == null || w == null || h == null) {
+    return null;
+  }
+  if (w <= 0 || h <= 0) return null;
+  // Every edge must be a coordinate the native write can take (SetWindowPos's
+  // are 32-bit ints, less the border it adds): narrowed there, a finite but
+  // enormous field would become a different, plausible rectangle.
+  const limit = 1 << 30;
+  for (final v in [x, y, w, h, x + w, y + h]) {
+    if (v.abs() > limit) return null;
+  }
+  return (sessionId: id, rect: WinRect(x, y, w, h));
 }

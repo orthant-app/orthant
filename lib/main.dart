@@ -44,6 +44,9 @@ Future<void> main() async {
     onConfigWindowClosed: () => app.onConfigWindowClosed(),
     onSaveRegion: (block) => app.requestSaveRegion(block),
     onKeyboardLayoutChanged: () => app.refreshKeyboardLabels(),
+    onOverlayCommit: (id, rect) => app.overlayCommit(id, rect),
+    onOverlaySaveRegion: (id, rect, block) =>
+        app.overlaySaveRegion(id, rect, block),
   );
   app = OrthantCoordinator(
     wc: wc,

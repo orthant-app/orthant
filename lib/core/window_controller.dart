@@ -126,6 +126,18 @@ abstract class WindowController {
   /// Best-effort; true only when the window demonstrably arrived.
   Future<bool> applyFrame(WinRect target);
 
+  /// Place the window captured for the summon named [sessionId] at [target],
+  /// in global placement space, at most once.
+  ///
+  /// Windows only. There the overlay's commit comes back to Dart, which owns
+  /// the captured window: it applies only if [sessionId]
+  /// names the current capture and that capture has not been applied yet, so
+  /// a duplicate, or a late commit from a session a newer capture replaced,
+  /// never moves a window. True only when the window demonstrably arrived.
+  ///
+  /// macOS applies the grid's commit natively and never calls this.
+  Future<bool> applyOverlayCommit(int sessionId, WinRect target);
+
   /// Open System Settings ▸ Privacy & Security ▸ Accessibility.
   Future<void> openAccessibilitySettings();
 

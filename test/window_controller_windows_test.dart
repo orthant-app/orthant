@@ -240,6 +240,97 @@ void main() {
     });
   });
 
+  group('the overlay commit contract', () {
+    // Notepad (0x10, pid 7) in front, and the window placement moves.
+    (FakeDesktop, FakeWindow, WindowsWindowController) notepad() {
+      final desktop = FakeDesktop(ownPid: 1)
+        ..windows.add(windowFacts(0x10, pid: 7))
+        ..foreground = 0x10;
+      final window = FakeWindow(frame: const PxRect(0, 0, 800, 600));
+      return (desktop, window, wc(desktop: desktop, placer: window));
+    }
+
+    const target = WinRect(0, 0, 960, 1040);
+
+    test('every capture gets a new, larger id', () async {
+      final (_, _, c) = notepad();
+      await c.captureFrontmost();
+      final first = c.captureId!;
+      await c.captureFrontmost();
+      expect(c.captureId!, greaterThan(first));
+    });
+
+    test('a commit for the current capture places it, exactly once',
+        () async {
+      final (_, window, c) = notepad();
+      await c.captureFrontmost();
+      final id = c.captureId!;
+      expect(await c.applyOverlayCommit(id, target), isTrue);
+      expect(window.frame, const PxRect(0, 0, 960, 1040));
+      final writes = window.writes.length;
+      expect(await c.applyOverlayCommit(id, target), isFalse,
+          reason: 'a duplicate');
+      expect(window.writes, hasLength(writes),
+          reason: 'the duplicate moved nothing');
+      expect(window.beeps, 0,
+          reason: 'a refused duplicate is not a failed placement');
+    });
+
+    test('a commit naming an older capture is dropped', () async {
+      final (_, window, c) = notepad();
+      await c.captureFrontmost();
+      final older = c.captureId!;
+      await c.captureFrontmost();
+      expect(await c.applyOverlayCommit(older, target), isFalse);
+      expect(window.writes, isEmpty);
+      expect(window.touches, 0);
+      expect(window.beeps, 0);
+    });
+
+    test('a commit with nothing captured is dropped', () async {
+      final (_, window, c) = notepad();
+      expect(await c.applyOverlayCommit(1, target), isFalse);
+      expect(window.writes, isEmpty);
+    });
+
+    test('after one session is committed, the next capture can be',
+        () async {
+      final (_, window, c) = notepad();
+      await c.captureFrontmost();
+      expect(await c.applyOverlayCommit(c.captureId!, target), isTrue);
+      await c.captureFrontmost();
+      expect(
+          await c.applyOverlayCommit(
+              c.captureId!, const WinRect(960, 0, 960, 1040)),
+          isTrue);
+      expect(window.frame, const PxRect(960, 0, 1920, 1040));
+    });
+
+    test('a commit that does not land beeps once; an elevated one is not '
+        'beeped at twice', () async {
+      final (_, hung, c) = notepad();
+      hung.hung = true;
+      await c.captureFrontmost();
+      expect(await c.applyOverlayCommit(c.captureId!, target), isFalse);
+      expect(hung.beeps, 1);
+
+      final (_, elevated, c2) = notepad();
+      elevated.deniedTouch = true;
+      await c2.captureFrontmost();
+      expect(await c2.applyOverlayCommit(c2.captureId!, target), isFalse);
+      expect(elevated.beeps, 1, reason: 'placement beeped; the commit did not');
+    });
+
+    test('a commit whose window is gone beeps and moves nothing', () async {
+      final (desktop, window, c) = notepad();
+      await c.captureFrontmost();
+      desktop.windows.clear();
+      expect(await c.applyOverlayCommit(c.captureId!, target), isFalse);
+      expect(window.writes, isEmpty);
+      expect(window.beeps, 1);
+    });
+  });
+
   group('displays', () {
     test('screenFrames reads the runner reply, scale included', () async {
       answer = (call) => call.method == kScreenFrames

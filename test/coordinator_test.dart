@@ -68,6 +68,8 @@ class _FakeWc implements WindowController {
     return placementSucceeds;
   }
   @override
+  Future<bool> applyOverlayCommit(int sessionId, WinRect target) async => false;
+  @override
   Future<void> showOverlay() async => calls.add('showOverlay');
   @override
   Future<void> hideOverlay() async => calls.add('hideOverlay');

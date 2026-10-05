@@ -68,6 +68,12 @@ class MacosWindowController implements WindowController {
       }) ??
       false;
 
+  /// Never called on macOS: `OverlayPanelSet.swift` applies the grid's commit
+  /// itself, because the captured window lives in Swift there, so the runner
+  /// never sends a commit to Dart. Nothing is placed if it ever is.
+  @override
+  Future<bool> applyOverlayCommit(int sessionId, WinRect target) async => false;
+
   @override
   Future<List<Display>> screenFrames() async {
     final res = await _channel.invokeListMethod<dynamic>(kScreenFrames);

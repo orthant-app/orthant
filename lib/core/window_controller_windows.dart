@@ -59,14 +59,28 @@ class WindowsWindowController implements WindowController {
   final Win32Placer _placer;
   final PlacementClock _clock;
 
-  /// The capture slot: the window the next [applyFrame] moves. A handle, so it
+  /// The capture slot: the window the next placement moves. A handle, so it
   /// stays here, private to this backend; the seam sees only the
-  /// [CapturedWindow] built from it (Windows design §5.1). The owning process
+  /// [CapturedWindow] built from it. The owning process
   /// and class are kept beside it because Windows reuses handles: if the
-  /// window closes before [applyFrame], the same number can in principle name
+  /// window closes before it is placed, the same number can in principle name
   /// a stranger's window (rare, as the handle's high word counts reuses),
-  /// which must fail rather than move.
-  ({int hwnd, int pid, String className})? _captured;
+  /// which must fail rather than move. [id] names the capture to the overlay:
+  /// a summon's session is this id.
+  ({int hwnd, int pid, String className, int id})? _captured;
+
+  /// The last id handed out. Every capture takes the next one, the direct
+  /// shortcuts' included, so a commit from an older summon can never match a
+  /// newer capture.
+  int _captureSeq = 0;
+
+  /// Whether the overlay has committed [_captured] already. Applying consumes
+  /// the slot, so a duplicate commit is refused.
+  bool _consumed = false;
+
+  /// The current capture's id, or null when nothing is captured.
+  @visibleForTesting
+  int? get captureId => _captured?.id;
 
   static const MethodChannel _channel = MethodChannel(kOrthantChannel);
 
@@ -122,18 +136,25 @@ class WindowsWindowController implements WindowController {
         reactivated = _desktop.setForeground(window.hwnd) ? 'yes' : 'refused';
       }
       final name = _desktop.processName(window.pid) ?? '';
+      final id = _captureSeq + 1;
       _log('capture: branch=${decision.branch.name} '
           'hwnd=0x${window.hwnd.toRadixString(16)} class=${window.className} '
           'pid=${window.pid} frame=$frame reactivated=$reactivated '
-          'reason=${decision.reason}');
+          'reason=${decision.reason} id=$id');
       final captured = CapturedWindow(
         name,
         WinRect(frame.left.toDouble(), frame.top.toDouble(),
             frame.width.toDouble(), frame.height.toDouble()),
       );
       // Last, so a throw anywhere above leaves nothing captured.
-      _captured =
-          (hwnd: window.hwnd, pid: window.pid, className: window.className);
+      _captureSeq = id;
+      _captured = (
+        hwnd: window.hwnd,
+        pid: window.pid,
+        className: window.className,
+        id: id,
+      );
+      _consumed = false;
       return captured;
     } catch (e) {
       // A boundary: whatever Win32 did, a failed capture is "nothing to
@@ -144,9 +165,15 @@ class WindowsWindowController implements WindowController {
   }
 
   @override
-  Future<bool> applyFrame(WinRect target) async {
+  Future<bool> applyFrame(WinRect target) async =>
+      await _place(target) == PlacementOutcome.placed;
+
+  /// Moves the captured window to [target] and reports how it went, or null
+  /// when nothing was attempted: nothing captured, a different window behind
+  /// the handle, or a throw.
+  Future<PlacementOutcome?> _place(WinRect target) async {
     final captured = _captured;
-    if (captured == null) return false;
+    if (captured == null) return null;
     final hwnd = captured.hwnd;
     final started = _clock.elapsedMs;
     try {
@@ -154,18 +181,43 @@ class WindowsWindowController implements WindowController {
       if (now.pid != captured.pid || now.className != captured.className) {
         _log('place: outcome=failed ms=0 why=window-changed '
             '(pid ${now.pid}, class ${now.className})');
-        return false;
+        return null;
       }
       final result =
           await placeWindow(_placer, hwnd, pxRectFor(target), clock: _clock);
       _log('place: outcome=${result.outcome.name} '
           'ms=${_clock.elapsedMs - started} ${result.trace}');
-      return result.placed;
+      return result.outcome;
     } catch (e) {
       _log('place: outcome=failed ms=${_clock.elapsedMs - started} '
           'why=threw ($e)');
+      return null;
+    }
+  }
+
+  @override
+  Future<bool> applyOverlayCommit(int sessionId, WinRect target) async {
+    final captured = _captured;
+    if (captured == null || captured.id != sessionId) {
+      _log('overlay commit: id=$sessionId outcome=dropped why=stale '
+          'slot=${captured?.id ?? 'none'}');
       return false;
     }
+    if (_consumed) {
+      _log('overlay commit: id=$sessionId outcome=dropped why=consumed');
+      return false;
+    }
+    _consumed = true;
+    final outcome = await _place(target);
+    // A grid commit that moved nothing is never silent: macOS beeps for it
+    // natively (OverlayPanelSet.commit). An elevated target was beeped at
+    // inside placement already.
+    if (outcome != PlacementOutcome.placed &&
+        outcome != PlacementOutcome.elevated) {
+      _placer.beep();
+    }
+    _log('overlay commit: id=$sessionId outcome=${outcome?.name ?? 'failed'}');
+    return outcome == PlacementOutcome.placed;
   }
 
   @override

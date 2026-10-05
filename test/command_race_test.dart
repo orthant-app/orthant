@@ -45,6 +45,8 @@ class _SlottedWc implements WindowController {
     moves.add('$_slot@${t.x.toInt()}');
     return true;
   }
+  @override
+  Future<bool> applyOverlayCommit(int sessionId, WinRect target) async => false;
 
   @override
   Future<List<Display>> screenFrames() async {

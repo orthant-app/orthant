@@ -39,10 +39,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // tray item, which exits the process from Dart.
   window.SetQuitOnClose(false);
 
-#ifndef NDEBUG
-  // W0's proof of per-monitor-v2 awareness at runtime (spec §5.2): the live
-  // window's context, not the manifest that requested it. Debug builds only,
-  // read from the acceptance log; NDEBUG is defined for Profile and Release.
+#ifdef ORTHANT_DEV_BUILD
+  // Proof of per-monitor-v2 awareness at runtime: the live window's context,
+  // not the manifest that requested it. Debug and Profile builds, read from
+  // the acceptance log.
   const bool per_monitor_v2 = AreDpiAwarenessContextsEqual(
       GetWindowDpiAwarenessContext(window.GetHandle()),
       DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);

@@ -1,6 +1,8 @@
 #include "flutter_window.h"
 
+#include <iostream>
 #include <optional>
+#include <utility>
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -27,7 +29,8 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
-  overlay_set_ = std::make_unique<WindowsOverlaySet>();
+  overlay_set_ = std::make_unique<WindowsOverlaySet>(
+      GetHandle(), WindowsOverlaySet::Forward{});
   window_channel_ = std::make_unique<WindowChannel>(
       flutter_controller_->engine()->messenger(), GetHandle(),
       overlay_set_.get());
@@ -53,7 +56,18 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  // The overlay's posted work: reconciles and engine attaches.
+  if (overlay_set_ && overlay_set_->HandleHostMessage(message)) {
+    return 0;
+  }
+
   switch (message) {
+    case WM_HOTKEY: {
+      const int id = static_cast<int>(wparam);
+      // The overlay's grabs, and anything at all while a session is live.
+      if (overlay_set_ && overlay_set_->HandleHotkey(id)) return 0;
+      break;
+    }
     case WM_CLOSE:
       // Closing the settings window hides it. A tray app outlives its
       // window; Quit is the tray item (spec §5.5). Handled ahead of the
@@ -72,12 +86,18 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       PostMessage(hwnd, WM_NULL, 0, 0);
       break;
     case WM_DISPLAYCHANGE:
-      // A monitor came, went or changed mode: rebuild the per-monitor
-      // windows screenFrames answers from (spec §5.2), then fall through so
-      // Flutter and DefWindowProc see the message too. Broadcast to every
-      // top-level window, hidden ones included.
+      // A monitor came, went or changed mode or scale. The overlay ends any
+      // session and reconciles its panels on a later turn of the loop; then
+      // fall through so Flutter and DefWindowProc see the message too.
       if (overlay_set_) {
-        overlay_set_->Reconcile("WM_DISPLAYCHANGE");
+        overlay_set_->OnDisplayChange("WM_DISPLAYCHANGE");
+      }
+      break;
+    case WM_SETTINGCHANGE:
+      // A work area moved: a taskbar resized, moved or rescaled. Measured to
+      // follow a scale change by about 200 ms, without a WM_DISPLAYCHANGE.
+      if (wparam == SPI_SETWORKAREA && overlay_set_) {
+        overlay_set_->OnDisplayChange("SPI_SETWORKAREA");
       }
       break;
   }

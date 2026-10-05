@@ -30,6 +30,7 @@ class GridOverlay extends StatefulWidget {
     this.cols = kDefaultGridCols,
     this.rows = kDefaultGridRows,
     this.gap = 0,
+    this.scale = 1,
     this.appIcon,
   });
 
@@ -54,9 +55,15 @@ class GridOverlay extends StatefulWidget {
   /// signal guaranteed to arrive for every new session.
   final int sessionId;
 
-  /// The display's visible frame, top-left global points. The panel covers it
-  /// exactly, so panel-local == global minus this origin.
+  /// The display's visible frame in global placement space: points on macOS,
+  /// physical pixels on Windows. The panel covers it exactly.
   final WinRect displayFrame;
+
+  /// Display units per logical pixel of this panel: 1 on macOS, the monitor's
+  /// DPI scale on Windows. Layout happens in logical pixels; [displayFrame]
+  /// and [scale] are used only where the two spaces meet, [targetRect] and
+  /// [previewToLocal].
+  final double scale;
 
   /// The captured window's app — the only thing telling the user what they are
   /// about to move, since that window is now behind the overlay.
@@ -131,11 +138,19 @@ class GridOverlayState extends State<GridOverlay> {
     }
   }
 
+  /// The panel's own size in logical pixels.
+  ///
+  /// Derived from the summon rather than measured with a LayoutBuilder: the
+  /// runner sizes the panel to exactly [GridOverlay.displayFrame] before it
+  /// shows it, so the two are the same number, and on macOS this is
+  /// [GridOverlay.displayFrame]'s own size because the scale is 1.
+  Size get _localSize => Size(widget.displayFrame.width / widget.scale,
+      widget.displayFrame.height / widget.scale);
+
   /// The cell area's size — proportional to the display. The panel is derived
   /// from this by adding chrome, never the reverse.
   Size get _cellsSize =>
-      gridCellsSizeFor(widget.displayFrame.width, widget.displayFrame.height,
-          rows: widget.rows);
+      gridCellsSizeFor(_localSize.width, _localSize.height, rows: widget.rows);
 
   /// The whole rounded panel — background, chip and cells together — centred
   /// on the display. Positions the background and the chip; [_cellsRect], not
@@ -143,8 +158,7 @@ class GridOverlayState extends State<GridOverlay> {
   Rect get _panelRect {
     final c = _cellsSize;
     return Rect.fromCenter(
-      center: Offset(
-          widget.displayFrame.width / 2, widget.displayFrame.height / 2),
+      center: Offset(_localSize.width / 2, _localSize.height / 2),
       width: c.width + _kPanelPadding * 2,
       height: c.height + _kPanelPadding * 2 + _kChipRowHeight + _kChipGap,
     );
@@ -178,7 +192,7 @@ class GridOverlayState extends State<GridOverlay> {
     return b == null
         ? null
         : targetRect(b, widget.displayFrame,
-            cols: widget.cols, rows: widget.rows, gap: widget.gap);
+            cols: widget.cols, rows: widget.rows, gap: widget.gap, scale: widget.scale);
   }
 
   /// Commit whatever is currently selected. Called for `Return`, which is
@@ -389,8 +403,12 @@ class GridOverlayState extends State<GridOverlay> {
         ? null
         : previewToLocal(
             targetRect(block, widget.displayFrame,
-                cols: widget.cols, rows: widget.rows, gap: widget.gap),
-            widget.displayFrame);
+                cols: widget.cols,
+                rows: widget.rows,
+                gap: widget.gap,
+                scale: widget.scale),
+            widget.displayFrame,
+            widget.scale);
     final dim = widget.active ? 1.0 : 0.4;
     final dragging = _anchor != null;
 

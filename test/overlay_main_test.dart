@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/overlay/overlay_main.dart';
+import 'package:orthant/overlay/grid_overlay.dart';
 
 /// The overlay engine's side of the channel.
 ///
@@ -144,6 +145,43 @@ void main() {
     expect(commitIn(sent), isNull);
   });
 
+  testWidgets('a replaced session\'s selection never commits for the next one',
+      (tester) async {
+    await tester.pumpWidget(const OverlayApp());
+    await send('summon', summon());
+    await tester.pump();
+    await send('moveSelection', {'sessionId': 1, 'direction': 'right'});
+    await tester.pump();
+    sent.clear();
+
+    // The runner's replacement order, with no frame between: session 1's grid,
+    // and the cell it selected, are still mounted when session 2's Return
+    // arrives.
+    await send('hidden', 1);
+    await send('summon', summon(session: 2));
+    await send('commitCurrent', 2);
+    await tester.pump();
+    expect(commitIn(sent), isNull, reason: 'session 2 selected nothing');
+  });
+
+  testWidgets('a gesture on a replaced grid commits under its own session',
+      (tester) async {
+    await tester.pumpWidget(const OverlayApp());
+    await send('summon', summon());
+    await tester.pump();
+    sent.clear();
+
+    // Session 2 has arrived but not yet been built, so the pointer still hits
+    // session 1's grid: what it commits must name session 1, which the runner
+    // drops, never session 2.
+    await send('hidden', 1);
+    await send('summon', summon(session: 2));
+    await tester.tapAt(tester.getRect(find.byKey(GridOverlay.cellsKey)).center);
+    final commit = commitIn(sent);
+    expect(commit, isNotNull, reason: 'the tap reached no cell');
+    expect((commit!.arguments as Map)['sessionId'], 1);
+  });
+
   testWidgets('a key for another session is dropped, not queued',
       (tester) async {
     await tester.pumpWidget(const OverlayApp());
@@ -276,5 +314,52 @@ void main() {
     await send('hidden');
     await tester.pump();
     expect(announced, isEmpty);
+  });
+
+  testWidgets('the summon\'s scale reaches the grid; absent or impossible is 1',
+      (tester) async {
+    await tester.pumpWidget(const OverlayApp());
+    var session = 10;
+    for (final (given, expected) in <(Object?, double)>[
+      (1.5, 1.5),
+      (2.5, 2.5),
+      (null, 1.0),
+      (0.0, 1.0),
+      (-2.0, 1.0),
+      ('1.5', 1.0),
+    ]) {
+      final payload = summon(session: session++);
+      if (given == null) {
+        payload.remove('scale');
+      } else {
+        payload['scale'] = given;
+      }
+      await send('summon', payload);
+      await tester.pump();
+      expect(tester.widget<GridOverlay>(find.byType(GridOverlay)).scale,
+          expected,
+          reason: 'scale: $given');
+    }
+  });
+
+  testWidgets('a warm-up summon renders, but neither speaks nor reports a '
+      'first frame', (tester) async {
+    await tester.pumpWidget(const OverlayApp());
+    await send('summon', {...summon(session: 1), 'warm': true});
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(GridOverlay), findsOneWidget,
+        reason: 'rendering is the point of a warm-up');
+    expect(sent.where((c) => c.method == 'firstFrame'), isEmpty);
+    await send('hidden', 1);
+    await tester.pump();
+    expect(announced, isEmpty, reason: 'nobody summoned anything');
+
+    // The next, real summon speaks and reports as it always has.
+    await send('summon', summon(session: 2));
+    await tester.pump();
+    await tester.pump();
+    expect(sent.where((c) => c.method == 'firstFrame'), hasLength(1));
+    expect(announced, isNotEmpty);
   });
 }

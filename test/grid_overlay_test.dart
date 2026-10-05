@@ -698,4 +698,87 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('at a display scale of 1.5', () {
+    // A 3840x2088 work area at 150 %: the panel is 2560x1392 logical pixels.
+    const frame = WinRect(561, -2160, 3840, 2088);
+
+    Widget scaled({Key? key, void Function(WinRect)? onCommit}) => MediaQuery(
+          data: const MediaQueryData(size: Size(2560, 1392)),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: GridOverlay(
+              key: key,
+              sessionId: 1,
+              displayFrame: frame,
+              scale: 1.5,
+              appName: 'Notepad',
+              active: true,
+              gap: 16,
+              onBeginDrag: () {},
+              onEndDrag: () {},
+              onCommit: onCommit ?? (_) {},
+              onCancel: () {},
+            ),
+          ),
+        );
+
+    void sizeTo(WidgetTester tester) {
+      tester.view.physicalSize = const Size(2560, 1392);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+    }
+
+    // Rows 0-2 and columns 0-2 of 6x6, by keyboard: the first arrow starts at
+    // (0, 0) whichever it is (moveSelectionFor).
+    void selectTopLeftQuarter(GridOverlayState grid) {
+      grid.moveSelection(GridDirection.right);
+      grid.moveSelection(GridDirection.right, extend: true);
+      grid.moveSelection(GridDirection.right, extend: true);
+      grid.moveSelection(GridDirection.down, extend: true);
+      grid.moveSelection(GridDirection.down, extend: true);
+    }
+
+    final expected = gridBlock(frame,
+        cols: 6, rows: 6, c0: 0, c1: 2, r0: 0, r1: 2, gap: 16, scale: 1.5);
+
+    testWidgets('lays out in its own logical pixels, centred on the panel',
+        (tester) async {
+      sizeTo(tester);
+      await tester.pumpWidget(scaled());
+      // The card is centred on (1280, 696); the cells sit below the 16 pt chip
+      // and its 8 pt gap, so their centre is 12 lower. Laid out in the
+      // display's physical pixels instead, it would be (1920, 1056).
+      final centre = tester.getCenter(find.byKey(GridOverlay.cellsKey));
+      expect(centre.dx, moreOrLessEquals(1280));
+      expect(centre.dy, moreOrLessEquals(708));
+    });
+
+    testWidgets('commits in display units, with the gap scaled',
+        (tester) async {
+      sizeTo(tester);
+      final key = GlobalKey<GridOverlayState>();
+      WinRect? committed;
+      await tester.pumpWidget(scaled(key: key, onCommit: (r) => committed = r));
+      selectTopLeftQuarter(key.currentState!);
+      key.currentState!.commitCurrent();
+      expect(committed, expected);
+    });
+
+    testWidgets('draws the preview where the window will land, in local pixels',
+        (tester) async {
+      sizeTo(tester);
+      final key = GlobalKey<GridOverlayState>();
+      await tester.pumpWidget(scaled(key: key));
+      selectTopLeftQuarter(key.currentState!);
+      await tester.pump();
+      final preview = find.byWidgetPredicate((w) =>
+          w is DecoratedBox &&
+          w.decoration is BoxDecoration &&
+          (w.decoration as BoxDecoration).color ==
+              const Color(0xFF8CCDFF).withValues(alpha: 0.34));
+      expect(preview, findsOneWidget);
+      expect(tester.getRect(preview), previewToLocal(expected, frame, 1.5));
+    });
+  });
 }

@@ -71,13 +71,45 @@ void main() {
           cols: 6, rows: 6, gap: 10);
       expect(r, const WinRect(10, 10, 1180, 580));
     });
+
+    test('converts the gap with the display scale, exactly as gridBlock does',
+        () {
+      // A 3840x2088 work area at 150 %: a 16 pt gap is 24 px there.
+      const frame = WinRect(561, -2160, 3840, 2088);
+      const block = CellBlock(0, 2, 0, 2);
+      final scaled =
+          targetRect(block, frame, cols: 6, rows: 6, gap: 16, scale: 1.5);
+      expect(
+          scaled,
+          gridBlock(frame,
+              cols: 6, rows: 6, c0: 0, c1: 2, r0: 0, r1: 2, gap: 16, scale: 1.5));
+      expect(scaled, isNot(targetRect(block, frame, cols: 6, rows: 6, gap: 16)),
+          reason: 'ignoring the scale places a 16 px gap where 24 belongs');
+    });
   });
 
   group('previewToLocal', () {
     test('subtracts the display origin so the preview draws in panel space', () {
       const second = WinRect(1440, 25, 1200, 600);
       const global = WinRect(1440, 25, 600, 600);
-      expect(previewToLocal(global, second), const Rect.fromLTWH(0, 0, 600, 600));
+      expect(previewToLocal(global, second, 1), const Rect.fromLTWH(0, 0, 600, 600));
+    });
+
+    test('divides by the scale: panel-local logical pixels, not display units',
+        () {
+      const frame = WinRect(561, -2160, 3840, 2088);
+      expect(
+          previewToLocal(
+              const WinRect(561 + 300, -2160 + 150, 1500, 900), frame, 1.5),
+          const Rect.fromLTWH(200, 100, 1000, 600));
+    });
+
+    test('is the inverse of origin + local x scale', () {
+      const frame = WinRect(-1733, -1958, 2294, 1366);
+      const local = Rect.fromLTWH(12.5, 40, 300, 220);
+      final global = WinRect(frame.x + local.left * 1.5,
+          frame.y + local.top * 1.5, local.width * 1.5, local.height * 1.5);
+      expect(previewToLocal(global, frame, 1.5), local);
     });
   });
 

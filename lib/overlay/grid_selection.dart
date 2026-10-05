@@ -110,12 +110,18 @@ CellBlock blockFrom(Cell anchor, Cell focus) => CellBlock(
     );
 
 /// Where a window covering [block] lands on a [cols] x [rows] grid over
-/// [displayFrame], in top-left global points.
+/// [displayFrame], in global placement space: points on macOS, physical pixels
+/// on Windows.
 ///
-/// Delegates to [gridBlock] — the single placement formula the direct
+/// Delegates to [gridBlock], the single placement formula the direct
 /// shortcuts also use, so the grid and the keyboard paths can never disagree.
+/// [scale] is the display's: it converts the device-independent [gap], and
+/// it is 1 on macOS.
 WinRect targetRect(CellBlock block, WinRect displayFrame,
-        {required int cols, required int rows, double gap = 0}) =>
+        {required int cols,
+        required int rows,
+        double gap = 0,
+        double scale = 1}) =>
     gridBlock(displayFrame,
         cols: cols,
         rows: rows,
@@ -123,16 +129,20 @@ WinRect targetRect(CellBlock block, WinRect displayFrame,
         c1: block.c1,
         r0: block.r0,
         r1: block.r1,
-        gap: gap);
+        gap: gap,
+        scale: scale);
 
-/// A global top-left rect expressed in panel-local coordinates.
+/// A global rect expressed in panel-local coordinates.
 ///
-/// The panel covers the display's visible frame exactly, so this is a
-/// subtraction of the frame origin — and it is the only place in the overlay
-/// where the global and panel coordinate spaces meet.
-Rect previewToLocal(WinRect global, WinRect displayFrame) => Rect.fromLTWH(
-      global.x - displayFrame.x,
-      global.y - displayFrame.y,
-      global.width,
-      global.height,
+/// The panel covers the display's visible frame exactly, so this subtracts
+/// the frame origin and divides by the display's [scale]: panel-local space is
+/// Flutter's logical pixels, global space is the display's own units. It is
+/// the only place in the overlay where the two spaces meet in this direction;
+/// [targetRect] is the other. [scale] is 1 on macOS, where the two coincide.
+Rect previewToLocal(WinRect global, WinRect displayFrame, double scale) =>
+    Rect.fromLTWH(
+      (global.x - displayFrame.x) / scale,
+      (global.y - displayFrame.y) / scale,
+      global.width / scale,
+      global.height / scale,
     );

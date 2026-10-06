@@ -365,9 +365,16 @@ void WindowsOverlaySet::Reconcile(const char* reason) {
       if (panel->monitor && std::find(monitors.begin(), monitors.end(),
                                       panel->monitor) == monitors.end()) {
         // Its monitor is gone. Parked, not destroyed, and kept for the next
-        // monitor that comes. Already hidden: a display change dismisses
-        // before it reconciles.
+        // monitor that comes. A session's panels are off the screen already:
+        // a display change dismisses before it reconciles. A warm-up in
+        // flight is not a session, so Dismiss leaves it shown and cloaked, and
+        // its late frame would reveal it during the next session: it ends
+        // here, hidden, once the panel is off Live() so NoteReady does not
+        // count it. A panel whose warm-up never started has nothing to end.
         panel->monitor = nullptr;
+        if (panel->warming && !panel->warm) {
+          EndWarm(*panel, panel->shows, "parked");
+        }
         parked++;
       }
     }

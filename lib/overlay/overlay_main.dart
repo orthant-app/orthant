@@ -204,6 +204,18 @@ class _OverlayAppState extends State<OverlayApp> {
         args is Map ? {'sessionId': sessionId, ...args} : {'sessionId': sessionId});
   }
 
+  /// A commit or save from the grid of [sessionId]: the `hidden` that follows
+  /// is a placement, not a cancellation. Only for the current session's grid
+  /// and never during a warm-up. A replaced grid's commit is dropped by
+  /// native and a warm-up's was never asked for, so either would announce a
+  /// placement that does not happen and leave [_placing] set, silencing the
+  /// next session's "Grid closed.".
+  void _notePlacing(int sessionId) {
+    if (sessionId != _sessionId || _warming) return;
+    _placing = true;
+    GridOverlayState.announce(context, 'Placing window.');
+  }
+
   @override
   Widget build(BuildContext context) {
     final frame = _frame;
@@ -237,8 +249,7 @@ class _OverlayAppState extends State<OverlayApp> {
                   // is native's to know, and a failure takes the main window's
                   // recovery path, which has its own semantics.
                   onSave: (b, r) {
-                    _placing = true;
-                    GridOverlayState.announce(context, 'Placing window.');
+                    _notePlacing(sessionId);
                     _send(sessionId, 'saveRegion', {
                     'cols': cols,
                     'rows': rows,
@@ -253,8 +264,7 @@ class _OverlayAppState extends State<OverlayApp> {
                     });
                   },
                   onCommit: (r) {
-                    _placing = true;
-                    GridOverlayState.announce(context, 'Placing window.');
+                    _notePlacing(sessionId);
                     _send(sessionId, 'commit', {
                       'x': r.x,
                       'y': r.y,

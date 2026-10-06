@@ -182,6 +182,40 @@ void main() {
     expect((commit!.arguments as Map)['sessionId'], 1);
   });
 
+  testWidgets('a gesture on a replaced grid neither announces a placement nor '
+      'silences the next close', (tester) async {
+    await tester.pumpWidget(const OverlayApp());
+    await send('summon', summon());
+    await tester.pump();
+
+    // The same one-frame window: the pointer hits session 1's grid, whose
+    // commit the runner drops, so nothing is being placed.
+    await send('hidden', 1);
+    await send('summon', summon(session: 2));
+    announced.clear();
+    await tester.tapAt(tester.getRect(find.byKey(GridOverlay.cellsKey)).center);
+    expect(commitIn(sent), isNotNull, reason: 'the tap reached no cell');
+    expect(announced, isNot(contains('Placing window.')),
+        reason: 'session 1 is over; its commit is dropped');
+
+    // Session 2 is then dismissed without placing anything: a cancellation,
+    // and spoken as one.
+    await tester.pump();
+    announced.clear();
+    await send('hidden', 2);
+    await tester.pump();
+    expect(announced, ['Grid closed.']);
+  });
+
+  testWidgets('a gesture on a warm-up grid announces nothing', (tester) async {
+    await tester.pumpWidget(const OverlayApp());
+    await send('summon', {...summon(session: 1), 'warm': true});
+    await tester.pump();
+    await tester.tapAt(tester.getRect(find.byKey(GridOverlay.cellsKey)).center);
+    expect(commitIn(sent), isNotNull, reason: 'the tap reached no cell');
+    expect(announced, isEmpty, reason: 'nobody summoned anything');
+  });
+
   testWidgets('a key for another session is dropped, not queued',
       (tester) async {
     await tester.pumpWidget(const OverlayApp());

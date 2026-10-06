@@ -116,6 +116,10 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     case WM_HOTKEY: {
       const int id = static_cast<int>(wparam);
 #ifdef ORTHANT_DEV_BUILD
+      // Ahead of the overlay's live-session swallow on purpose: the replay and
+      // cycle chords must work while a session is live, since replaying an
+      // older session's commit during a newer one is exactly the stale commit
+      // Dart must refuse. Only the dev summon is swallowed, in HandleDevChord.
       if (HandleDevChord(id)) return 0;
 #endif
       // The overlay's grabs, and anything at all while a session is live.

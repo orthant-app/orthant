@@ -424,8 +424,9 @@ class OrthantCoordinator extends ChangeNotifier {
 
   /// Windows: Ctrl+S on the grid. Place first; offer the shape as a shortcut
   /// only if the window landed (macOS's rule: a failed placement offers
-  /// nothing). The picker opens outside the queue: it waits on the user, and
-  /// the queue must not.
+  /// nothing). The picker opens outside the queue: nothing after the
+  /// placement needs the capture slot, so holding the queue through the
+  /// settings window's round trips would only delay the next command.
   Future<void> overlaySaveRegion(
       int sessionId, WinRect rect, Map<Object?, Object?> block) async {
     var placed = false;

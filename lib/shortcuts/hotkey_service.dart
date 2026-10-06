@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/foundation.dart'
+    show debugPrint, kReleaseMode, visibleForTesting;
 import 'package:flutter/services.dart';
 import '../core/channel.dart';
 import '../core/geometry.dart';
@@ -160,13 +161,19 @@ class HotkeyService implements HotkeyRegistrar {
       if (a is Map) onSaveRegion?.call(a);
     } else if (call.method == kOverlayCommit) {
       final commit = overlayCommitFrom(call.arguments);
-      if (commit != null) onOverlayCommit?.call(commit.sessionId, commit.rect);
+      if (commit != null) {
+        onOverlayCommit?.call(commit.sessionId, commit.rect);
+      } else {
+        _logDropped(call.method);
+      }
     } else if (call.method == kOverlaySaveRegion) {
       final commit = overlayCommitFrom(call.arguments);
       final args = call.arguments;
       final block = args is Map ? args['block'] : null;
       if (commit != null && block is Map) {
         onOverlaySaveRegion?.call(commit.sessionId, commit.rect, block);
+      } else {
+        _logDropped(call.method);
       }
     } else if (call.method == kDebugSummon) {
       // W3's temporary Ctrl+Shift+O, until W2 registers the real summon.
@@ -175,6 +182,16 @@ class HotkeyService implements HotkeyRegistrar {
       onKeyboardLayoutChanged?.call();
     }
     return null;
+  }
+
+  /// The runner dismisses the overlay before it sends a commit, so a payload
+  /// dropped here is a window that silently does not move: leave a trace.
+  /// Debug and Profile only.
+  static void _logDropped(String method) {
+    if (!kReleaseMode) {
+      debugPrint('[orthant] overlay commit: dropped malformed payload '
+          'method=$method');
+    }
   }
 
   /// Visible for tests: dispatch as if a native press with [id] arrived.

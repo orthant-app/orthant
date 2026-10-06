@@ -25,6 +25,11 @@ class FlutterWindow : public Win32Window {
                          LPARAM const lparam) noexcept override;
 
  private:
+#ifdef ORTHANT_DEV_BUILD
+  // The temporary chords that drive W3's acceptance until W2's real hotkeys.
+  bool HandleDevChord(int id);
+#endif
+
   // The project to run.
   flutter::DartProject project_;
 

@@ -1,10 +1,13 @@
 #include "window_channel.h"
 
+#include <flutter/method_result_functions.h>
 #include <flutter/standard_method_codec.h>
 
 #include <cstdint>
+#include <iostream>
 #include <optional>
 #include <string>
+#include <utility>
 
 namespace {
 
@@ -67,12 +70,27 @@ flutter::EncodableValue DisplayToValue(
   });
 }
 
+const flutter::EncodableValue* Field(const flutter::EncodableValue* arguments,
+                                     const char* key) {
+  const auto* map = std::get_if<flutter::EncodableMap>(arguments);
+  if (!map) return nullptr;
+  const auto it = map->find(flutter::EncodableValue(key));
+  return it == map->end() ? nullptr : &it->second;
+}
+
+std::optional<int64_t> IntOf(const flutter::EncodableValue* value) {
+  if (!value) return std::nullopt;
+  if (const auto* v = std::get_if<int32_t>(value)) return *v;
+  if (const auto* v = std::get_if<int64_t>(value)) return *v;
+  return std::nullopt;
+}
+
 }  // namespace
 
 WindowChannel::WindowChannel(flutter::BinaryMessenger* messenger,
                              HWND config_window,
-                             const WindowsOverlaySet* displays)
-    : config_window_(config_window), displays_(displays) {
+                             WindowsOverlaySet* overlays)
+    : config_window_(config_window), overlays_(overlays) {
   channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
       messenger, kChannelName, &flutter::StandardMethodCodec::GetInstance());
   channel_->SetMethodCallHandler(
@@ -88,6 +106,56 @@ WindowChannel::~WindowChannel() {
 void WindowChannel::NotifyConfigWindowClosed() {
   channel_->InvokeMethod("onConfigWindowClosed", nullptr);
 }
+
+void WindowChannel::NotifyOverlayCommit(flutter::EncodableMap payload) {
+#ifdef ORTHANT_DEV_BUILD
+  last_commit_ = payload;
+#endif
+  channel_->InvokeMethod("onOverlayCommit",
+                         std::make_unique<flutter::EncodableValue>(
+                             std::move(payload)));
+}
+
+void WindowChannel::NotifyOverlaySaveRegion(flutter::EncodableMap payload) {
+  channel_->InvokeMethod("onOverlaySaveRegion",
+                         std::make_unique<flutter::EncodableValue>(
+                             std::move(payload)));
+}
+
+#ifdef ORTHANT_DEV_BUILD
+void WindowChannel::NotifyDebugSummon() {
+  // A press stamped for a summon Dart never hears of (its handler is not set
+  // in the first moments after launch) must not be taken for the next
+  // summon's: the engine answers that case "not implemented".
+  WindowsOverlaySet* overlays = overlays_;
+  channel_->InvokeMethod(
+      "onDebugSummon", nullptr,
+      std::make_unique<flutter::MethodResultFunctions<flutter::EncodableValue>>(
+          nullptr,
+          [overlays](const std::string&, const std::string&,
+                     const flutter::EncodableValue*) {
+            overlays->ForgetTrigger();
+          },
+          [overlays]() { overlays->ForgetTrigger(); }));
+}
+
+void WindowChannel::DebugReplayLastCommit() {
+  if (!last_commit_) {
+    std::cout << "[orthant] overlay commit replay: nothing to replay"
+              << std::endl;
+    return;
+  }
+  // find, not at: with exceptions off, at() on a missing key terminates.
+  const auto it = last_commit_->find(flutter::EncodableValue("sessionId"));
+  const std::optional<int64_t> id =
+      it == last_commit_->end() ? std::nullopt : IntOf(&it->second);
+  std::cout << "[orthant] overlay commit replayed: id=" << id.value_or(-1)
+            << std::endl;
+  channel_->InvokeMethod(
+      "onOverlayCommit",
+      std::make_unique<flutter::EncodableValue>(*last_commit_));
+}
+#endif
 
 void WindowChannel::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue>& call,
@@ -125,17 +193,52 @@ void WindowChannel::HandleMethodCall(
     result->Success();
   } else if (method == "getScreenFrames") {
     flutter::EncodableList list;
-    for (const auto& display : displays_->Displays()) {
+    for (const auto& display : overlays_->Displays()) {
       list.push_back(DisplayToValue(display));
     }
     result->Success(flutter::EncodableValue(list));
   } else if (method == "getActiveScreenFrame") {
-    const auto display = displays_->DisplayUnderCursor();
+    const auto display = overlays_->DisplayUnderCursor();
     if (display) {
       result->Success(DisplayToValue(*display));
     } else {
       result->Success();  // null: Dart reads "no display", never a zero rect
     }
+  } else if (method == "setOverlayGrid") {
+    // Plain numbers from Dart's settings, included in every summon. saveHint
+    // defaults rather than being required, as on macOS.
+    const auto cols = IntOf(Field(call.arguments(), "cols"));
+    const auto rows = IntOf(Field(call.arguments(), "rows"));
+    const auto* gap = Field(call.arguments(), "gap");
+    const auto* gap_value = gap ? std::get_if<double>(gap) : nullptr;
+    const auto* save_hint = Field(call.arguments(), "saveHint");
+    const auto* save_hint_value =
+        save_hint ? std::get_if<bool>(save_hint) : nullptr;
+    if (cols && rows && gap_value) {
+      overlays_->SetGrid(static_cast<int>(*cols), static_cast<int>(*rows),
+                         *gap_value, save_hint_value && *save_hint_value);
+    }
+    result->Success();
+  } else if (method == "showOverlay") {
+    // {captureId, appName}: Dart has captured the window already, and the
+    // session is named by that capture's id. The reply is whether it showed:
+    // engines not attached yet, or Esc or Enter refused, is false.
+    const auto capture_id = IntOf(Field(call.arguments(), "captureId"));
+    const auto* app_name = Field(call.arguments(), "appName");
+    const auto* app_name_value =
+        app_name ? std::get_if<std::string>(app_name) : nullptr;
+    const bool shown =
+        capture_id &&
+        overlays_->Show(*capture_id,
+                        app_name_value ? *app_name_value : std::string()) ==
+            WindowsOverlaySet::ShowResult::kShown;
+    result->Success(flutter::EncodableValue(shown));
+  } else if (method == "hideOverlay") {
+    // Also how Dart ends a summon that will not reach showOverlay (nothing to
+    // capture), so that its press is not taken for the next summon's.
+    overlays_->ForgetTrigger();
+    overlays_->Dismiss("hideOverlay");
+    result->Success();
   } else {
     result->NotImplemented();
   }

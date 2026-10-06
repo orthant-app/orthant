@@ -6,6 +6,34 @@
 
 #include "flutter/generated_plugin_registrant.h"
 
+namespace {
+
+#ifdef ORTHANT_DEV_BUILD
+// W3's temporary chords, Debug and Profile builds only, until W2 registers the
+// real summon. None uses Alt: an Alt chord leaves a WinUI target such as
+// Notepad in access-key mode, eating the next keys typed into it (measured).
+constexpr int kDevSummon = 0xBFF0;
+constexpr int kDevReplayCommit = 0xBFF1;
+constexpr int kDevCyclePanels = 0xBFF2;
+
+struct DevChord {
+  int id;
+  UINT modifiers;
+  UINT vk;
+  const char* name;
+};
+
+constexpr DevChord kDevChords[] = {
+    {kDevSummon, MOD_CONTROL | MOD_SHIFT, 'O', "Ctrl+Shift+O summons"},
+    {kDevReplayCommit, MOD_CONTROL | MOD_SHIFT, VK_F11,
+     "Ctrl+Shift+F11 replays the last commit"},
+    {kDevCyclePanels, MOD_CONTROL | MOD_SHIFT, VK_F10,
+     "Ctrl+Shift+F10 parks and reuses every panel"},
+};
+#endif
+
+}  // namespace
+
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
 
@@ -29,11 +57,34 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
+  // A commit is forwarded to Dart, which owns the captured window; the
+  // channel exists by the time a panel can commit.
   overlay_set_ = std::make_unique<WindowsOverlaySet>(
-      GetHandle(), WindowsOverlaySet::Forward{});
+      GetHandle(),
+      WindowsOverlaySet::Forward{
+          [this](flutter::EncodableMap payload) {
+            if (window_channel_) {
+              window_channel_->NotifyOverlayCommit(std::move(payload));
+            }
+          },
+          [this](flutter::EncodableMap payload) {
+            if (window_channel_) {
+              window_channel_->NotifyOverlaySaveRegion(std::move(payload));
+            }
+          },
+      });
   window_channel_ = std::make_unique<WindowChannel>(
       flutter_controller_->engine()->messenger(), GetHandle(),
       overlay_set_.get());
+
+#ifdef ORTHANT_DEV_BUILD
+  for (const DevChord& chord : kDevChords) {
+    const BOOL registered = RegisterHotKey(
+        GetHandle(), chord.id, chord.modifiers | MOD_NOREPEAT, chord.vk);
+    std::cout << "[orthant] dev chord " << chord.name << ": "
+              << (registered ? "registered" : "refused") << std::endl;
+  }
+#endif
 
   // The template shows the window on the engine's first frame. Orthant is a
   // tray app: the window stays hidden until Dart asks for it over the channel
@@ -64,6 +115,9 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   switch (message) {
     case WM_HOTKEY: {
       const int id = static_cast<int>(wparam);
+#ifdef ORTHANT_DEV_BUILD
+      if (HandleDevChord(id)) return 0;
+#endif
       // The overlay's grabs, and anything at all while a session is live.
       if (overlay_set_ && overlay_set_->HandleHotkey(id)) return 0;
       break;
@@ -120,3 +174,25 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
 }
+
+#ifdef ORTHANT_DEV_BUILD
+bool FlutterWindow::HandleDevChord(int id) {
+  if (!overlay_set_ || !window_channel_) return false;
+  switch (id) {
+    case kDevSummon:
+      // Swallowed while a session is live, as every other hotkey is.
+      if (!overlay_set_->live()) {
+        overlay_set_->StampTrigger(GetMessageTime());
+        window_channel_->NotifyDebugSummon();
+      }
+      return true;
+    case kDevReplayCommit:
+      window_channel_->DebugReplayLastCommit();
+      return true;
+    case kDevCyclePanels:
+      overlay_set_->DebugCyclePanels();
+      return true;
+  }
+  return false;
+}
+#endif

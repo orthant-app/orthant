@@ -754,9 +754,9 @@ WindowsOverlaySet::ShowResult WindowsOverlaySet::Show(
   // no-op, because display changes re-fit already; done before the session
   // exists, so a WM_DPICHANGED it provokes cannot end it.
   for (Panel* panel : Live()) Fit(*panel);
-  // A resize there can deliver a display change (M8), whose reconcile would
-  // re-assign these panels under the session about to start: give the summon
-  // up instead, and let the reconcile run.
+  // A resize there can deliver a display change (measured), whose reconcile
+  // would re-assign these panels under the session about to start: give the
+  // summon up instead, and let the reconcile run.
   if (reconcile_posted_ || reconciling_) {
     ReleaseKeys();
     DevLog("overlay summon refused: displays changing");
@@ -782,7 +782,7 @@ WindowsOverlaySet::ShowResult WindowsOverlaySet::Show(
     SetWindowPos(panel->hwnd, HWND_TOPMOST, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
     const flutter::EncodableValue payload(SummonPayload(
-        *panel, session_id, session_->trigger_ms, app_name, active, false));
+        *panel, session_id, trigger, app_name, active, false));
     panel->last_summon = payload;
     panel->channel->InvokeMethod(
         "summon", std::make_unique<flutter::EncodableValue>(payload));

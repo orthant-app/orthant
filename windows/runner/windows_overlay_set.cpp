@@ -36,12 +36,12 @@ constexpr UINT kRevealDeadlineMs = 250;
 // A warm-up whose frame never comes must not leave a shown, cloaked panel.
 constexpr UINT kWarmDeadlineMs = 2000;
 // A hotkey summon reaching Show later than this after its press waited behind
-// something holding this thread (an engine attaching takes over a second,
-// measured): shown now, it would take Esc, Enter and the arrows from whatever
-// the user has moved on to. However late: a stamp is never left over to be
-// mistaken for a later summon's, because Show consumes it and every summon
-// that does not reach Show clears it (hideOverlay, a showOverlay with no
-// readable captureId, or an unanswered notice).
+// something: this thread (an engine attaching takes over a second, measured),
+// or a placement ahead of it in Dart's command queue. Shown now, it would take
+// Esc, Enter and the arrows from whatever the user has moved on to. Each
+// summon carries its own press time, through Dart and back in showOverlay, so
+// two presses cannot share one, and nothing is left over to be mistaken for a
+// later summon's.
 constexpr double kStaleSummonMs = 1000;
 
 struct Grab {
@@ -646,14 +646,16 @@ bool WindowsOverlaySet::HandleHotkey(int id) {
   return true;
 }
 
-void WindowsOverlaySet::StampTrigger(LONG message_time) {
+#ifdef ORTHANT_DEV_BUILD
+double WindowsOverlaySet::PressedAtMs(LONG message_time) {
   // The press, not the dispatch: a WM_HOTKEY waits in the queue while this
   // thread is busy (an engine attaching takes over a second, measured), and
   // that wait is what the stale check is for. Message times are GetTickCount's,
-  // to its resolution; the stamp stays in Dart's clock.
+  // to its resolution; the press time is in Dart's clock.
   const DWORD queued = GetTickCount() - static_cast<DWORD>(message_time);
-  pending_trigger_ms_ = EpochMs() - static_cast<double>(queued);
+  return EpochMs() - static_cast<double>(queued);
 }
+#endif
 
 void WindowsOverlaySet::SetGrid(int cols, int rows, double gap,
                                 bool save_hint) {
@@ -699,20 +701,18 @@ flutter::EncodableMap WindowsOverlaySet::SummonPayload(
 }
 
 WindowsOverlaySet::ShowResult WindowsOverlaySet::Show(
-    int64_t session_id, const std::string& app_name) {
+    int64_t session_id, const std::string& app_name, double pressed_ms) {
   // Timed from the summon's key press when there is one, as macOS times from
-  // its Carbon press; a tray summon has none and is timed from here.
+  // its Carbon press; a tray summon has none (0) and is timed from here.
   const double now = EpochMs();
-  const double pressed = pending_trigger_ms_;
-  pending_trigger_ms_ = 0;
-  const double age = now - pressed;
-  if (pressed > 0 && age > kStaleSummonMs) {
+  const double age = now - pressed_ms;
+  if (pressed_ms > 0 && age > kStaleSummonMs) {
     DevLog("overlay summon refused: stale, " + Ms(age) +
            " ms after its hotkey");
     MessageBeep(MB_OK);
     return ShowResult::kStale;
   }
-  const double trigger = pressed > 0 ? pressed : now;
+  const double trigger = pressed_ms > 0 ? pressed_ms : now;
 
   // Not while the panels are being re-read after a display change, whose
   // geometry and DPI are mid-change; and not from inside a resize, which can

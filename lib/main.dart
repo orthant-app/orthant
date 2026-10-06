@@ -39,7 +39,7 @@ Future<void> main() async {
   // deferring the read through a closure is the whole of the knot.
   final hotkeys = HotkeyService(
     onCommand: (ref) => app.runCommand(ref),
-    onSummon: () => app.summon(),
+    onSummon: ({pressedAtMs}) => app.summon(pressedAtMs: pressedAtMs),
     onPlacementFailed: () => app.recoverIfPermissionLost(),
     onConfigWindowClosed: () => app.onConfigWindowClosed(),
     onSaveRegion: (block) => app.requestSaveRegion(block),

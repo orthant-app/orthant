@@ -68,7 +68,7 @@ class _SlottedWc implements WindowController {
   @override
   Future<void> hideConfigWindow() async {}
   @override
-  Future<void> showOverlay() async {}
+  Future<void> showOverlay({double? pressedAtMs}) async {}
   @override
   Future<void> hideOverlay() async {}
   @override

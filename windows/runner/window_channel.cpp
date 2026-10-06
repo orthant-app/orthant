@@ -1,8 +1,8 @@
 #include "window_channel.h"
 
-#include <flutter/method_result_functions.h>
 #include <flutter/standard_method_codec.h>
 
+#include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <optional>
@@ -123,20 +123,15 @@ void WindowChannel::NotifyOverlaySaveRegion(flutter::EncodableMap payload) {
 }
 
 #ifdef ORTHANT_DEV_BUILD
-void WindowChannel::NotifyDebugSummon() {
-  // A press stamped for a summon Dart never hears of (its handler is not set
-  // in the first moments after launch) must not be taken for the next
-  // summon's: the engine answers that case "not implemented".
-  WindowsOverlaySet* overlays = overlays_;
+void WindowChannel::NotifyDebugSummon(double pressed_at_ms) {
+  // The press goes with the summon and comes back in its showOverlay, so a
+  // summon Dart never hears of leaves nothing behind, and no reply is needed.
   channel_->InvokeMethod(
-      "onDebugSummon", nullptr,
-      std::make_unique<flutter::MethodResultFunctions<flutter::EncodableValue>>(
-          nullptr,
-          [overlays](const std::string&, const std::string&,
-                     const flutter::EncodableValue*) {
-            overlays->ForgetTrigger();
-          },
-          [overlays]() { overlays->ForgetTrigger(); }));
+      "onDebugSummon",
+      std::make_unique<flutter::EncodableValue>(flutter::EncodableMap{
+          {flutter::EncodableValue("pressedAtMs"),
+           flutter::EncodableValue(pressed_at_ms)},
+      }));
 }
 
 void WindowChannel::DebugReplayLastCommit() {
@@ -220,33 +215,42 @@ void WindowChannel::HandleMethodCall(
     }
     result->Success();
   } else if (method == "showOverlay") {
-    // {captureId, appName}: Dart has captured the window already, and the
-    // session is named by that capture's id. The reply is whether it showed.
+    // {captureId, appName, pressedAtMs?}: Dart has captured the window
+    // already, and the session is named by that capture's id. pressedAtMs is
+    // the key press that asked for this summon, carried with it; absent for a
+    // summon with no press (the tray). The reply is whether it showed.
     // Show refuses, and the reply is false, for four reasons: a monitor with
     // no panel, or whose panel has no engine attached yet; Esc or Enter held
     // by another app; a hotkey press more than 1 s old (stale); or the
     // displays changing (a reconcile posted or running, or Show re-entered
     // from inside a resize).
-    // A captureId that cannot be read is false without reaching Show, so its
-    // press is cleared here, as Show would have consumed it.
+    // A captureId that cannot be read is false without reaching Show.
     const auto capture_id = IntOf(Field(call.arguments(), "captureId"));
     if (!capture_id) {
-      overlays_->ForgetTrigger();
       result->Success(flutter::EncodableValue(false));
       return;
     }
     const auto* app_name = Field(call.arguments(), "appName");
     const auto* app_name_value =
         app_name ? std::get_if<std::string>(app_name) : nullptr;
+    // A double from Dart; an integer too, defensively. Anything else, or a
+    // value that is not finite, is no press.
+    const auto* pressed = Field(call.arguments(), "pressedAtMs");
+    double pressed_ms = 0;
+    if (const auto* d = pressed ? std::get_if<double>(pressed) : nullptr) {
+      pressed_ms = *d;
+    } else if (const auto i = IntOf(pressed)) {
+      pressed_ms = static_cast<double>(*i);
+    }
+    if (!std::isfinite(pressed_ms)) pressed_ms = 0;
     const bool shown =
         overlays_->Show(*capture_id,
-                        app_name_value ? *app_name_value : std::string()) ==
-        WindowsOverlaySet::ShowResult::kShown;
+                        app_name_value ? *app_name_value : std::string(),
+                        pressed_ms) == WindowsOverlaySet::ShowResult::kShown;
     result->Success(flutter::EncodableValue(shown));
   } else if (method == "hideOverlay") {
     // Also how Dart ends a summon that will not reach showOverlay (nothing to
-    // capture), so that its press is not taken for the next summon's.
-    overlays_->ForgetTrigger();
+    // capture): a grid still open names the capture that summon just cleared.
     overlays_->Dismiss("hideOverlay");
     result->Success();
   } else {

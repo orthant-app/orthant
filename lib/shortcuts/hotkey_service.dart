@@ -52,7 +52,9 @@ class HotkeyService implements HotkeyRegistrar {
   final void Function(CommandRef) onCommand;
 
   /// Overlay summon. Absent (null) means the trigger isn't wired up.
-  final void Function()? onSummon;
+  /// [pressedAtMs] is the key press that asked for it, when the platform sent
+  /// one (Windows' summon chord); see `WindowController.showOverlay`.
+  final void Function({double? pressedAtMs})? onSummon;
 
   /// A grid commit that did not place the window. Lives here only because this
   /// class owns the handler for the shared channel; it is not a hotkey concern.
@@ -176,8 +178,13 @@ class HotkeyService implements HotkeyRegistrar {
         _logDropped(call.method);
       }
     } else if (call.method == kDebugSummon) {
-      // W3's temporary Ctrl+Shift+O, until W2 registers the real summon.
-      onSummon?.call();
+      // W3's temporary Ctrl+Shift+O, until W2 registers the real summon. It
+      // carries its own press time, which the runner's stale check reads.
+      final args = call.arguments;
+      final pressed = args is Map ? args['pressedAtMs'] : null;
+      onSummon?.call(
+          pressedAtMs:
+              pressed is num && pressed.isFinite ? pressed.toDouble() : null);
     } else if (call.method == kKeyboardLayoutChanged) {
       onKeyboardLayoutChanged?.call();
     }

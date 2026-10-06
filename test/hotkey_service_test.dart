@@ -80,7 +80,7 @@ void main() {
     // the first entry in the list, which is what lets it share the recorder,
     // the persistence and the collision check with the ten placements.
     final ids = captureIds();
-    await HotkeyService(onCommand: (_) {}, onSummon: () {})
+    await HotkeyService(onCommand: (_) {}, onSummon: ({pressedAtMs}) {})
         .apply(kDefaultBindings);
     expect(ids, contains(ShortcutCommand.showGrid.index));
   });
@@ -110,7 +110,8 @@ void main() {
     var summons = 0;
     CommandRef? placed;
     final svc =
-        HotkeyService(onCommand: (c) => placed = c, onSummon: () => summons++);
+        HotkeyService(
+        onCommand: (c) => placed = c, onSummon: ({pressedAtMs}) => summons++);
     messenger.setMockMethodCallHandler(channel, (_) async => <int>[]);
     await svc.apply(kDefaultBindings);
 
@@ -135,7 +136,8 @@ void main() {
     var commands = 0;
     var summons = 0;
     final svc =
-        HotkeyService(onCommand: (_) => commands++, onSummon: () => summons++);
+        HotkeyService(
+        onCommand: (_) => commands++, onSummon: ({pressedAtMs}) => summons++);
     messenger.setMockMethodCallHandler(channel, (_) async => <int>[]);
     await svc.apply(kDefaultBindings);
 
@@ -162,7 +164,8 @@ void main() {
     // through the same `unavailable` set the settings row already renders,
     // instead of the bespoke bool the ⌃⌥G spike needed.
     captureIds(reply: (id) => id != ShortcutCommand.showGrid.index);
-    final refused = await HotkeyService(onCommand: (_) {}, onSummon: () {})
+    final refused = await HotkeyService(
+            onCommand: (_) {}, onSummon: ({pressedAtMs}) {})
         .apply(kDefaultBindings);
     expect(refused, {const BuiltIn(ShortcutCommand.showGrid)});
   });
@@ -410,8 +413,33 @@ void main() {
 
   test('the debug summon summons', () async {
     var summons = 0;
-    HotkeyService(onCommand: (_) {}, onSummon: () => summons++);
+    HotkeyService(onCommand: (_) {}, onSummon: ({pressedAtMs}) => summons++);
     await fromNative(kDebugSummon);
     expect(summons, 1);
+  });
+
+  test('the debug summon carries its press time, and only a number',
+      () async {
+    final presses = <double?>[];
+    HotkeyService(
+        onCommand: (_) {},
+        onSummon: ({pressedAtMs}) => presses.add(pressedAtMs));
+    await fromNative(kDebugSummon, {'pressedAtMs': 123.5});
+    await fromNative(kDebugSummon, {'pressedAtMs': 1700000000000});
+    await fromNative(kDebugSummon);
+    await fromNative(kDebugSummon, {'pressedAtMs': 'soon'});
+    expect(presses, [123.5, 1700000000000.0, null, null]);
+  });
+
+  test('a hotkey summon carries no press time: macOS stamps its own',
+      () async {
+    final presses = <double?>[];
+    final svc = HotkeyService(
+        onCommand: (_) {},
+        onSummon: ({pressedAtMs}) => presses.add(pressedAtMs));
+    messenger.setMockMethodCallHandler(channel, (_) async => <int>[]);
+    await svc.apply(kDefaultBindings);
+    await svc.debugHandle(ShortcutCommand.showGrid.index);
+    expect(presses, [null]);
   });
 }

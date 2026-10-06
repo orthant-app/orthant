@@ -186,8 +186,8 @@ bool FlutterWindow::HandleDevChord(int id) {
     case kDevSummon:
       // Swallowed while a session is live, as every other hotkey is.
       if (!overlay_set_->live()) {
-        overlay_set_->StampTrigger(GetMessageTime());
-        window_channel_->NotifyDebugSummon();
+        window_channel_->NotifyDebugSummon(
+            WindowsOverlaySet::PressedAtMs(GetMessageTime()));
       }
       return true;
     case kDevReplayCommit:

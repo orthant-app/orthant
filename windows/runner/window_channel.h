@@ -51,8 +51,10 @@ class WindowChannel {
   void NotifyOverlaySaveRegion(flutter::EncodableMap payload);
 
 #ifdef ORTHANT_DEV_BUILD
-  // W3's temporary summon, until W2's hotkeys.
-  void NotifyDebugSummon();
+  // W3's temporary summon, until W2's hotkeys. `pressed_at_ms` is its key
+  // press (WindowsOverlaySet::PressedAtMs), which Dart sends back with the
+  // summon's showOverlay.
+  void NotifyDebugSummon(double pressed_at_ms);
   // Sends the last commit again, so the acceptance can watch Dart refuse a
   // duplicate, and a commit from a session a newer capture replaced.
   void DebugReplayLastCommit();

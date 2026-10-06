@@ -79,18 +79,19 @@ class WindowsOverlaySet {
   // nothing can capture anew underneath an open grid.
   bool HandleHotkey(int id);
 
-  // A summon's WM_HOTKEY arrived. `message_time` is its GetMessageTime, so the
-  // session's trigger is the press, not the dispatch, and a summon that
-  // reaches Show long after its press is refused as stale.
-  void StampTrigger(LONG message_time);
-
-  // A summon that will not reach Show (Dart found nothing to capture, never
-  // heard of it, or sent no readable captureId): its press must not be taken
-  // for the next summon's.
-  void ForgetTrigger() { pending_trigger_ms_ = 0; }
+#ifdef ORTHANT_DEV_BUILD
+  // A summon hotkey's press, from its WM_HOTKEY's GetMessageTime, in epoch
+  // milliseconds (Dart's clock). It travels with that summon, through Dart and
+  // back to Show, so the session's trigger is the press, not the dispatch.
+  static double PressedAtMs(LONG message_time);
+#endif
 
   void SetGrid(int cols, int rows, double gap, bool save_hint);
-  ShowResult Show(int64_t session_id, const std::string& app_name);
+  // `pressed_ms` is the key press that asked for this summon, carried with it
+  // (PressedAtMs), or 0 for a summon with no press (the tray). A summon that
+  // reaches Show more than a second after its press is refused as stale.
+  ShowResult Show(int64_t session_id, const std::string& app_name,
+                  double pressed_ms);
   void Dismiss(const char* why);
   bool live() const { return session_.has_value(); }
 
@@ -172,7 +173,6 @@ class WindowsOverlaySet {
 
   std::optional<Session> session_;
   bool showing_ = false;  // inside Show, which a resize can re-enter
-  double pending_trigger_ms_ = 0;  // the last summon hotkey, until Show
   std::vector<int> grabbed_;
 
   int cols_ = 6;

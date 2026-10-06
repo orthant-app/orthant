@@ -423,8 +423,31 @@ void main() {
           placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)));
       await c.showOverlay();
       expect(calls, [kShowOverlay]);
-      expect(sent, {'captureId': c.captureId, 'appName': 'Notepad'});
+      expect(sent, {'captureId': c.captureId, 'appName': 'Notepad'},
+          reason: 'a summon with no press sends no pressedAtMs');
       expect(c.captureId, isNotNull);
+    });
+
+    test('a summon sends the press that asked for it, for the stale check',
+        () async {
+      final desktop = FakeDesktop(ownPid: 1)
+        ..windows.add(windowFacts(0x10, pid: 7))
+        ..foreground = 0x10
+        ..names[7] = 'Notepad';
+      Object? sent;
+      answer = (call) {
+        sent = call.arguments;
+        return true;
+      };
+      final c = wc(
+          desktop: desktop,
+          placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)));
+      await c.showOverlay(pressedAtMs: 1234.5);
+      expect(sent, {
+        'captureId': c.captureId,
+        'appName': 'Notepad',
+        'pressedAtMs': 1234.5,
+      });
     });
 
     test('nothing to capture: a beep, and the runner is told to hide',
@@ -432,8 +455,7 @@ void main() {
       final window = FakeWindow(frame: const PxRect(0, 0, 800, 600));
       await wc(desktop: FakeDesktop(ownPid: 1), placer: window).showOverlay();
       expect(calls, [kHideOverlay],
-          reason: 'a grid still open names the capture just cleared, and the '
-              "summon's press must not be taken for the next one's");
+          reason: 'a grid still open names the capture just cleared');
       expect(window.beeps, 1);
     });
 

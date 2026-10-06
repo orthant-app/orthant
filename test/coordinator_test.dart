@@ -86,8 +86,13 @@ class _FakeWc implements WindowController {
     await onCommit?.call();
     return commitSucceeds;
   }
+  /// The press time each summon carried, in order.
+  final List<double?> summonPresses = [];
   @override
-  Future<void> showOverlay() async => calls.add('showOverlay');
+  Future<void> showOverlay({double? pressedAtMs}) async {
+    calls.add('showOverlay');
+    summonPresses.add(pressedAtMs);
+  }
   @override
   Future<void> hideOverlay() async => calls.add('hideOverlay');
   @override
@@ -1235,6 +1240,28 @@ void main() {
         gridBlock(const WinRect(1440, 0, 2880, 1800),
             cols: 2, rows: 2, c0: 0, c1: 0, r0: 0, r1: 1, gap: 20),
       );
+    });
+  });
+
+  group('the summon', () {
+    test('carries its press time to showOverlay, through the command queue',
+        () async {
+      final t = build(granted: true);
+      await t.app.start();
+      final release = Completer<void>();
+      t.wc.onCommit = () => release.future;
+      final commit = t.app.overlayCommit(5, const WinRect(0, 0, 10, 10));
+      final summon = t.app.summon(pressedAtMs: 1234.5);
+      await pumpEventQueue();
+      expect(t.wc.summonPresses, isEmpty,
+          reason: 'the summon must wait for the commit ahead of it');
+      release.complete();
+      await commit;
+      await summon;
+      expect(t.wc.summonPresses, [1234.5]);
+      await t.app.summon();
+      expect(t.wc.summonPresses, [1234.5, null],
+          reason: 'a summon with no press (the tray) carries none');
     });
   });
 

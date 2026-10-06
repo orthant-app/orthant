@@ -163,7 +163,11 @@ abstract class WindowController {
     required bool saveHint,
   });
 
-  Future<void> showOverlay();
+  /// [pressedAtMs] is Windows only: the epoch-ms time of the key press that
+  /// asked for this summon, so the runner can refuse a summon that reached it
+  /// more than a second after its press. Null for a summon with no press (the
+  /// tray). macOS stamps its own press natively and ignores it.
+  Future<void> showOverlay({double? pressedAtMs});
   Future<void> hideOverlay();
 
   /// What the running bundle reports itself to be. Read natively from

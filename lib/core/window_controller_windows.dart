@@ -259,7 +259,8 @@ class WindowsWindowController implements WindowController {
   ///
   /// The summon path's one Dart round trip, with the capture inside it and
   /// before any UI: the session is named by the capture's id, so the commit
-  /// that comes back can be checked against the slot it was meant for.
+  /// that comes back can be checked against the slot it was meant for, and
+  /// [pressedAtMs] goes with it when the summon had a press.
   /// Nothing to capture is a beep and no overlay, as on macOS, and the runner
   /// is told to hide, which ends any grid still open. The reply says
   /// whether the panels showed. The runner refuses for four reasons: a
@@ -269,7 +270,7 @@ class WindowsWindowController implements WindowController {
   /// displays changing (a reconcile posted or running, or a summon re-entered
   /// from inside a resize).
   @override
-  Future<void> showOverlay() async {
+  Future<void> showOverlay({double? pressedAtMs}) async {
     final started = _clock.elapsedMs;
     final captured = await captureFrontmost();
     final id = captureId;
@@ -277,14 +278,15 @@ class WindowsWindowController implements WindowController {
     if (captured == null || id == null) {
       _placer.beep();
       _log('summon: outcome=no-capture capture=${captureMs}ms');
-      // Ends what the runner holds for this summon: an open grid, whose
-      // capture was just cleared, and the press it stamped, which must not be
-      // taken for the next summon's.
+      // Ends a grid still open, whose capture was just cleared.
       await _channel.invokeMethod<void>(kHideOverlay);
       return;
     }
-    final shown = await _channel.invokeMethod<Object?>(
-        kShowOverlay, {'captureId': id, 'appName': captured.appName});
+    final shown = await _channel.invokeMethod<Object?>(kShowOverlay, {
+      'captureId': id,
+      'appName': captured.appName,
+      'pressedAtMs': ?pressedAtMs,
+    });
     _log('summon: outcome=${shown == true ? 'shown' : 'refused'} id=$id '
         'capture=${captureMs}ms');
   }

@@ -374,7 +374,12 @@ class OrthantCoordinator extends ChangeNotifier {
   /// capturing *ourselves* is the actual invariant, it depends on who is
   /// frontmost at this instant, and `captureFrontmostWindow` is the only place
   /// that knows without a round trip on the latency-sensitive summon path.
-  Future<void> summon() => _commands.add(() => wc.showOverlay());
+  ///
+  /// [pressedAtMs] is the key press that asked for this summon, if any. It
+  /// rides in the same queue item, so a summon held behind a slow placement is
+  /// still judged by its own press.
+  Future<void> summon({double? pressedAtMs}) =>
+      _commands.add(() => wc.showOverlay(pressedAtMs: pressedAtMs));
 
   /// Run a shortcut. If placement fails we check permission on the spot: this is
   /// how a genuine loss of Accessibility surfaces (macOS never tells us), at the

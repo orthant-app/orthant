@@ -111,7 +111,8 @@ class MacosWindowController implements WindowController {
       });
 
   @override
-  Future<void> showOverlay() => _channel.invokeMethod<void>(kShowOverlay);
+  Future<void> showOverlay({double? pressedAtMs}) =>
+      _channel.invokeMethod<void>(kShowOverlay);
 
   @override
   Future<void> hideOverlay() => _channel.invokeMethod<void>(kHideOverlay);

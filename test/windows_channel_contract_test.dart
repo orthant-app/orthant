@@ -53,7 +53,8 @@ void main() {
 
   test('the sweep sees the calls it must (a regex gone blind fails here)', () {
     expect(dartCalls(),
-        containsAll(['showConfigWindow', 'configFirstFrame', 'replaceHotkeys']));
+        containsAll(['showConfigWindow', 'configFirstFrame', 'replaceHotkeys',
+          'showOverlay', 'setOverlayGrid']));
     expect(answered, isNotEmpty);
     expect(sent, isNotEmpty);
   });

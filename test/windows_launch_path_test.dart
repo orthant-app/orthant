@@ -9,10 +9,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/fake_win32.dart';
 
-/// The W0 native contract, as `windows/runner/window_channel.cpp` answers it:
-/// the config window works, every hotkey is refused, unregistering is a
-/// no-op, and anything else is NotImplemented (a null reply, which Dart
-/// reports as MissingPluginException).
+/// The native contract, as `windows/runner/window_channel.cpp` answers it on
+/// the launch path: the config window works, the overlay's grid is accepted
+/// (pushed at launch, before any summon), every hotkey is refused,
+/// unregistering is a no-op, and anything else is NotImplemented (a null
+/// reply, which Dart reports as MissingPluginException).
 ///
 /// This drives the real coordinator, the real HotkeyService and the real
 /// WindowsWindowController through the launch path. Permission reads as
@@ -33,6 +34,7 @@ void main() {
       switch (call.method) {
         case kShowConfigWindow:
         case kHideConfigWindow:
+        case kSetOverlayGrid:
         case 'unregisterAllHotkeys':
           return null;
         case 'replaceHotkeys':
@@ -75,6 +77,8 @@ void main() {
     expect(app.unavailable, bound,
         reason: 'W0 registers nothing, so every default reads Not set');
     expect(calls, contains('replaceHotkeys'));
+    expect(calls, contains(kSetOverlayGrid),
+        reason: 'the grid reaches the runner before any summon can');
     expect(calls, contains(kHideConfigWindow),
         reason: 'a granted first launch stays a tray app (no window)');
     expect(app.trayMenu, isNotEmpty);
@@ -88,8 +92,11 @@ void main() {
     // because the native side is a mock here. Task 11 verifies the real one.
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
+      // The grid is answered so that what throws is the hotkey pair, the
+      // requirement this test documents, and not the grid push before it.
       if (call.method == kShowConfigWindow ||
-          call.method == kHideConfigWindow) {
+          call.method == kHideConfigWindow ||
+          call.method == kSetOverlayGrid) {
         return null;
       }
       throw MissingPluginException(call.method);

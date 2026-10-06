@@ -80,9 +80,6 @@ void main() {
 
   test('the remaining stubs answer safely and never reach native', () async {
     final c = wc();
-    await c.setOverlayGrid(cols: 2, rows: 2, gap: 0, saveHint: false);
-    await c.showOverlay();
-    await c.hideOverlay();
     expect(await c.keyboardLabels(), isEmpty);
     expect(await c.loginItemStatus(), LoginItemStatus.unavailable);
     expect(await c.setLoginItem(true), LoginItemStatus.unavailable);
@@ -395,6 +392,67 @@ void main() {
     test('anything but a list is no displays', () {
       expect(displaysFromReply(null), isEmpty);
       expect(displaysFromReply({'x': 0}), isEmpty);
+    });
+  });
+
+  group('the overlay over the channel', () {
+    test('the grid reaches the runner as plain numbers', () async {
+      Object? sent;
+      answer = (call) {
+        sent = call.arguments;
+        return null;
+      };
+      await wc().setOverlayGrid(cols: 4, rows: 3, gap: 8, saveHint: true);
+      expect(calls, [kSetOverlayGrid]);
+      expect(sent, {'cols': 4, 'rows': 3, 'gap': 8.0, 'saveHint': true});
+    });
+
+    test('a summon captures first, then names the session by the capture id',
+        () async {
+      final desktop = FakeDesktop(ownPid: 1)
+        ..windows.add(windowFacts(0x10, pid: 7))
+        ..foreground = 0x10
+        ..names[7] = 'Notepad';
+      Object? sent;
+      answer = (call) {
+        sent = call.arguments;
+        return true;
+      };
+      final c = wc(
+          desktop: desktop,
+          placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)));
+      await c.showOverlay();
+      expect(calls, [kShowOverlay]);
+      expect(sent, {'captureId': c.captureId, 'appName': 'Notepad'});
+      expect(c.captureId, isNotNull);
+    });
+
+    test('nothing to capture: a beep, and the runner is told to hide',
+        () async {
+      final window = FakeWindow(frame: const PxRect(0, 0, 800, 600));
+      await wc(desktop: FakeDesktop(ownPid: 1), placer: window).showOverlay();
+      expect(calls, [kHideOverlay],
+          reason: 'a grid still open names the capture just cleared, and the '
+              "summon's press must not be taken for the next one's");
+      expect(window.beeps, 1);
+    });
+
+    test('a summon the runner refuses leaves nothing applied', () async {
+      final desktop = FakeDesktop(ownPid: 1)
+        ..windows.add(windowFacts(0x10, pid: 7))
+        ..foreground = 0x10;
+      answer = (_) => false;
+      final window = FakeWindow(frame: const PxRect(0, 0, 800, 600));
+      final c = wc(desktop: desktop, placer: window);
+      await c.showOverlay();
+      expect(calls, [kShowOverlay]);
+      expect(window.writes, isEmpty);
+      expect(window.beeps, 0, reason: 'the runner beeps for its own refusal');
+    });
+
+    test('hideOverlay asks the runner', () async {
+      await wc().hideOverlay();
+      expect(calls, [kHideOverlay]);
     });
   });
 }

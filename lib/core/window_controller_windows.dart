@@ -12,8 +12,7 @@ import 'windows_window_ops.dart';
 
 /// The Windows backend of the seam.
 ///
-/// Design: `.claude/docs/superpowers/specs/2026-09-18-windows-port-design.md`
-/// §5. Everything stateless is `dart:ffi` via `package:win32`; C++ in
+/// Everything stateless is `dart:ffi` via `package:win32`; C++ in
 /// `windows/runner/` holds only what needs a window we create, the message
 /// loop or (from W3) an engine, and is reached over the same
 /// `app.orthant/window` channel macOS uses (`windows/runner/window_channel.cpp`).
@@ -240,18 +239,54 @@ class WindowsWindowController implements WindowController {
       '${d.frame.x.round()},${d.frame.y.round()},'
       '${d.frame.width.round()}x${d.frame.height.round()}@${d.scale}';
 
-  // W3: the overlay, one engine per monitor, in C++.
+  // The overlay: one panel per monitor in the runner, each with its own
+  // engine running overlayMain (windows_overlay_set.cpp).
   @override
   Future<void> setOverlayGrid({
     required int cols,
     required int rows,
     required double gap,
     required bool saveHint,
-  }) async {}
+  }) =>
+      _channel.invokeMethod<void>(kSetOverlayGrid, {
+        'cols': cols,
+        'rows': rows,
+        'gap': gap,
+        'saveHint': saveHint,
+      });
+
+  /// Capture, then ask the runner to show the panels for that capture.
+  ///
+  /// The summon path's one Dart round trip, with the capture inside it and
+  /// before any UI: the session is named by the capture's id, so the commit
+  /// that comes back can be checked against the slot it was meant for.
+  /// Nothing to capture is a beep and no overlay, as on macOS, and the runner
+  /// is told to hide, which ends any grid still open. The reply says
+  /// whether the panels showed: not in the seconds after launch while the
+  /// engines attach, and not if Esc or Enter is held by another app.
   @override
-  Future<void> showOverlay() async {}
+  Future<void> showOverlay() async {
+    final started = _clock.elapsedMs;
+    final captured = await captureFrontmost();
+    final id = captureId;
+    final captureMs = _clock.elapsedMs - started;
+    if (captured == null || id == null) {
+      _placer.beep();
+      _log('summon: outcome=no-capture capture=${captureMs}ms');
+      // Ends what the runner holds for this summon: an open grid, whose
+      // capture was just cleared, and the press it stamped, which must not be
+      // taken for the next summon's.
+      await _channel.invokeMethod<void>(kHideOverlay);
+      return;
+    }
+    final shown = await _channel.invokeMethod<Object?>(
+        kShowOverlay, {'captureId': id, 'appName': captured.appName});
+    _log('summon: outcome=${shown == true ? 'shown' : 'refused'} id=$id '
+        'capture=${captureMs}ms');
+  }
+
   @override
-  Future<void> hideOverlay() async {}
+  Future<void> hideOverlay() => _channel.invokeMethod<void>(kHideOverlay);
 
   // R2: labels keyed by HID usage; on Windows the stored logical key labels
   // letters and named keys itself, so this serves punctuation only (§5.4).

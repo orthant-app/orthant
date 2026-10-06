@@ -422,7 +422,8 @@ void main() {
           desktop: desktop,
           placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)));
       await c.showOverlay();
-      expect(calls, [kShowOverlay]);
+      expect(calls, [kShowOverlay],
+          reason: 'a summon that showed hides nothing');
       expect(sent, {'captureId': c.captureId, 'appName': 'Notepad'},
           reason: 'a summon with no press sends no pressedAtMs');
       expect(c.captureId, isNotNull);
@@ -467,9 +468,23 @@ void main() {
       final window = FakeWindow(frame: const PxRect(0, 0, 800, 600));
       final c = wc(desktop: desktop, placer: window);
       await c.showOverlay();
-      expect(calls, [kShowOverlay]);
       expect(window.writes, isEmpty);
       expect(window.beeps, 0, reason: 'the runner beeps for its own refusal');
+    });
+
+    test('a summon the runner refuses ends any grid still open', () async {
+      // The capture slot was just replaced, so an earlier summon's grid names
+      // a capture that no longer exists; a stale press is refused before the
+      // runner replaces that grid's session, so Dart must end it.
+      final desktop = FakeDesktop(ownPid: 1)
+        ..windows.add(windowFacts(0x10, pid: 7))
+        ..foreground = 0x10;
+      answer = (call) => call.method == kShowOverlay ? false : null;
+      await wc(
+              desktop: desktop,
+              placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)))
+          .showOverlay(pressedAtMs: 1);
+      expect(calls, [kShowOverlay, kHideOverlay]);
     });
 
     test('hideOverlay asks the runner', () async {

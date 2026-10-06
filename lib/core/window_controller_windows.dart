@@ -262,13 +262,13 @@ class WindowsWindowController implements WindowController {
   /// that comes back can be checked against the slot it was meant for, and
   /// [pressedAtMs] goes with it when the summon had a press.
   /// Nothing to capture is a beep and no overlay, as on macOS, and the runner
-  /// is told to hide, which ends any grid still open. The reply says
-  /// whether the panels showed. The runner refuses for four reasons: a
-  /// monitor with no panel, or whose panel has no engine attached yet (the
-  /// seconds after launch, or just after a monitor arrives); Esc or Enter
-  /// held by another app; a hotkey press more than 1 s old (stale); or the
-  /// displays changing (a reconcile posted or running, or a summon re-entered
-  /// from inside a resize).
+  /// is told to hide, which ends any grid still open. The reply says whether
+  /// the panels showed, and a refusal is followed by the same hide. The
+  /// runner refuses for four reasons: a monitor with no panel, or whose panel
+  /// has no engine attached yet (the seconds after launch, or just after a
+  /// monitor arrives); Esc or Enter held by another app; a hotkey press more
+  /// than 1 s old (stale); or the displays changing (a reconcile posted or
+  /// running, or a summon re-entered from inside a resize).
   @override
   Future<void> showOverlay({double? pressedAtMs}) async {
     final started = _clock.elapsedMs;
@@ -289,6 +289,14 @@ class WindowsWindowController implements WindowController {
     });
     _log('summon: outcome=${shown == true ? 'shown' : 'refused'} id=$id '
         'capture=${captureMs}ms');
+    if (shown != true) {
+      // The capture slot was just replaced, so a grid still open names a
+      // capture that no longer exists: every commit from it would be dropped
+      // while it holds Esc, Enter and the arrows. The runner refuses for a
+      // stale press, engines not ready, displays changing, or Esc or Enter
+      // held, and some of those return before it replaces the session.
+      await _channel.invokeMethod<void>(kHideOverlay);
+    }
   }
 
   @override

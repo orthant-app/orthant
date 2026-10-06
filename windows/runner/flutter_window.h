@@ -25,14 +25,20 @@ class FlutterWindow : public Win32Window {
                          LPARAM const lparam) noexcept override;
 
  private:
+#ifdef ORTHANT_DEV_BUILD
+  // The temporary chords that drive W3's acceptance until W2's real hotkeys.
+  bool HandleDevChord(int id);
+#endif
+
   // The project to run.
   flutter::DartProject project_;
 
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
 
-  // One hidden window per monitor, the source of every display's DPI
-  // (spec §5.2). Created before the channel that reads it and destroyed after.
+  // The overlay: one panel per monitor, each with its own engine, and the
+  // source of every display's DPI. Created before the channel that reads it
+  // and destroyed after.
   std::unique_ptr<WindowsOverlaySet> overlay_set_;
 
   // The Windows half of app.orthant/window. Owned here because it needs this

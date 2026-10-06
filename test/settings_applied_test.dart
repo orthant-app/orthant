@@ -25,6 +25,8 @@ class _RecordingWc implements WindowController {
     applied = target;
     return true;
   }
+  @override
+  Future<bool> applyOverlayCommit(int sessionId, WinRect target) async => false;
 
   @override
   Future<bool> checkPermission() async => true;
@@ -44,7 +46,7 @@ class _RecordingWc implements WindowController {
     required bool saveHint,
   }) async {}
   @override
-  Future<void> showOverlay() async {}
+  Future<void> showOverlay({double? pressedAtMs}) async {}
   @override
   Future<void> hideOverlay() async {}
   @override

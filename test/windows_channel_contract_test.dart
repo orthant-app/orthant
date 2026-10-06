@@ -47,12 +47,14 @@ void main() {
     for (final m in RegExp(r'method == "([^"]+)"').allMatches(cpp)) m.group(1)!,
   };
   final sent = {
-    for (final m in RegExp(r'InvokeMethod\("([^"]+)"').allMatches(cpp)) m.group(1)!,
+    for (final m in RegExp(r'InvokeMethod\(\s*"([^"]+)"').allMatches(cpp))
+      m.group(1)!,
   };
 
   test('the sweep sees the calls it must (a regex gone blind fails here)', () {
     expect(dartCalls(),
-        containsAll(['showConfigWindow', 'configFirstFrame', 'replaceHotkeys']));
+        containsAll(['showConfigWindow', 'configFirstFrame', 'replaceHotkeys',
+          'showOverlay', 'setOverlayGrid']));
     expect(answered, isNotEmpty);
     expect(sent, isNotEmpty);
   });
@@ -77,5 +79,68 @@ void main() {
       for (final m in _handled.allMatches(dart)) resolve(m.group(1)!),
     };
     expect(sent.difference(handled), isEmpty);
+  });
+
+  // The overlay's own channel, app.orthant/overlay: every call overlayMain
+  // makes must be answered by the runner's panel handler, and every call the
+  // runner makes to a panel must be handled by overlayMain. The same failure
+  // as above, one engine over: an unanswered call is dropped, and a summon
+  // overlayMain cannot handle leaves a panel on screen with nothing in it.
+  final overlayDart = File('lib/overlay/overlay_main.dart').readAsStringSync();
+  final overlayCalls = {
+    for (final m in RegExp(r'''_overlay\.invokeMethod(?:<[^(]*>)?\(\s*['"]([^'"]+)['"]''')
+        .allMatches(overlayDart))
+      m.group(1)!,
+    for (final m in RegExp(r'''_send\(\s*\w+,\s*['"]([^'"]+)['"]''')
+        .allMatches(overlayDart))
+      m.group(1)!,
+  };
+  final overlayHandled = {
+    for (final m in RegExp(r'''case ['"]([^'"]+)['"]:''').allMatches(overlayDart))
+      m.group(1)!,
+  };
+  final overlayCpp =
+      File('windows/runner/windows_overlay_set.cpp').readAsStringSync();
+  final overlayAnswered = {
+    for (final m in RegExp(r'method == "([^"]+)"').allMatches(overlayCpp))
+      m.group(1)!,
+  };
+  // Literal InvokeMethod calls, and the grabs' relays, which name their
+  // method as Relay's first argument.
+  final overlaySent = {
+    for (final m in RegExp(r'InvokeMethod\(\s*"([^"]+)"').allMatches(overlayCpp))
+      m.group(1)!,
+    for (final m in RegExp(r'Relay\(\s*"([^"]+)"').allMatches(overlayCpp))
+      m.group(1)!,
+  };
+
+  test('the overlay sweep sees what it must (a regex gone blind fails here)',
+      () {
+    expect(overlayCalls,
+        containsAll(['ready', 'firstFrame', 'commit', 'saveRegion', 'hide']));
+    expect(overlayHandled, containsAll(['summon', 'hidden', 'commitCurrent']));
+    expect(overlayAnswered, containsAll(['ready', 'commit']));
+    expect(overlaySent,
+        containsAll(['summon', 'hidden', 'setActive', 'commitCurrent']));
+    // One Dart user of the channel: a second would call the runner from
+    // outside this sweep.
+    final users = [
+      for (final f in Directory('lib').listSync(recursive: true))
+        if (f is File &&
+            f.path.endsWith('.dart') &&
+            f.readAsStringSync().contains('app.orthant/overlay'))
+          f.path.replaceAll(r'\', '/'),
+    ];
+    expect(users, ['lib/overlay/overlay_main.dart']);
+  });
+
+  test('every call overlayMain makes is answered by the runner', () {
+    expect(overlayCalls.difference(overlayAnswered), isEmpty,
+        reason: 'windows_overlay_set.cpp ignores these, and overlayMain waits '
+            'on a reply or a state change that never comes');
+  });
+
+  test('every call the runner makes to a panel is handled by overlayMain', () {
+    expect(overlaySent.difference(overlayHandled), isEmpty);
   });
 }

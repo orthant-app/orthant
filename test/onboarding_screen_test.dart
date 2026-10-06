@@ -26,7 +26,9 @@ class _FakeWc implements WindowController {
   @override
   Future<bool> applyFrame(WinRect target) async => false;
   @override
-  Future<void> showOverlay() async {}
+  Future<bool> applyOverlayCommit(int sessionId, WinRect target) async => false;
+  @override
+  Future<void> showOverlay({double? pressedAtMs}) async {}
   @override
   Future<void> hideOverlay() async {}
   @override

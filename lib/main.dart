@@ -39,11 +39,14 @@ Future<void> main() async {
   // deferring the read through a closure is the whole of the knot.
   final hotkeys = HotkeyService(
     onCommand: (ref) => app.runCommand(ref),
-    onSummon: () => app.summon(),
+    onSummon: ({pressedAtMs}) => app.summon(pressedAtMs: pressedAtMs),
     onPlacementFailed: () => app.recoverIfPermissionLost(),
     onConfigWindowClosed: () => app.onConfigWindowClosed(),
     onSaveRegion: (block) => app.requestSaveRegion(block),
     onKeyboardLayoutChanged: () => app.refreshKeyboardLabels(),
+    onOverlayCommit: (id, rect) => app.overlayCommit(id, rect),
+    onOverlaySaveRegion: (id, rect, block) =>
+        app.overlaySaveRegion(id, rect, block),
   );
   app = OrthantCoordinator(
     wc: wc,

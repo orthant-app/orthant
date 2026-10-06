@@ -126,6 +126,18 @@ abstract class WindowController {
   /// Best-effort; true only when the window demonstrably arrived.
   Future<bool> applyFrame(WinRect target);
 
+  /// Place the window captured for the summon named [sessionId] at [target],
+  /// in global placement space, at most once.
+  ///
+  /// Windows only. There the overlay's commit comes back to Dart, which owns
+  /// the captured window: it applies only if [sessionId]
+  /// names the current capture and that capture has not been applied yet, so
+  /// a duplicate, or a late commit from a session a newer capture replaced,
+  /// never moves a window. True only when the window demonstrably arrived.
+  ///
+  /// macOS applies the grid's commit natively and never calls this.
+  Future<bool> applyOverlayCommit(int sessionId, WinRect target);
+
   /// Open System Settings ▸ Privacy & Security ▸ Accessibility.
   Future<void> openAccessibilitySettings();
 
@@ -151,7 +163,11 @@ abstract class WindowController {
     required bool saveHint,
   });
 
-  Future<void> showOverlay();
+  /// [pressedAtMs] is Windows only: the epoch-ms time of the key press that
+  /// asked for this summon, so the runner can refuse a summon that reached it
+  /// more than a second after its press. Null for a summon with no press (the
+  /// tray). macOS stamps its own press natively and ignores it.
+  Future<void> showOverlay({double? pressedAtMs});
   Future<void> hideOverlay();
 
   /// What the running bundle reports itself to be. Read natively from

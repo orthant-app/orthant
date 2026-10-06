@@ -26,3 +26,12 @@ const String kSetAutomaticUpdateChecks = 'setAutomaticUpdateChecks';
 const String kAppVersion = 'appVersion';
 const String kKeyboardLabels = 'keyboardLabels';
 const String kKeyboardLayoutChanged = 'onKeyboardLayoutChanged';
+
+// Windows only: the overlay's commit comes back to Dart, which owns the
+// captured window there.
+const String kOverlayCommit = 'onOverlayCommit';
+const String kOverlaySaveRegion = 'onOverlaySaveRegion';
+
+// Windows Debug and Profile builds only, until W2's real hotkeys: the
+// runner's temporary Ctrl+Shift+O summon.
+const String kDebugSummon = 'onDebugSummon';

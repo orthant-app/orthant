@@ -150,11 +150,11 @@ const double kMinPlacedCell = 40;
 /// DIPs on Windows; [scale] (a [Display]'s) converts both into [frame]'s units,
 /// and the result is in [frame]'s units. The conversion lives here, so every
 /// placement built from [gridBlock] (the direct shortcuts and custom regions)
-/// shares it rather than each call site multiplying on its own. Two
-/// exceptions: `center` (`region_commands.dart`) is not a block, and applies
-/// the same scale to its own gap itself, without this floor; and the overlay's
-/// `targetRect` (`grid_selection.dart`) does not take a scale yet, so its gap
-/// is converted at 1, which is right while the overlay runs only on macOS.
+/// shares it rather than each call site multiplying on its own, the overlay's
+/// `targetRect` (`grid_selection.dart`) included: it takes the display's scale
+/// and passes it through [gridBlock]. The one exception is `center`
+/// (`region_commands.dart`), which is not a block, and applies the same scale
+/// to its own gap itself, without this floor.
 double gapForPlacement(
   WinRect frame, {
   required int cols,

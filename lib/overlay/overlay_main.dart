@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -47,6 +48,15 @@ class _OverlayAppState extends State<OverlayApp> {
   int _cols = 6;
   int _rows = 6;
   double _gap = 0;
+
+  /// Display units per logical pixel. 1 when the native side does not say,
+  /// which is what macOS means.
+  double _scale = 1;
+
+  /// This summon exists only to render one frame ahead of need, so the first
+  /// real one is not a cold engine's (the Windows runner, at launch). Nobody
+  /// is looking: it must not speak, and its first frame measures nothing.
+  bool _warming = false;
   bool _visible = false;
   double? _triggerAtMs;
 
@@ -69,7 +79,8 @@ class _OverlayAppState extends State<OverlayApp> {
       case 'summon':
         final a = (call.arguments as Map).cast<String, dynamic>();
         _sessionId = a['sessionId'] as int;
-        _triggerAtMs = (a['triggerMs'] as num).toDouble();
+        _warming = a['warm'] == true;
+        _triggerAtMs = _warming ? null : (a['triggerMs'] as num).toDouble();
         _frame = WinRect((a['x'] as num).toDouble(), (a['y'] as num).toDouble(),
             (a['w'] as num).toDouble(), (a['h'] as num).toDouble());
         _appName = a['appName'] as String? ?? '';
@@ -81,19 +92,31 @@ class _OverlayAppState extends State<OverlayApp> {
         _rows = a['rows'] as int? ?? _rows;
         _gap = (a['gap'] as num?)?.toDouble() ?? _gap;
         _saveHint = a['saveHint'] as bool? ?? false;
+        final scale = a['scale'];
+        _scale = scale is num && scale.isFinite && scale > 0
+            ? scale.toDouble()
+            : 1.0;
         // One panel per display, and only the active one speaks: the others
         // are the same grid, and a screen reader saying it three times is
         // not three times as clear.
-        if (_active) {
+        if (_active && !_warming) {
           GridOverlayState.announce(context,
               'Grid open for ${_appName.isEmpty ? 'the captured window' : _appName}. '
               '$_cols columns, $_rows rows. Arrow keys move, Shift and arrows '
               'extend, Return places, Escape cancels.');
         }
-        assert(() {
-          debugPrint('[orthant] overlay summon: saveHint=$_saveHint');
-          return true;
-        }());
+        // Debug and Profile: the acceptance reads it, and Profile is where the
+        // timings are taken. dpr is what the engine renders at; on Windows it
+        // must equal scale, or the runner did not give the view its monitor's
+        // DPI.
+        if (!kReleaseMode) {
+          final view = View.of(context);
+          debugPrint('[orthant] overlay summon: session=$_sessionId '
+              'active=$_active warm=$_warming scale=$_scale '
+              'dpr=${view.devicePixelRatio} '
+              'size=${view.physicalSize.width.round()}x'
+              '${view.physicalSize.height.round()} saveHint=$_saveHint');
+        }
         // Anything still queued belongs to a session that is over.
         _pending.clear();
         setState(() => _visible = true);
@@ -129,10 +152,11 @@ class _OverlayAppState extends State<OverlayApp> {
         // Every way out arrives here — Esc and click-away are native grabs
         // that never pass through Dart's cancel — so this is the one place a
         // cancellation can be spoken. The active panel speaks for the set.
-        if (_visible && _active && !_placing) {
+        if (_visible && _active && !_placing && !_warming) {
           GridOverlayState.announce(context, 'Grid closed.');
         }
         _placing = false;
+        _warming = false;
         // Drop the tree and let the controller go: zero tickers while hidden.
         _pending.clear();
         setState(() {
@@ -144,9 +168,13 @@ class _OverlayAppState extends State<OverlayApp> {
   }
 
   /// Act on the grid, or hold the action until there is one. See [_pending].
+  ///
+  /// "One" means this session's: the runner sends `hidden` and the next
+  /// `summon` with no frame between, so the grid still mounted until the next
+  /// build is the previous session's, with that session's selection.
   void _onGrid(void Function(GridOverlayState) action) {
     final grid = _grid.currentState;
-    if (grid == null) {
+    if (grid == null || grid.widget.sessionId != _sessionId) {
       _pending.add(action);
       return;
     }
@@ -157,7 +185,9 @@ class _OverlayAppState extends State<OverlayApp> {
   /// `Return` behind it only mean anything in that order.
   void _drainPending() {
     final grid = _grid.currentState;
-    if (grid == null || _pending.isEmpty) return;
+    if (grid == null || grid.widget.sessionId != _sessionId || _pending.isEmpty) {
+      return;
+    }
     final queued = List.of(_pending);
     _pending.clear();
     for (final action in queued) {
@@ -165,17 +195,33 @@ class _OverlayAppState extends State<OverlayApp> {
     }
   }
 
-  void _send(String method, [Object? args]) {
-    final id = _sessionId;
-    if (id == null) return;
-    _overlay.invokeMethod<void>(
-        method, args is Map ? {'sessionId': id, ...args} : {'sessionId': id});
+  /// Every call names the session of the grid that made it, not whichever is
+  /// current when it runs: a grid built for an earlier session can still take
+  /// a pointer for a frame after the next summon, and native drops what it
+  /// sends.
+  void _send(int sessionId, String method, [Object? args]) {
+    _overlay.invokeMethod<void>(method,
+        args is Map ? {'sessionId': sessionId, ...args} : {'sessionId': sessionId});
+  }
+
+  /// A commit or save from the grid of [sessionId]: the `hidden` that follows
+  /// is a placement, not a cancellation. Only for the current session's grid
+  /// and never during a warm-up. A replaced grid's commit is dropped by
+  /// native and a warm-up's was never asked for, so either would announce a
+  /// placement that does not happen and leave [_placing] set, silencing the
+  /// next session's "Grid closed.".
+  void _notePlacing(int sessionId) {
+    if (sessionId != _sessionId || _warming) return;
+    _placing = true;
+    GridOverlayState.announce(context, 'Placing window.');
   }
 
   @override
   Widget build(BuildContext context) {
     final frame = _frame;
     final sessionId = _sessionId;
+    final cols = _cols;
+    final rows = _rows;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
@@ -183,7 +229,7 @@ class _OverlayAppState extends State<OverlayApp> {
         body: (!_visible || frame == null || sessionId == null)
             ? const SizedBox.shrink()
             : MouseRegion(
-                onEnter: (_) => _send('becameActive'),
+                onEnter: (_) => _send(sessionId, 'becameActive'),
                 child: GridOverlay(
                   key: _grid,
                   sessionId: sessionId,
@@ -194,19 +240,19 @@ class _OverlayAppState extends State<OverlayApp> {
                   cols: _cols,
                   rows: _rows,
                   gap: _gap,
-                  onBeginDrag: () => _send('beginDrag'),
-                  onEndDrag: () => _send('endDrag'),
-                  onCancel: () => _send('hide'),
+                  scale: _scale,
+                  onBeginDrag: () => _send(sessionId, 'beginDrag'),
+                  onEndDrag: () => _send(sessionId, 'endDrag'),
+                  onCancel: () => _send(sessionId, 'hide'),
                   saveHint: _saveHint,
                   // "Placing", not "placed": whether the window actually moved
                   // is native's to know, and a failure takes the main window's
                   // recovery path, which has its own semantics.
                   onSave: (b, r) {
-                    _placing = true;
-                    GridOverlayState.announce(context, 'Placing window.');
-                    _send('saveRegion', {
-                    'cols': _cols,
-                    'rows': _rows,
+                    _notePlacing(sessionId);
+                    _send(sessionId, 'saveRegion', {
+                    'cols': cols,
+                    'rows': rows,
                     'c0': b.c0,
                     'c1': b.c1,
                     'r0': b.r0,
@@ -218,9 +264,8 @@ class _OverlayAppState extends State<OverlayApp> {
                     });
                   },
                   onCommit: (r) {
-                    _placing = true;
-                    GridOverlayState.announce(context, 'Placing window.');
-                    _send('commit', {
+                    _notePlacing(sessionId);
+                    _send(sessionId, 'commit', {
                       'x': r.x,
                       'y': r.y,
                       'w': r.width,

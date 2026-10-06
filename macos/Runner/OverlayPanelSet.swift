@@ -204,11 +204,14 @@ final class OverlayPanelSet {
         "rows": gridRows,
         "gap": gap,
         "saveHint": saveHint,
+        // Panel points times this are global placement units: 1 here, where a
+        // panel's points are the display's. Windows sends its monitor's DPI
+        // scale, and the overlay converts with it where the two spaces meet.
+        "scale": 1.0,
       ]
-      // No "scale" or "reduceMotion" here: Dart reads neither. The first died
-      // with M4's DPI probe, the second with the Flutter-side scale entrance
-      // that was never built. Dead fields in a hand-written protocol are how it
-      // drifts — re-add them alongside whatever reads them.
+      // No "reduceMotion" here: Dart does not read it (the Flutter-side scale
+      // entrance it was for was never built). Dead fields in a hand-written
+      // protocol are how it drifts; re-add it alongside whatever reads it.
       // Only set when present: an Optional wrapped in Any does not survive the
       // standard codec, and a missing icon is a supported state (name only).
       if let icon = icon { payload["appIcon"] = icon }

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../core/geometry.dart';
 import '../core/window_controller.dart';
 import '../permission/permission_controller.dart';
 import '../settings/settings.dart';
@@ -373,7 +374,12 @@ class OrthantCoordinator extends ChangeNotifier {
   /// capturing *ourselves* is the actual invariant, it depends on who is
   /// frontmost at this instant, and `captureFrontmostWindow` is the only place
   /// that knows without a round trip on the latency-sensitive summon path.
-  Future<void> summon() => _commands.add(() => wc.showOverlay());
+  ///
+  /// [pressedAtMs] is the key press that asked for this summon, if any. It
+  /// rides in the same queue item, so a summon held behind a slow placement is
+  /// still judged by its own press.
+  Future<void> summon({double? pressedAtMs}) =>
+      _commands.add(() => wc.showOverlay(pressedAtMs: pressedAtMs));
 
   /// Run a shortcut. If placement fails we check permission on the spot: this is
   /// how a genuine loss of Accessibility surfaces (macOS never tells us), at the
@@ -408,6 +414,33 @@ class OrthantCoordinator extends ChangeNotifier {
             gap: _settings.effectiveGap,
             displayOffset: 1);
       });
+
+  /// Windows: the grid's commit, back from the runner.
+  ///
+  /// Through the command queue, serialised with the direct shortcuts over the
+  /// one capture slot, and applied only if [sessionId] still names the
+  /// current, unconsumed capture: the controller decides that. A commit that
+  /// did not land takes the shortcut path's recovery.
+  Future<void> overlayCommit(int sessionId, WinRect rect) =>
+      _commands.add(() async {
+        if (await wc.applyOverlayCommit(sessionId, rect)) return;
+        await recoverIfPermissionLost();
+      });
+
+  /// Windows: Ctrl+S on the grid. Place first; offer the shape as a shortcut
+  /// only if the window landed (macOS's rule: a failed placement offers
+  /// nothing). The picker opens outside the queue: nothing after the
+  /// placement needs the capture slot, so holding the queue through the
+  /// settings window's round trips would only delay the next command.
+  Future<void> overlaySaveRegion(
+      int sessionId, WinRect rect, Map<Object?, Object?> block) async {
+    var placed = false;
+    await _commands.add(() async {
+      placed = await wc.applyOverlayCommit(sessionId, rect);
+      if (!placed) await recoverIfPermissionLost();
+    });
+    if (placed) await requestSaveRegion(block);
+  }
 
   // ------------------------------------------------------------------ tray
 

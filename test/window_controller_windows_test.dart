@@ -80,9 +80,6 @@ void main() {
 
   test('the remaining stubs answer safely and never reach native', () async {
     final c = wc();
-    await c.setOverlayGrid(cols: 2, rows: 2, gap: 0, saveHint: false);
-    await c.showOverlay();
-    await c.hideOverlay();
     expect(await c.keyboardLabels(), isEmpty);
     expect(await c.loginItemStatus(), LoginItemStatus.unavailable);
     expect(await c.setLoginItem(true), LoginItemStatus.unavailable);
@@ -240,6 +237,97 @@ void main() {
     });
   });
 
+  group('the overlay commit contract', () {
+    // Notepad (0x10, pid 7) in front, and the window placement moves.
+    (FakeDesktop, FakeWindow, WindowsWindowController) notepad() {
+      final desktop = FakeDesktop(ownPid: 1)
+        ..windows.add(windowFacts(0x10, pid: 7))
+        ..foreground = 0x10;
+      final window = FakeWindow(frame: const PxRect(0, 0, 800, 600));
+      return (desktop, window, wc(desktop: desktop, placer: window));
+    }
+
+    const target = WinRect(0, 0, 960, 1040);
+
+    test('every capture gets a new, larger id', () async {
+      final (_, _, c) = notepad();
+      await c.captureFrontmost();
+      final first = c.captureId!;
+      await c.captureFrontmost();
+      expect(c.captureId!, greaterThan(first));
+    });
+
+    test('a commit for the current capture places it, exactly once',
+        () async {
+      final (_, window, c) = notepad();
+      await c.captureFrontmost();
+      final id = c.captureId!;
+      expect(await c.applyOverlayCommit(id, target), isTrue);
+      expect(window.frame, const PxRect(0, 0, 960, 1040));
+      final writes = window.writes.length;
+      expect(await c.applyOverlayCommit(id, target), isFalse,
+          reason: 'a duplicate');
+      expect(window.writes, hasLength(writes),
+          reason: 'the duplicate moved nothing');
+      expect(window.beeps, 0,
+          reason: 'a refused duplicate is not a failed placement');
+    });
+
+    test('a commit naming an older capture is dropped', () async {
+      final (_, window, c) = notepad();
+      await c.captureFrontmost();
+      final older = c.captureId!;
+      await c.captureFrontmost();
+      expect(await c.applyOverlayCommit(older, target), isFalse);
+      expect(window.writes, isEmpty);
+      expect(window.touches, 0);
+      expect(window.beeps, 0);
+    });
+
+    test('a commit with nothing captured is dropped', () async {
+      final (_, window, c) = notepad();
+      expect(await c.applyOverlayCommit(1, target), isFalse);
+      expect(window.writes, isEmpty);
+    });
+
+    test('after one session is committed, the next capture can be',
+        () async {
+      final (_, window, c) = notepad();
+      await c.captureFrontmost();
+      expect(await c.applyOverlayCommit(c.captureId!, target), isTrue);
+      await c.captureFrontmost();
+      expect(
+          await c.applyOverlayCommit(
+              c.captureId!, const WinRect(960, 0, 960, 1040)),
+          isTrue);
+      expect(window.frame, const PxRect(960, 0, 1920, 1040));
+    });
+
+    test('a commit that does not land beeps once; an elevated one is not '
+        'beeped at twice', () async {
+      final (_, hung, c) = notepad();
+      hung.hung = true;
+      await c.captureFrontmost();
+      expect(await c.applyOverlayCommit(c.captureId!, target), isFalse);
+      expect(hung.beeps, 1);
+
+      final (_, elevated, c2) = notepad();
+      elevated.deniedTouch = true;
+      await c2.captureFrontmost();
+      expect(await c2.applyOverlayCommit(c2.captureId!, target), isFalse);
+      expect(elevated.beeps, 1, reason: 'placement beeped; the commit did not');
+    });
+
+    test('a commit whose window is gone beeps and moves nothing', () async {
+      final (desktop, window, c) = notepad();
+      await c.captureFrontmost();
+      desktop.windows.clear();
+      expect(await c.applyOverlayCommit(c.captureId!, target), isFalse);
+      expect(window.writes, isEmpty);
+      expect(window.beeps, 1);
+    });
+  });
+
   group('displays', () {
     test('screenFrames reads the runner reply, scale included', () async {
       answer = (call) => call.method == kScreenFrames
@@ -304,6 +392,104 @@ void main() {
     test('anything but a list is no displays', () {
       expect(displaysFromReply(null), isEmpty);
       expect(displaysFromReply({'x': 0}), isEmpty);
+    });
+  });
+
+  group('the overlay over the channel', () {
+    test('the grid reaches the runner as plain numbers', () async {
+      Object? sent;
+      answer = (call) {
+        sent = call.arguments;
+        return null;
+      };
+      await wc().setOverlayGrid(cols: 4, rows: 3, gap: 8, saveHint: true);
+      expect(calls, [kSetOverlayGrid]);
+      expect(sent, {'cols': 4, 'rows': 3, 'gap': 8.0, 'saveHint': true});
+    });
+
+    test('a summon captures first, then names the session by the capture id',
+        () async {
+      final desktop = FakeDesktop(ownPid: 1)
+        ..windows.add(windowFacts(0x10, pid: 7))
+        ..foreground = 0x10
+        ..names[7] = 'Notepad';
+      Object? sent;
+      answer = (call) {
+        sent = call.arguments;
+        return true;
+      };
+      final c = wc(
+          desktop: desktop,
+          placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)));
+      await c.showOverlay();
+      expect(calls, [kShowOverlay],
+          reason: 'a summon that showed hides nothing');
+      expect(sent, {'captureId': c.captureId, 'appName': 'Notepad'},
+          reason: 'a summon with no press sends no pressedAtMs');
+      expect(c.captureId, isNotNull);
+    });
+
+    test('a summon sends the press that asked for it, for the stale check',
+        () async {
+      final desktop = FakeDesktop(ownPid: 1)
+        ..windows.add(windowFacts(0x10, pid: 7))
+        ..foreground = 0x10
+        ..names[7] = 'Notepad';
+      Object? sent;
+      answer = (call) {
+        sent = call.arguments;
+        return true;
+      };
+      final c = wc(
+          desktop: desktop,
+          placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)));
+      await c.showOverlay(pressedAtMs: 1234.5);
+      expect(sent, {
+        'captureId': c.captureId,
+        'appName': 'Notepad',
+        'pressedAtMs': 1234.5,
+      });
+    });
+
+    test('nothing to capture: a beep, and the runner is told to hide',
+        () async {
+      final window = FakeWindow(frame: const PxRect(0, 0, 800, 600));
+      await wc(desktop: FakeDesktop(ownPid: 1), placer: window).showOverlay();
+      expect(calls, [kHideOverlay],
+          reason: 'a grid still open names the capture just cleared');
+      expect(window.beeps, 1);
+    });
+
+    test('a summon the runner refuses leaves nothing applied', () async {
+      final desktop = FakeDesktop(ownPid: 1)
+        ..windows.add(windowFacts(0x10, pid: 7))
+        ..foreground = 0x10;
+      answer = (_) => false;
+      final window = FakeWindow(frame: const PxRect(0, 0, 800, 600));
+      final c = wc(desktop: desktop, placer: window);
+      await c.showOverlay();
+      expect(window.writes, isEmpty);
+      expect(window.beeps, 0, reason: 'the runner beeps for its own refusal');
+    });
+
+    test('a summon the runner refuses ends any grid still open', () async {
+      // The capture slot was just replaced, so an earlier summon's grid names
+      // a capture that no longer exists; a stale press is refused before the
+      // runner replaces that grid's session, so Dart must end it.
+      final desktop = FakeDesktop(ownPid: 1)
+        ..windows.add(windowFacts(0x10, pid: 7))
+        ..foreground = 0x10;
+      answer = (call) => call.method == kShowOverlay ? false : null;
+      await wc(
+              desktop: desktop,
+              placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)))
+          .showOverlay(pressedAtMs: 1);
+      expect(calls, [kShowOverlay, kHideOverlay]);
+    });
+
+    test('hideOverlay asks the runner', () async {
+      await wc().hideOverlay();
+      expect(calls, [kHideOverlay]);
     });
   });
 }

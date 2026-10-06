@@ -178,4 +178,17 @@ void main() {
     messenger.setMockMethodCallHandler(channel, (call) async => null);
     expect(await const MacosWindowController().activeScreenFrame(), isNull);
   });
+
+  test('applyOverlayCommit places nothing and never reaches native', () async {
+    final calls = <MethodCall>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      return true;
+    });
+    expect(
+        await const MacosWindowController()
+            .applyOverlayCommit(1, const WinRect(0, 0, 10, 10)),
+        isFalse);
+    expect(calls, isEmpty);
+  });
 }

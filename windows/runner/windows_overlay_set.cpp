@@ -40,7 +40,8 @@ constexpr UINT kWarmDeadlineMs = 2000;
 // measured): shown now, it would take Esc, Enter and the arrows from whatever
 // the user has moved on to. However late: a stamp is never left over to be
 // mistaken for a later summon's, because Show consumes it and every summon
-// that does not reach Show clears it (hideOverlay, or an unanswered notice).
+// that does not reach Show clears it (hideOverlay, a showOverlay with no
+// readable captureId, or an unanswered notice).
 constexpr double kStaleSummonMs = 1000;
 
 struct Grab {

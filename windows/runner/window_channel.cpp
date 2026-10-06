@@ -221,17 +221,27 @@ void WindowChannel::HandleMethodCall(
     result->Success();
   } else if (method == "showOverlay") {
     // {captureId, appName}: Dart has captured the window already, and the
-    // session is named by that capture's id. The reply is whether it showed:
-    // engines not attached yet, or Esc or Enter refused, is false.
+    // session is named by that capture's id. The reply is whether it showed.
+    // Show refuses, and the reply is false, for four reasons: a monitor with
+    // no panel, or whose panel has no engine attached yet; Esc or Enter held
+    // by another app; a hotkey press more than 1 s old (stale); or the
+    // displays changing (a reconcile posted or running, or Show re-entered
+    // from inside a resize).
+    // A captureId that cannot be read is false without reaching Show, so its
+    // press is cleared here, as Show would have consumed it.
     const auto capture_id = IntOf(Field(call.arguments(), "captureId"));
+    if (!capture_id) {
+      overlays_->ForgetTrigger();
+      result->Success(flutter::EncodableValue(false));
+      return;
+    }
     const auto* app_name = Field(call.arguments(), "appName");
     const auto* app_name_value =
         app_name ? std::get_if<std::string>(app_name) : nullptr;
     const bool shown =
-        capture_id &&
         overlays_->Show(*capture_id,
                         app_name_value ? *app_name_value : std::string()) ==
-            WindowsOverlaySet::ShowResult::kShown;
+        WindowsOverlaySet::ShowResult::kShown;
     result->Success(flutter::EncodableValue(shown));
   } else if (method == "hideOverlay") {
     // Also how Dart ends a summon that will not reach showOverlay (nothing to

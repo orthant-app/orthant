@@ -84,8 +84,9 @@ class WindowsOverlaySet {
   // reaches Show long after its press is refused as stale.
   void StampTrigger(LONG message_time);
 
-  // A summon that will not reach Show (Dart found nothing to capture, or never
-  // heard of it): its press must not be taken for the next summon's.
+  // A summon that will not reach Show (Dart found nothing to capture, never
+  // heard of it, or sent no readable captureId): its press must not be taken
+  // for the next summon's.
   void ForgetTrigger() { pending_trigger_ms_ = 0; }
 
   void SetGrid(int cols, int rows, double gap, bool save_hint);

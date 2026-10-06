@@ -262,8 +262,12 @@ class WindowsWindowController implements WindowController {
   /// that comes back can be checked against the slot it was meant for.
   /// Nothing to capture is a beep and no overlay, as on macOS, and the runner
   /// is told to hide, which ends any grid still open. The reply says
-  /// whether the panels showed: not in the seconds after launch while the
-  /// engines attach, and not if Esc or Enter is held by another app.
+  /// whether the panels showed. The runner refuses for four reasons: a
+  /// monitor with no panel, or whose panel has no engine attached yet (the
+  /// seconds after launch, or just after a monitor arrives); Esc or Enter
+  /// held by another app; a hotkey press more than 1 s old (stale); or the
+  /// displays changing (a reconcile posted or running, or a summon re-entered
+  /// from inside a resize).
   @override
   Future<void> showOverlay() async {
     final started = _clock.elapsedMs;

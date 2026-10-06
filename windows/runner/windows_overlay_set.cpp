@@ -371,7 +371,6 @@ void WindowsOverlaySet::Reconcile(const char* reason) {
         parked++;
       }
     }
-    unpanelled_.clear();
     for (HMONITOR monitor : monitors) {
       if (PanelFor(monitor)) continue;
       if (Panel* spare = Parked()) {
@@ -379,8 +378,6 @@ void WindowsOverlaySet::Reconcile(const char* reason) {
         reused++;
       } else if (CreatePanel(monitor)) {
         created++;
-      } else {
-        unpanelled_.push_back(monitor);
       }
     }
     for (Panel* panel : Live()) Fit(*panel);
@@ -563,12 +560,16 @@ std::optional<WindowsOverlaySet::Display> WindowsOverlaySet::DisplayFor(
 std::vector<WindowsOverlaySet::Display> WindowsOverlaySet::Displays() const {
   // All or none, the rule Dart's displaysFromReply applies to this reply: a
   // shorter list lets displayContaining fall back to the first display and
-  // place a window on the wrong monitor. A monitor that has gone is skipped,
-  // since a reconcile follows; one still attached with no working panel
-  // empties the list. Empty means "no display list", not "no displays": Dart
-  // then places only on the cursor's display, and only a window that is on it.
-  for (HMONITOR monitor : unpanelled_) {
-    if (MonitorExists(monitor)) return {};
+  // place a window on the wrong monitor. A monitor still attached with no
+  // panel empties the list: one the last reconcile could not give a panel,
+  // or one that has arrived since, for the turn of the loop before the
+  // reconcile WM_DISPLAYCHANGE posted runs. A live panel whose monitor has
+  // gone is skipped, since a reconcile follows; one whose monitor is still
+  // attached but whose display cannot be read empties the list. Empty means
+  // "no display list", not "no displays": Dart then places only on the
+  // cursor's display, and only a window that is on it.
+  for (HMONITOR monitor : Monitors()) {
+    if (!PanelFor(monitor)) return {};
   }
   std::vector<Display> displays;
   for (const Panel* panel : Live()) {

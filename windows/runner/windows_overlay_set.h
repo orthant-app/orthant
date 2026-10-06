@@ -160,8 +160,6 @@ class WindowsOverlaySet {
   // Owned for the life of the set: parked, never freed, so a Panel* held by a
   // callback or a session stays valid until the destructor.
   std::vector<std::unique_ptr<Panel>> panels_;
-  // Monitors the last reconcile could not give a panel.
-  std::vector<HMONITOR> unpanelled_;
   int next_index_ = 0;
 
   bool reconcile_posted_ = false;

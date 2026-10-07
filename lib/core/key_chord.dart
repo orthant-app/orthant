@@ -75,6 +75,41 @@ class KeyChord {
           ? logical == other.logical
           : physical == other.physical);
 
+  /// As v3 stores it: both keys, and the modifiers by name.
+  Map<String, Object?> toJson() => {
+        'physical': physical,
+        'logical': logical,
+        'modifiers': [
+          for (final (flag, name) in _modifierNames)
+            if (modifiers.has(flag)) name,
+        ],
+      };
+
+  /// One stored chord, or null if this build cannot register it.
+  ///
+  /// Strict about what it accepts, for the reason `Binding.tryFromJson` is
+  /// tolerant: a key this build cannot bind, or a modifier it does not know,
+  /// rejects the whole chord, and the command falls back to its default.
+  /// Dropping only the unknown part would register a different chord from the
+  /// one stored. And a bound chord needs a modifier, because a bare global
+  /// hotkey takes its key from every app for as long as Orthant runs.
+  static KeyChord? tryFromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final physical = raw['physical'];
+    final logical = raw['logical'];
+    final names = raw['modifiers'];
+    if (physical is! int || logical is! int || names is! List) return null;
+    if (!isBindableKey(physical) || logical <= 0) return null;
+    var modifiers = Modifiers.none;
+    for (final name in names) {
+      final flag = _modifierFlags[name];
+      if (flag == null) return null;
+      modifiers = modifiers | flag;
+    }
+    if (modifiers.isEmpty) return null;
+    return KeyChord(physical: physical, logical: logical, modifiers: modifiers);
+  }
+
   @override
   bool operator ==(Object other) =>
       other is KeyChord &&
@@ -89,6 +124,18 @@ class KeyChord {
   String toString() => 'KeyChord(physical: 0x${physical.toRadixString(16)}, '
       'logical: 0x${logical.toRadixString(16)}, modifiers: $modifiers)';
 }
+
+/// The modifiers by the names v3 stores, in the order glyphs are drawn.
+const _modifierNames = [
+  (Modifiers.ctrl, 'ctrl'),
+  (Modifiers.alt, 'alt'),
+  (Modifiers.shift, 'shift'),
+  (Modifiers.meta, 'meta'),
+];
+
+final Map<String, Modifiers> _modifierFlags = {
+  for (final (flag, name) in _modifierNames) name: flag,
+};
 
 /// Whether a shortcut may use the key at [physical], a USB HID usage.
 bool isBindableKey(int physical) => _usLogicalKeys.containsKey(physical);

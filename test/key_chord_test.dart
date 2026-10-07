@@ -60,6 +60,17 @@ void main() {
         Modifiers.ctrl)));
   });
 
+  test('a chord round-trips through its stored form', () {
+    final chord = _chord(PhysicalKeyboardKey.keyO, LogicalKeyboardKey.keyR,
+        Modifiers.meta | Modifiers.ctrl);
+    expect(chord.toJson(), {
+      'physical': PhysicalKeyboardKey.keyO.usbHidUsage,
+      'logical': LogicalKeyboardKey.keyR.keyId,
+      'modifiers': ['ctrl', 'meta'],
+    }, reason: 'modifiers are named, in the order their glyphs are drawn');
+    expect(KeyChord.tryFromJson(chord.toJson()), chord);
+  });
+
   group('sameChordAs', () {
     // Dvorak puts R where US has O. Recorded there, the O position carries the
     // logical key R.

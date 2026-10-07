@@ -21,6 +21,31 @@ class Binding {
 
   bool get isBound => chord != null;
 
+  /// As v3 stores it. An unbound command keeps its entry, with a null chord:
+  /// clearing a shortcut is a choice, and the next launch must not read its
+  /// absence as "missing" and restore the default.
+  Map<String, Object?> toJson() =>
+      {'command': command.jsonName, 'chord': chord?.toJson()};
+
+  /// One stored entry, or null if it isn't one we can trust.
+  ///
+  /// Tolerant by design. This reads a file we did not necessarily write (a
+  /// newer release's, or a corrupt one), and it is read before any shortcut is
+  /// registered, so anything thrown here takes the entire feature down at
+  /// launch with no user-visible way back. A rejected entry costs that one
+  /// command its saved combo; a thrown one costs all of them.
+  static Binding? tryFromJson(Object? entry) {
+    if (entry is! Map || !entry.containsKey('chord')) return null;
+    final name = entry['command'];
+    if (name is! String) return null;
+    final command = CommandRef.tryParse(name);
+    if (command == null) return null;
+    final raw = entry['chord'];
+    if (raw == null) return Binding.unbound(command);
+    final chord = KeyChord.tryFromJson(raw);
+    return chord == null ? null : Binding(command, chord);
+  }
+
   @override
   bool operator ==(Object other) =>
       other is Binding && other.command == command && other.chord == chord;

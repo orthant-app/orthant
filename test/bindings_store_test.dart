@@ -267,6 +267,25 @@ void main() {
       }
     });
 
+    test('an entry that is not an object, or names no command or an unknown one, is dropped alone',
+        () async {
+      // One bad entry costs one command its saved combo, never the file: a
+      // thrown cast here would be thrown before any shortcut registers.
+      final loaded = await loadV3([
+        7,
+        {'command': 5, 'chord': null},
+        {'command': 'quadrantOfMars', 'chord': null},
+        centerOn(valid),
+      ]);
+      expect(_of(loaded, ShortcutCommand.center),
+          Binding(const BuiltIn(ShortcutCommand.center),
+              carbon(17, kControlKey | kShiftKey)));
+      for (final b in loaded) {
+        if (b.command == const BuiltIn(ShortcutCommand.center)) continue;
+        expect(b, _of(macDefaults, (b.command as BuiltIn).command));
+      }
+    });
+
     test('a key holding something other than text never stops a launch',
         () async {
       // The newest key present is the one read, whatever it holds, and an
@@ -379,6 +398,33 @@ void main() {
       expect(_of(loaded, ShortcutCommand.center),
           _of(macDefaults, ShortcutCommand.center));
       expect(_of(loaded, ShortcutCommand.leftHalf).keyCode, 99);
+    });
+
+    test('a v2 or v1 holding something other than text is the defaults, never a throw',
+        () async {
+      // A hand-written preference of the wrong type must not stop a launch:
+      // reading it as a string would cast and throw before any shortcut
+      // registers. It is the newest key present, so it means the defaults.
+      SharedPreferences.setMockInitialValues({'orthant.bindings.v2': 7});
+      expect((await BindingsStore().load()).bindings, macDefaults);
+
+      SharedPreferences.setMockInitialValues({'orthant.bindings.v1': 7});
+      expect((await BindingsStore().load()).bindings, macDefaults);
+    });
+
+    test('an unreadable v2 is the defaults, never the v1 beside it', () async {
+      // The newest key present is the only one read, even when it cannot be
+      // read: falling through to v1 would resurrect shortcuts the user has
+      // since changed.
+      SharedPreferences.setMockInitialValues({
+        'orthant.bindings.v2': '{not json',
+        'orthant.bindings.v1': jsonEncode([
+          {'command': 'center', 'keyCode': 17, 'modifiers': kControlOption},
+        ]),
+      });
+      final loaded = (await BindingsStore().load()).bindings;
+      expect(_of(loaded, ShortcutCommand.center),
+          _of(macDefaults, ShortcutCommand.center));
     });
   });
 

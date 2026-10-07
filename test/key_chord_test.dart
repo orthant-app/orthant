@@ -79,6 +79,8 @@ void main() {
     final usR = _chord(PhysicalKeyboardKey.keyR, LogicalKeyboardKey.keyR);
 
     test('on macOS a chord is its position', () {
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
       expect(usO.sameChordAs(dvorakR), isTrue);
       expect(usR.sameChordAs(dvorakR), isFalse);
       expect(

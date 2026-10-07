@@ -197,6 +197,8 @@ void main() {
 
   test('on macOS a chord recorded under another layout still collides by position',
       () {
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     // Dvorak types G at the US U position. Recorded there, ⌃⌥ on that key
     // holds the logical key G, while the default it lands on holds the US
     // placeholder U. macOS registers by position, so it is the same hotkey,
@@ -237,6 +239,8 @@ void main() {
   });
 
   test('sameShortcut asks the platform, where == compares every field', () {
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     // Dvorak types J at the US C position: ⌃⌥ recorded there is the default
     // Center hotkey on macOS, though the two bindings are not equal.
     final center = macDefaults.last;
@@ -255,7 +259,6 @@ void main() {
         isTrue);
     expect(sameShortcut(unbound, center), isFalse);
     expect(sameShortcut(center, unbound), isFalse);
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     expect(sameShortcut(dvorak, center), isFalse,
         reason: 'on Windows the key that types J is a different hotkey');

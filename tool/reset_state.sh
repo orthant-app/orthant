@@ -69,6 +69,11 @@ case "$WHAT" in
     ;;&
   bindings|all)
     step 'Shortcut bindings'
+    # Every key a version has kept them under, newest first. Clearing only the
+    # newest is not a reset: a build that finds no v3 migrates v2 (or v1) into
+    # it, and the old shortcuts come back on the next launch.
+    forget 'flutter.orthant.bindings.v3'
+    forget 'flutter.orthant.bindings.v2'
     forget 'flutter.orthant.bindings.v1'
     ;;&
   accessibility|all)

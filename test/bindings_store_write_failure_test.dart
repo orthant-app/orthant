@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -75,7 +76,15 @@ void main() {
     test('a migration whose write fails ($failure) still loads, and the next '
         'launch migrates again', () async {
       writes = failure;
+      final logs = <String>[];
+      final savedDebugPrint = debugPrint;
+      debugPrint = (String? message, {int? wrapWidth}) => logs.add(message ?? '');
+      addTearDown(() => debugPrint = savedDebugPrint);
       final first = await launch();
+      if (failure == 'throw') {
+        expect(logs, contains(contains('migration write failed')),
+            reason: 'a debug build says why the migration will repeat');
+      }
       expect(of(first, 'center').keyCode, 17, reason: 'usable at once');
       expect(of(first, 'custom:r1').keyCode, 37);
       expect(first.regions.single.id, 'r1');

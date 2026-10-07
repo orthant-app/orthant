@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show debugPrint, kReleaseMode;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'bindings.dart';
 import '../core/carbon_keys.dart';
@@ -63,10 +64,14 @@ class BindingsStore {
     }
     try {
       await save(migrated.bindings, migrated.regions);
-    } catch (_) {
+    } catch (e) {
       // Deliberately swallowed. A write that fails costs a repeat, not the
       // shortcuts: v3 stays absent, so the next launch migrates the same file
       // the same way. Thrown from here it would cost every shortcut instead.
+      // A debug build says why, so a write that keeps failing is seen.
+      if (!kReleaseMode) {
+        debugPrint('[orthant] bindings: migration write failed: $e');
+      }
     }
     return migrated;
   }

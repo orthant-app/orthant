@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../core/key_chord.dart';
 import '../shortcuts/bindings.dart';
 import '../shortcuts/command_ref.dart';
 import '../shortcuts/custom_region.dart';
@@ -361,7 +362,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   /// clicking the footer's button — takes it. Refusing outright and dropping
   /// out of recording made getting a taken combination onto a row a six-step
   /// errand through a command ten rows away.
-  ({CommandRef row, int keyCode, int modifiers, CommandRef owner})? _pending;
+  ({CommandRef row, KeyChord chord, CommandRef owner})? _pending;
 
   @override
   void dispose() {
@@ -436,26 +437,13 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   /// same combination again takes it; so does the footer's button; anything
   /// else is simply recorded as usual; esc cancels. Whatever is taken is
   /// undoable, which is what makes offering it safe at all.
-  Future<void> _commit(
-    CommandRef cmd,
-    ({int keyCode, int modifiers}) combo,
-  ) async {
-    final updated = _bindingFor(
-      cmd,
-    ).copyWith(keyCode: combo.keyCode, modifiers: combo.modifiers);
-    final displaced = conflictFor(widget.bindings, updated);
+  Future<void> _commit(CommandRef cmd, KeyChord combo) async {
+    final displaced = conflictFor(widget.bindings, Binding(cmd, combo));
 
     if (displaced != null && !_isRepeatOf(cmd, combo)) {
-      setState(
-        () => _pending = (
-          row: cmd,
-          keyCode: combo.keyCode,
-          modifiers: combo.modifiers,
-          owner: displaced,
-        ),
-      );
+      setState(() => _pending = (row: cmd, chord: combo, owner: displaced));
       _notify(
-        '${formatCombo(combo.keyCode, combo.modifiers, keyLabels: KeyboardLabels.of(context))} is used by '
+        '${formatCombo(combo, keyLabels: KeyboardLabels.of(context))} is used by '
         '${_labelFor(displaced)}. Press it again to use it here.',
         actionLabel: 'Use it here',
         // Two ways in, and not for redundancy: [RecordingField] answers every
@@ -500,7 +488,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   }
 
   /// Whether [combo] is the confirming second press of the pending question.
-  bool _isRepeatOf(CommandRef cmd, ({int keyCode, int modifiers}) combo) {
+  bool _isRepeatOf(CommandRef cmd, KeyChord combo) {
     final p = _pending;
     // A question is always about the row that is recording — [_startRecording]
     // drops one raised elsewhere and [_stopRecording] drops it outright — so
@@ -508,15 +496,13 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
     // no input can reach, which is worse than an assertion: it reads as a
     // handled case and is never exercised.
     assert(p == null || p.row == cmd);
-    return p != null &&
-        p.keyCode == combo.keyCode &&
-        p.modifiers == combo.modifiers;
+    return p != null && p.chord.sameChordAs(combo);
   }
 
   /// Bind [combo] to [cmd], offering the way back when it costs another row.
   void _take(
     CommandRef cmd,
-    ({int keyCode, int modifiers}) combo,
+    KeyChord combo,
     CommandRef? displaced,
   ) {
     // Snapshotted *before* the rebind: this is the state Undo returns to — and
@@ -534,11 +520,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
       _bindingFor(cmd),
       if (displaced != null) _bindingFor(displaced),
     ];
-    widget.onRebound(
-      _bindingFor(
-        cmd,
-      ).copyWith(keyCode: combo.keyCode, modifiers: combo.modifiers),
-    );
+    widget.onRebound(Binding(cmd, combo));
     if (displaced == null) return;
     _notifyDisplaced(displaced, combo, before);
   }
@@ -550,7 +532,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   /// drift would be in the one place the user is told what just happened.
   void _notifyDisplaced(
     CommandRef displaced,
-    ({int keyCode, int modifiers}) combo,
+    KeyChord combo,
     List<Binding> before,
   ) {
     // Point at the row, not only at the sentence. It is named at the bottom of
@@ -559,7 +541,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
     final restore = widget.onRestoreBindings;
     _notify(
       '${_labelFor(displaced)} lost '
-      '${formatCombo(combo.keyCode, combo.modifiers, keyLabels: KeyboardLabels.of(context))}.',
+      '${formatCombo(combo, keyLabels: KeyboardLabels.of(context))}.',
       actionLabel: restore == null ? null : 'Undo',
       action: restore == null ? null : () => restore(before),
     );
@@ -981,11 +963,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
       actionLabel: restore == null ? null : 'Undo',
       action: restore == null
           ? null
-          : () => restore((
-                region: region,
-                keyCode: binding?.keyCode ?? kUnboundKey,
-                modifiers: binding?.modifiers ?? 0,
-              )),
+          : () => restore((region: region, chord: binding?.chord)),
     );
   }
 
@@ -1003,7 +981,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
     // reset that never touched it.
     final before = [
       for (final b in widget.bindings)
-        if (b != defaultBindingFor(b.command)) b,
+        if (!sameShortcut(b, defaultBindingFor(b.command))) b,
     ];
     final restore = widget.onRestoreBindings;
     widget.onResetBindings!();
@@ -1164,17 +1142,16 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
         builder: (dialogContext) => RegionPickerSheet(
           initial: initial,
           isNew: isNew,
-          initialKeyCode: binding?.keyCode ?? kUnboundKey,
-          initialModifiers: binding?.modifiers ?? 0,
+          initialChord: binding?.chord,
           gridCols: widget.gridCols,
           gridRows: widget.gridRows,
           onCaptureStart: startCapture,
           onCaptureEnd: endCapture,
-          conflictName: (keyCode, modifiers) {
+          conflictName: (chord) {
             final ref = initial == null ? null : Custom(initial.id);
             final clash = conflictFor(
               widget.bindings,
-              Binding(ref ?? const Custom('__new__'), keyCode, modifiers),
+              Binding(ref ?? const Custom('__new__'), chord),
             );
             return clash == null ? null : _labelFor(clash);
           },
@@ -1190,7 +1167,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
             // `orElse` unbound row, which is exactly what Undo should put back.
             final displaced = conflictFor(
               widget.bindings,
-              Binding(Custom(draft.region.id), draft.keyCode, draft.modifiers),
+              Binding(Custom(draft.region.id), draft.chord),
             );
             final before = [
               _bindingFor(Custom(draft.region.id)),
@@ -1198,11 +1175,11 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
             ];
             onSaved(draft);
             _flashRow(Custom(draft.region.id));
-            if (displaced != null) {
-              _notifyDisplaced(displaced, (
-                keyCode: draft.keyCode,
-                modifiers: draft.modifiers,
-              ), before);
+            // A displacement implies a chord: conflictFor finds nothing for
+            // an unbound draft.
+            final chord = draft.chord;
+            if (displaced != null && chord != null) {
+              _notifyDisplaced(displaced, chord, before);
             }
           },
           onDelete: (initial == null || isNew)
@@ -1292,12 +1269,12 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
         // exists to remove, restored for exactly one class of user.
         semanticLabel: switch ((isRecording, _pending)) {
           (true, final p?) when p.row == cmd =>
-            '${_labelFor(cmd)}, ${formatCombo(p.keyCode, p.modifiers, keyLabels: KeyboardLabels.of(context))} is '
+            '${_labelFor(cmd)}, ${formatCombo(p.chord, keyLabels: KeyboardLabels.of(context))} is '
                 'used by ${_labelFor(p.owner)}. '
                 'Press it again to use it here, or escape to cancel.',
           (true, _) => '${_labelFor(cmd)}, listening for a combination',
           _ =>
-            '${_labelFor(cmd)}, ${binding.isBound ? formatCombo(binding.keyCode, binding.modifiers, keyLabels: KeyboardLabels.of(context)) : "no shortcut"}'
+            '${_labelFor(cmd)}, ${binding.isBound ? formatCombo(binding.chord!, keyLabels: KeyboardLabels.of(context)) : "no shortcut"}'
                 '${widget.unavailable.contains(cmd) ? ", unavailable" : ""}',
         },
         // The clear button lives inside this row and must stay reachable; the
@@ -1404,12 +1381,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
                   child: RecordingField(
                     // The combination in question, on the row it was pressed
                     // on, so the footer's sentence has a visible subject.
-                    pending: _pending?.row == cmd
-                        ? (
-                            keyCode: _pending!.keyCode,
-                            modifiers: _pending!.modifiers,
-                          )
-                        : null,
+                    pending: _pending?.row == cmd ? _pending!.chord : null,
                     onCombo: (combo) => _commit(cmd, combo),
                     onCancel: _stopRecording,
                   ),
@@ -1445,10 +1417,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
                   // the one row that needs pressing most was the only one that
                   // looked inert.
                   child: binding.isBound
-                      ? KeycapRow(
-                          keyCode: binding.keyCode,
-                          modifiers: binding.modifiers,
-                        )
+                      ? KeycapRow(chord: binding.chord)
                       : SetShortcutPill(
                           label: 'Click to set',
                           hovered: isHovered,

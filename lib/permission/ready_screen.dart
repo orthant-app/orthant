@@ -73,11 +73,7 @@ class ReadyScreen extends StatelessWidget {
           ),
           const SizedBox(width: 5),
         ],
-        KeycapRow(
-          keyCode: b.keyCode,
-          modifiers: b.modifiers,
-          unsetLabel: unsetLabel,
-        ),
+        KeycapRow(chord: b.chord, unsetLabel: unsetLabel),
       ];
 
   @override

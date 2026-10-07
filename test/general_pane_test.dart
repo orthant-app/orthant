@@ -6,7 +6,8 @@ import 'package:orthant/settings/grid_preview.dart';
 import 'package:orthant/settings/mac_stepper.dart';
 import 'package:orthant/settings/mac_theme.dart';
 import 'package:orthant/settings/settings.dart';
-import 'package:orthant/shortcuts/bindings.dart';
+
+import 'support/carbon_terms.dart';
 
 void main() {
   late List<Settings> changes;
@@ -23,7 +24,7 @@ void main() {
             onSettingsChanged: changes.add,
             permissionGranted: true,
             loginStatus: LoginItemStatus.disabled,
-            bindings: kDefaultBindings,
+            bindings: macDefaults,
           ),
         ),
       ),

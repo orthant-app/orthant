@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'bindings.dart';
+import '../core/carbon_keys.dart';
 import 'command_ref.dart';
 import 'custom_region.dart';
 import 'shortcut_command.dart';
@@ -51,7 +52,7 @@ class BindingsStore {
     }
 
     final v1 = prefs.getString(_v1Key);
-    if (v1 == null) return const StoredBindings(kDefaultBindings, []);
+    if (v1 == null) return StoredBindings(runningDefaults(), const []);
     return StoredBindings(
       _completed(_bindingsFrom(_tryDecode(v1)), const []),
       const [],
@@ -63,7 +64,7 @@ class BindingsStore {
     await prefs.setString(
       _v2Key,
       jsonEncode({
-        'bindings': [for (final b in bindings) b.toJson()],
+        'bindings': [for (final b in bindings) _carbonEntry(b)],
         'regions': [for (final r in regions) r.toJson()],
       }),
     );
@@ -78,6 +79,39 @@ Object? _tryDecode(String raw) {
   }
 }
 
+/// One v1 or v2 entry: a command, and a Carbon key code and mask.
+///
+/// The validation those versions applied, with one narrowing: the key code
+/// must be one the recorder can produce, and the mask may hold only the four
+/// modifiers. Every file Orthant wrote passes both, so the narrowing reaches
+/// only a hand-edited one, where a stray value used to go straight to
+/// `RegisterEventHotKey` and would now leave that command at its default.
+Binding? _bindingFromCarbon(Object? entry) {
+  if (entry is! Map) return null;
+  final name = entry['command'];
+  final keyCode = entry['keyCode'];
+  final modifiers = entry['modifiers'];
+  if (name is! String || keyCode is! int || modifiers is! int) return null;
+  final command = CommandRef.tryParse(name);
+  if (command == null) return null;
+  if (keyCode == kUnboundKey) {
+    return modifiers == 0 ? Binding.unbound(command) : null;
+  }
+  final chord = chordFromCarbon(keyCode, modifiers);
+  return chord == null ? null : Binding(command, chord);
+}
+
+/// [b] as v1 and v2 stored it. Only until storage moves to v3, after which v2
+/// is read, for the migration, and never written.
+Map<String, Object?> _carbonEntry(Binding b) {
+  final chord = b.chord;
+  return {
+    'command': b.command.jsonName,
+    'keyCode': chord == null ? kUnboundKey : carbonKeyCode(chord.physical)!,
+    'modifiers': chord == null ? 0 : carbonModifiers(chord.modifiers),
+  };
+}
+
 /// The bindings we could make sense of. A truncated file, a list of something
 /// other than objects, an entry naming a command this build doesn't have — all
 /// skipped rather than thrown. [BindingsStore.load] runs before any shortcut is
@@ -88,7 +122,7 @@ List<Binding> _bindingsFrom(Object? parsed) {
   if (parsed is! List) return const [];
   final out = <Binding>[];
   for (final entry in parsed) {
-    final binding = Binding.tryFromJson(entry);
+    final binding = _bindingFromCarbon(entry);
     if (binding != null) out.add(binding);
   }
   return out;
@@ -125,7 +159,7 @@ List<CustomRegion> _regionsFrom(Object? parsed) {
 List<Binding> _completed(List<Binding> stored, List<CustomRegion> regions) {
   final byCommand = <CommandRef, Binding>{for (final b in stored) b.command: b};
   final defaults = <CommandRef, Binding>{
-    for (final b in kDefaultBindings) b.command: b
+    for (final b in runningDefaults()) b.command: b
   };
   return [
     for (final command in ShortcutCommand.values)

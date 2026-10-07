@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../shortcuts/bindings.dart';
+import '../core/key_chord.dart';
 import 'key_capture.dart';
 import 'keyboard_labels.dart';
 import 'mac_theme.dart';
@@ -29,14 +30,14 @@ class RecordingField extends StatefulWidget {
     this.verticalPadding = 3,
   });
 
-  final void Function(({int keyCode, int modifiers})) onCombo;
+  final void Function(KeyChord) onCombo;
   final VoidCallback onCancel;
 
   /// A combination already pressed that something else owns.
   ///
   /// Drawn in place of the live preview, in the warning colour, so that the row
   /// the footer's question is about is obvious at a glance.
-  final ({int keyCode, int modifiers})? pending;
+  final KeyChord? pending;
 
   final double verticalPadding;
 
@@ -54,7 +55,7 @@ class _RecordingFieldState extends State<RecordingField> {
   final _node = FocusNode(debugLabel: 'shortcut-recorder');
 
   /// The modifiers held right now, so the field shows what it is hearing.
-  int _held = 0;
+  Modifiers _held = Modifiers.none;
 
   @override
   void initState() {
@@ -87,8 +88,8 @@ class _RecordingFieldState extends State<RecordingField> {
       widget.onCancel();
       return KeyEventResult.handled;
     }
-    final combo = carbonFromKeyEvent(event);
-    if (combo != null) widget.onCombo(combo);
+    final chord = chordFromKeyEvent(event);
+    if (chord != null) widget.onCombo(chord);
     return KeyEventResult.handled; // never let keys leak to the app
   }
 
@@ -97,8 +98,7 @@ class _RecordingFieldState extends State<RecordingField> {
     final t = context.mac;
     final pending = widget.pending;
     final symbols = pending != null
-        ? comboSymbols(pending.keyCode, pending.modifiers,
-            keyLabels: KeyboardLabels.of(context))
+        ? comboSymbols(pending, keyLabels: KeyboardLabels.of(context))
         : modifierSymbols(_held);
     return Focus(
       focusNode: _node,

@@ -13,6 +13,8 @@ import 'package:orthant/shortcuts/bindings.dart';
 import 'package:orthant/shortcuts/command_ref.dart';
 import 'package:orthant/shortcuts/shortcut_command.dart';
 
+import 'support/carbon_terms.dart';
+
 /// The window's controls were bare `GestureDetector`s: unreachable by Tab,
 /// unusable by Space or Return, with no focus ring and nothing for VoiceOver to
 /// announce. On an app whose whole subject is keyboard shortcuts, the pane for
@@ -25,7 +27,7 @@ import 'package:orthant/shortcuts/shortcut_command.dart';
 void main() {
   Widget host({
     Settings settings = const Settings(),
-    List<Binding> bindings = kDefaultBindings,
+    List<Binding>? bindings,
     bool permissionGranted = true,
     LoginItemStatus loginStatus = LoginItemStatus.disabled,
     void Function(Settings)? onSettingsChanged,
@@ -39,7 +41,7 @@ void main() {
       initialTab: initialTab,
       onOpenAccessibility: onOpenAccessibility,
       settings: settings,
-      bindings: bindings,
+      bindings: bindings ?? macDefaults,
       permissionGranted: permissionGranted,
       loginStatus: loginStatus,
       onSettingsChanged: onSettingsChanged ?? (_) {},
@@ -279,7 +281,7 @@ void main() {
       await tester.pumpWidget(host(
         initialTab: SettingsTab.shortcuts,
         bindings: withRebind(
-            kDefaultBindings, Binding.unbound(BuiltIn(ShortcutCommand.center))),
+            macDefaults, Binding.unbound(BuiltIn(ShortcutCommand.center))),
       ));
       await tester.pumpAndSettle();
       expect(find.bySemanticsLabel('Center, no shortcut'), findsOneWidget);
@@ -295,7 +297,7 @@ void main() {
         home: SettingsWindow(
           initialTab: SettingsTab.shortcuts,
           settings: const Settings(),
-          bindings: kDefaultBindings,
+          bindings: macDefaults,
           unavailable: {const BuiltIn(ShortcutCommand.leftHalf)},
           onSettingsChanged: (_) {},
           onRebound: (_) {},
@@ -515,7 +517,7 @@ void main() {
       await tester.pumpWidget(host(
         initialTab: SettingsTab.shortcuts,
         bindings: withRebind(
-            kDefaultBindings, Binding.unbound(BuiltIn(ShortcutCommand.center))),
+            macDefaults, Binding.unbound(BuiltIn(ShortcutCommand.center))),
       ));
       await tester.pumpAndSettle();
       expect(find.bySemanticsLabel('Remove Center shortcut'), findsNothing);

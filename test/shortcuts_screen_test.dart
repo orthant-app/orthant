@@ -9,11 +9,14 @@ import 'package:orthant/settings/mac_theme.dart';
 import 'package:orthant/settings/recording_field.dart';
 import 'package:orthant/settings/region_glyph.dart';
 import 'package:orthant/settings/shortcuts_screen.dart';
+import 'package:orthant/core/key_chord.dart';
 import 'package:orthant/shortcuts/bindings.dart';
 import 'package:orthant/settings/region_picker_sheet.dart';
 import 'package:orthant/shortcuts/command_ref.dart';
 import 'package:orthant/shortcuts/custom_region.dart';
 import 'package:orthant/shortcuts/shortcut_command.dart';
+
+import 'support/carbon_terms.dart';
 
 Widget _host(Widget child) =>
     MaterialApp(theme: macTheme(Brightness.light), home: child);
@@ -22,7 +25,7 @@ void main() {
   testWidgets('lists every command with a region glyph and its combo keycaps',
       (tester) async {
     await tester.pumpWidget(_host(
-      ShortcutsScreen(bindings: kDefaultBindings, onRebound: (_) {}),
+      ShortcutsScreen(bindings: macDefaults, onRebound: (_) {}),
     ));
 
     expect(find.text('Left half'), findsOneWidget);
@@ -56,7 +59,7 @@ void main() {
       width: 500,
       height: 900,
       child: ShortcutsScreen(
-        bindings: kDefaultBindings,
+        bindings: macDefaults,
         regions: const [region],
         onRebound: (_) {},
         onRegionSaved: (_) {},
@@ -91,8 +94,8 @@ void main() {
     // In production `main.dart` wraps the window in a `ListenableBuilder` on the
     // coordinator, so `widget.bindings` really is the post-reset list while the
     // notice is up.
-    var live = withRebind(kDefaultBindings,
-        const Binding(BuiltIn(ShortcutCommand.center), 6, kControlOption));
+    var live = withRebind(macDefaults,
+        Binding(BuiltIn(ShortcutCommand.center), carbon(6, kControlOption)));
     var resets = 0;
     List<Binding>? restored;
     await tester.pumpWidget(_host(StatefulBuilder(
@@ -101,7 +104,7 @@ void main() {
         onRebound: (_) {},
         onResetBindings: () => setInner(() {
           resets++;
-          live = [...kDefaultBindings];
+          live = [...macDefaults];
         }),
         onRestoreBindings: (b) => restored = b,
       ),
@@ -127,14 +130,14 @@ void main() {
     // left it exactly as it found it. Carrying it in the snapshot anyway means
     // that editing it afterwards and then clicking Undo reverts an edit this
     // operation never made, which is silent data loss dressed as a way back.
-    var live = withRebind(kDefaultBindings,
-        const Binding(BuiltIn(ShortcutCommand.center), 6, kControlOption));
+    var live = withRebind(macDefaults,
+        Binding(BuiltIn(ShortcutCommand.center), carbon(6, kControlOption)));
     List<Binding>? restored;
     await tester.pumpWidget(_host(StatefulBuilder(
       builder: (context, setInner) => ShortcutsScreen(
         bindings: live,
         onRebound: (_) {},
-        onResetBindings: () => setInner(() => live = [...kDefaultBindings]),
+        onResetBindings: () => setInner(() => live = [...macDefaults]),
         onRestoreBindings: (b) => restored = b,
       ),
     )));
@@ -157,10 +160,51 @@ void main() {
     );
   });
 
+  testWidgets('Reset leaves alone a row recorded at its default under another layout',
+      (tester) async {
+    // Dvorak types J at the US C position. ⌃⌥ recorded there holds the logical
+    // key J where the default holds the US placeholder C, but on macOS it is
+    // the same hotkey: the reset did not change that row, so its Undo must not
+    // claim it, or an edit made to the row afterwards would be reverted.
+    final dvorakC = KeyChord(
+      physical: PhysicalKeyboardKey.keyC.usbHidUsage,
+      logical: LogicalKeyboardKey.keyJ.keyId,
+      modifiers: Modifiers.ctrl | Modifiers.alt,
+    );
+    var live = [
+      for (final b in withRebind(macDefaults,
+          Binding(const BuiltIn(ShortcutCommand.leftHalf), carbon(6, kControlOption))))
+        b.command == const BuiltIn(ShortcutCommand.center)
+            ? Binding(b.command, dvorakC)
+            : b,
+    ];
+    List<Binding>? restored;
+    await tester.pumpWidget(_host(StatefulBuilder(
+      builder: (context, setInner) => ShortcutsScreen(
+        bindings: live,
+        onRebound: (_) {},
+        onResetBindings: () => setInner(() => live = [...macDefaults]),
+        onRestoreBindings: (b) => restored = b,
+      ),
+    )));
+
+    await tester.tap(find.text('Reset Shortcuts'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('notice-action')));
+    await tester.pumpAndSettle();
+
+    expect(restored!.map((b) => b.command),
+        contains(const BuiltIn(ShortcutCommand.leftHalf)),
+        reason: 'the control: a row the reset did change is offered back');
+    expect(restored!.map((b) => b.command),
+        isNot(contains(const BuiltIn(ShortcutCommand.center))),
+        reason: 'the default hotkey, recorded under another layout, was claimed');
+  });
+
   testWidgets('Reset says nothing about undo when there is no way back',
       (tester) async {
     await tester.pumpWidget(_host(ShortcutsScreen(
-      bindings: kDefaultBindings,
+      bindings: macDefaults,
       onRebound: (_) {},
       onResetBindings: () {},
     )));
@@ -187,7 +231,7 @@ void main() {
         .height;
 
     await tester.pumpWidget(_host(ShortcutsScreen(
-      bindings: kDefaultBindings,
+      bindings: macDefaults,
       onRebound: (_) {},
       onRestoreBindings: (_) {},
       onResetBindings: () {},
@@ -242,7 +286,7 @@ void main() {
         (tester) async {
       final changes = <Binding>[];
       await tester.pumpWidget(_host(ShortcutsScreen(
-        bindings: kDefaultBindings,
+        bindings: macDefaults,
         onRebound: changes.add,
       )));
 
@@ -260,7 +304,7 @@ void main() {
         (tester) async {
       final changes = <Binding>[];
       await tester.pumpWidget(_host(ShortcutsScreen(
-        bindings: kDefaultBindings,
+        bindings: macDefaults,
         onRebound: changes.add,
       )));
 
@@ -279,7 +323,7 @@ void main() {
       // would be a keyboard dead end, and a key-only one a mouse dead end.
       final changes = <Binding>[];
       await tester.pumpWidget(_host(ShortcutsScreen(
-        bindings: kDefaultBindings,
+        bindings: macDefaults,
         onRebound: changes.add,
       )));
 
@@ -300,7 +344,7 @@ void main() {
       // so the snapshot and a live read are indistinguishable — and an Undo
       // that handed back the damage instead of the way back would pass. In
       // production the window rebuilds on every coordinator change.
-      var live = [...kDefaultBindings];
+      var live = [...macDefaults];
       List<Binding>? restored;
       await tester.pumpWidget(_host(StatefulBuilder(
         builder: (context, setInner) => ShortcutsScreen(
@@ -357,7 +401,7 @@ void main() {
       // data loss: take a chord, rebind a third command, click the Undo that is
       // still sitting there, and the third command went back to a binding the
       // user had already replaced. Nothing said it had.
-      var live = [...kDefaultBindings];
+      var live = [...macDefaults];
       List<Binding>? restored;
       await tester.pumpWidget(_host(StatefulBuilder(
         builder: (context, setInner) => ShortcutsScreen(
@@ -415,7 +459,7 @@ void main() {
       // twelve, and the footer is at the bottom of the window. The message and
       // the thing it describes were disconnected — which is most of what made
       // the silent theft this replaced so confusing to begin with.
-      var live = [...kDefaultBindings];
+      var live = [...macDefaults];
       await tester.pumpWidget(_host(StatefulBuilder(
         builder: (context, setInner) => ShortcutsScreen(
           bindings: live,
@@ -454,7 +498,7 @@ void main() {
         (tester) async {
       final changes = <Binding>[];
       await tester.pumpWidget(_host(ShortcutsScreen(
-        bindings: kDefaultBindings,
+        bindings: macDefaults,
         onRebound: changes.add,
       )));
 
@@ -473,7 +517,7 @@ void main() {
         (tester) async {
       final changes = <Binding>[];
       await tester.pumpWidget(_host(ShortcutsScreen(
-        bindings: kDefaultBindings,
+        bindings: macDefaults,
         onRebound: changes.add,
       )));
 
@@ -497,7 +541,7 @@ void main() {
       // combination the user had been shown nothing about.
       final changes = <Binding>[];
       await tester.pumpWidget(_host(ShortcutsScreen(
-        bindings: kDefaultBindings,
+        bindings: macDefaults,
         onRebound: changes.add,
       )));
 
@@ -525,7 +569,7 @@ void main() {
       // whole change exists to remove, restored for one class of user.
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(_host(ShortcutsScreen(
-        bindings: kDefaultBindings,
+        bindings: macDefaults,
         onRebound: (_) {},
       )));
 
@@ -550,7 +594,7 @@ void main() {
       // this reason — the gate was on one of the two buttons in that row.
       final events = <String>[];
       await tester.pumpWidget(_host(ShortcutsScreen(
-        bindings: kDefaultBindings,
+        bindings: macDefaults,
         onRebound: (_) {},
         onRestoreBindings: (_) => events.add('restore'),
         onCaptureStart: () async => events.add('suspend'),
@@ -583,7 +627,7 @@ void main() {
       // the click" rule this pane already applies when opening the picker.
       var restored = false;
       await tester.pumpWidget(_host(ShortcutsScreen(
-        bindings: kDefaultBindings,
+        bindings: macDefaults,
         onRebound: (_) {},
         onRestoreBindings: (_) => restored = true,
         onCaptureEnd: () async => throw StateError('channel gone'),
@@ -606,7 +650,7 @@ void main() {
       // then rebinds, so a rejection between the two loses the rebind outright.
       final changes = <Binding>[];
       await tester.pumpWidget(_host(ShortcutsScreen(
-        bindings: kDefaultBindings,
+        bindings: macDefaults,
         onRebound: changes.add,
         onCaptureEnd: () async => throw StateError('channel gone'),
       )));
@@ -631,7 +675,7 @@ void main() {
       // all — for the wrong row.
       final changes = <Binding>[];
       await tester.pumpWidget(_host(ShortcutsScreen(
-        bindings: kDefaultBindings,
+        bindings: macDefaults,
         onRebound: changes.add,
       )));
 
@@ -652,7 +696,7 @@ void main() {
     // The counterpart, so the refusal cannot be a blanket "nothing commits".
     final changes = <Binding>[];
     await tester.pumpWidget(_host(ShortcutsScreen(
-      bindings: kDefaultBindings,
+      bindings: macDefaults,
       onRebound: changes.add,
     )));
 
@@ -669,8 +713,8 @@ void main() {
   });
 
   testWidgets('an unbound command offers a button, not a status', (tester) async {
-    final bindings = withRebind(kDefaultBindings,
-        const Binding(BuiltIn(ShortcutCommand.leftHalf), 124, kControlOption));
+    final bindings = withRebind(macDefaults,
+        Binding(BuiltIn(ShortcutCommand.leftHalf), carbon(124, kControlOption)));
     await tester.pumpWidget(_host(
       ShortcutsScreen(bindings: bindings, onRebound: (_) {}),
     ));
@@ -692,7 +736,7 @@ void main() {
     // failure too: not a throw, just a round trip that has not come back yet.
     final blocked = Completer<void>();
     await tester.pumpWidget(_host(ShortcutsScreen(
-      bindings: kDefaultBindings,
+      bindings: macDefaults,
       onRebound: (_) {},
       onCaptureStart: () => blocked.future,
     )));
@@ -713,8 +757,8 @@ void main() {
     // concluded the row could not be set at all. It always could; nothing said
     // so. Asserted for the pointer *and* the keyboard, because the row is
     // reachable both ways and the affordance has to be too.
-    final bindings = withRebind(kDefaultBindings,
-        const Binding(BuiltIn(ShortcutCommand.leftHalf), 124, kControlOption));
+    final bindings = withRebind(macDefaults,
+        Binding(BuiltIn(ShortcutCommand.leftHalf), carbon(124, kControlOption)));
     final changes = <Binding>[];
     await tester.pumpWidget(_host(
       ShortcutsScreen(bindings: bindings, onRebound: changes.add),
@@ -742,7 +786,7 @@ void main() {
     // The row is the only place this can surface: a refused chord is stored and
     // rendered exactly like a working one, and simply never fires.
     await tester.pumpWidget(_host(ShortcutsScreen(
-      bindings: kDefaultBindings,
+      bindings: macDefaults,
       unavailable: {const BuiltIn(ShortcutCommand.center)},
       onRebound: (_) {},
     )));
@@ -752,8 +796,8 @@ void main() {
   testWidgets('an unbound command is never marked unavailable', (tester) async {
     // "Not set" already says the shortcut does nothing; a warning beside it
     // would claim a conflict that does not exist.
-    final bindings = withRebind(kDefaultBindings,
-        const Binding(BuiltIn(ShortcutCommand.leftHalf), 124, kControlOption));
+    final bindings = withRebind(macDefaults,
+        Binding(BuiltIn(ShortcutCommand.leftHalf), carbon(124, kControlOption)));
     await tester.pumpWidget(_host(ShortcutsScreen(
       bindings: bindings,
       unavailable: {const BuiltIn(ShortcutCommand.rightHalf)},
@@ -767,7 +811,7 @@ void main() {
       (tester) async {
     final events = <String>[];
     await tester.pumpWidget(_host(ShortcutsScreen(
-      bindings: kDefaultBindings,
+      bindings: macDefaults,
       onRebound: (_) {},
       onCaptureStart: () async => events.add('suspend'),
       onCaptureEnd: () async => events.add('resume'),
@@ -787,7 +831,7 @@ void main() {
   testWidgets('clearing a shortcut reports an unbound binding', (tester) async {
     final changes = <Binding>[];
     await tester.pumpWidget(_host(ShortcutsScreen(
-      bindings: kDefaultBindings,
+      bindings: macDefaults,
       onRebound: changes.add,
     )));
 
@@ -851,9 +895,8 @@ void main() {
           child: ShortcutsScreen(
             bindings: bindings ??
                 [
-                  ...kDefaultBindings,
-                  const Binding(
-                      Custom('r1'), 123, kControlOption | kShiftKey),
+                  ...macDefaults,
+                  Binding(Custom('r1'), carbon(123, kControlOption | kShiftKey)),
                 ],
             regions: regions,
             onRebound: onRebound ?? (_) {},
@@ -1068,7 +1111,7 @@ void main() {
       // A live host, for the same reason as the two list cases: a fixed
       // `bindings:` prop makes the snapshot and a live read indistinguishable.
       var live = [
-        ...kDefaultBindings,
+        ...macDefaults,
         const Binding.unbound(Custom('r1')),
       ];
       List<Binding>? restored;
@@ -1082,7 +1125,7 @@ void main() {
             onRebound: (_) {},
             onRestoreBindings: (b) => restored = b,
             onRegionSaved: (d) => setInner(() => live = withRebind(
-                live, Binding(Custom(d.region.id), d.keyCode, d.modifiers))),
+                live, Binding(Custom(d.region.id), d.chord))),
             onRegionDeleted: (_) {},
           ),
         ),
@@ -1173,7 +1216,7 @@ void main() {
         width: 500,
         height: 900,
         child: ShortcutsScreen(
-          bindings: kDefaultBindings,
+          bindings: macDefaults,
           onRebound: (_) {},
         ),
       )));
@@ -1624,9 +1667,9 @@ void main() {
                   width: 500,
                   height: 900,
                   child: ShortcutsScreen(
-                    bindings: const [
-                      ...kDefaultBindings,
-                      Binding(Custom('r1'), 123, kControlOption | kShiftKey),
+                    bindings: [
+                      ...macDefaults,
+                      Binding(Custom('r1'), carbon(123, kControlOption | kShiftKey)),
                     ],
                     regions: const [region],
                     onRebound: (_) {},
@@ -1820,8 +1863,8 @@ void main() {
       // The row path can only report a theft afterwards; the sheet warns first.
       await tester.pumpWidget(host(
         bindings: [
-          ...kDefaultBindings,
-          const Binding(Custom('r1'), 123, kControlOption | kShiftKey),
+          ...macDefaults,
+          Binding(Custom('r1'), carbon(123, kControlOption | kShiftKey)),
         ],
       ));
       await tester.tap(find.byKey(const ValueKey('edit-custom:r1')));
@@ -1830,11 +1873,11 @@ void main() {
       final sheet =
           tester.widget<RegionPickerSheet>(find.byType(RegionPickerSheet));
       // ⌃⌥← is Left half's default.
-      expect(sheet.conflictName!(123, kControlOption), 'Left half');
+      expect(sheet.conflictName!(carbon(123, kControlOption)), 'Left half');
       // Its own combo is not a clash with itself.
-      expect(sheet.conflictName!(123, kControlOption | kShiftKey), isNull);
+      expect(sheet.conflictName!(carbon(123, kControlOption | kShiftKey)), isNull);
       // A free chord is free.
-      expect(sheet.conflictName!(17, kControlOption | kShiftKey), isNull);
+      expect(sheet.conflictName!(carbon(17, kControlOption | kShiftKey)), isNull);
     });
 
 
@@ -1941,7 +1984,7 @@ void main() {
               width: 500,
               height: 900,
               child: ShortcutsScreen(
-                bindings: kDefaultBindings,
+                bindings: macDefaults,
                 regions: const [region],
                 onRebound: (_) {},
                 onRegionSaved: (_) {},
@@ -2009,7 +2052,7 @@ void main() {
         width: 500,
         height: 900,
         child: ShortcutsScreen(
-          bindings: kDefaultBindings,
+          bindings: macDefaults,
           regions: const [region],
           onRebound: (_) {},
         ),

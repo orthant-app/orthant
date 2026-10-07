@@ -2,10 +2,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/channel.dart';
 import 'package:orthant/core/geometry.dart';
+import 'package:orthant/core/key_chord.dart';
 import 'package:orthant/shortcuts/bindings.dart';
 import 'package:orthant/shortcuts/command_ref.dart';
 import 'package:orthant/shortcuts/hotkey_service.dart';
 import 'package:orthant/shortcuts/shortcut_command.dart';
+
+import 'support/carbon_terms.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -49,9 +52,9 @@ void main() {
   test('apply registers one hotkey per binding with id = command index',
       () async {
     final ids = captureIds();
-    await HotkeyService(onCommand: (_) {}).apply(kDefaultBindings);
+    await HotkeyService(onCommand: (_) {}).apply(macDefaults);
     expect(ids.toSet(),
-        {for (final b in kDefaultBindings) (b.command as BuiltIn).command.index});
+        {for (final b in macDefaults) (b.command as BuiltIn).command.index});
   });
 
   test('apply replaces the whole set in a single native call', () async {
@@ -67,11 +70,11 @@ void main() {
       calls.add(call);
       return <int>[];
     });
-    await HotkeyService(onCommand: (_) {}).apply(kDefaultBindings);
+    await HotkeyService(onCommand: (_) {}).apply(macDefaults);
 
     expect(calls.map((c) => c.method).toList(), ['replaceHotkeys']);
     final sent = (calls.single.arguments as Map)['bindings'] as List<Object?>;
-    expect(sent.length, kDefaultBindings.length,
+    expect(sent.length, macDefaults.length,
         reason: 'the call carries the entire snapshot, not a delta');
   });
 
@@ -81,19 +84,67 @@ void main() {
     // the persistence and the collision check with the ten placements.
     final ids = captureIds();
     await HotkeyService(onCommand: (_) {}, onSummon: ({pressedAtMs}) {})
-        .apply(kDefaultBindings);
+        .apply(macDefaults);
     expect(ids, contains(ShortcutCommand.showGrid.index));
   });
 
   test('apply skips unbound commands', () async {
     final ids = captureIds();
-    final bindings = withRebind(kDefaultBindings,
-        const Binding(BuiltIn(ShortcutCommand.leftHalf), 124, kControlOption));
+    final bindings = withRebind(macDefaults,
+        Binding(BuiltIn(ShortcutCommand.leftHalf), carbon(124, kControlOption)));
     await HotkeyService(onCommand: (_) {}).apply(bindings);
 
     // rightHalf lost its combo to leftHalf, so it must not be registered.
     expect(ids, isNot(contains(ShortcutCommand.rightHalf.index)));
-    expect(ids.length, kDefaultBindings.length - 1);
+    expect(ids.length, macDefaults.length - 1);
+  });
+
+  test('the native side is sent exactly what 1.0.3 sent for the defaults',
+      () async {
+    // The registration half of "macOS behaves exactly as before". Typed out,
+    // not derived: a list computed through carbon_keys.dart would share any
+    // mistake in it.
+    final calls = <MethodCall>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      return <int>[];
+    });
+    await HotkeyService(onCommand: (_) {}).apply(macDefaults);
+    expect((calls.single.arguments as Map)['bindings'], [
+      {'id': 0, 'keyCode': 31, 'modifiers': 6144},
+      {'id': 1, 'keyCode': 123, 'modifiers': 6144},
+      {'id': 2, 'keyCode': 124, 'modifiers': 6144},
+      {'id': 3, 'keyCode': 126, 'modifiers': 6144},
+      {'id': 4, 'keyCode': 125, 'modifiers': 6144},
+      {'id': 5, 'keyCode': 32, 'modifiers': 6144},
+      {'id': 6, 'keyCode': 34, 'modifiers': 6144},
+      {'id': 7, 'keyCode': 38, 'modifiers': 6144},
+      {'id': 8, 'keyCode': 40, 'modifiers': 6144},
+      {'id': 9, 'keyCode': 36, 'modifiers': 6144},
+      {'id': 10, 'keyCode': 8, 'modifiers': 6144},
+    ]);
+  });
+
+  test('a chord with no Carbon code is reported refused, and never sent',
+      () async {
+    // Nothing in this build produces one (carbon_keys_test proves every
+    // bindable key has a code), so this guards that proof: if the two drift,
+    // the row says "unavailable" instead of looking live and doing nothing.
+    final ids = captureIds();
+    final orphan = KeyChord(
+      physical: 0x00070032,
+      logical: LogicalKeyboardKey.backslash.keyId,
+      modifiers: Modifiers.ctrl | Modifiers.alt,
+    );
+    final bindings = [
+      for (final b in macDefaults)
+        b.command == const BuiltIn(ShortcutCommand.center)
+            ? Binding(b.command, orphan)
+            : b,
+    ];
+    final refused = await HotkeyService(onCommand: (_) {}).apply(bindings);
+    expect(ids, isNot(contains(ShortcutCommand.center.index)));
+    expect(refused, {const BuiltIn(ShortcutCommand.center)});
   });
 
   test('unregisterAll drops every native hotkey', () async {
@@ -113,7 +164,7 @@ void main() {
         HotkeyService(
         onCommand: (c) => placed = c, onSummon: ({pressedAtMs}) => summons++);
     messenger.setMockMethodCallHandler(channel, (_) async => <int>[]);
-    await svc.apply(kDefaultBindings);
+    await svc.apply(macDefaults);
 
     await svc.debugHandle(ShortcutCommand.showGrid.index);
     expect(summons, 1);
@@ -124,7 +175,7 @@ void main() {
     CommandRef? got;
     final svc = HotkeyService(onCommand: (c) => got = c);
     messenger.setMockMethodCallHandler(channel, (_) async => <int>[]);
-    await svc.apply(kDefaultBindings);
+    await svc.apply(macDefaults);
     await svc.debugHandle(ShortcutCommand.maximize.index);
     expect(got, const BuiltIn(ShortcutCommand.maximize));
   });
@@ -139,7 +190,7 @@ void main() {
         HotkeyService(
         onCommand: (_) => commands++, onSummon: ({pressedAtMs}) => summons++);
     messenger.setMockMethodCallHandler(channel, (_) async => <int>[]);
-    await svc.apply(kDefaultBindings);
+    await svc.apply(macDefaults);
 
     await svc.debugHandle(901); // the native Esc grab's id
     await svc.debugHandle(ShortcutCommand.values.length);
@@ -155,7 +206,7 @@ void main() {
     const taken = ShortcutCommand.leftHalf;
     captureIds(reply: (id) => id != taken.index);
     final refused =
-        await HotkeyService(onCommand: (_) {}).apply(kDefaultBindings);
+        await HotkeyService(onCommand: (_) {}).apply(macDefaults);
     expect(refused, {const BuiltIn(taken)});
   });
 
@@ -166,7 +217,7 @@ void main() {
     captureIds(reply: (id) => id != ShortcutCommand.showGrid.index);
     final refused = await HotkeyService(
             onCommand: (_) {}, onSummon: ({pressedAtMs}) {})
-        .apply(kDefaultBindings);
+        .apply(macDefaults);
     expect(refused, {const BuiltIn(ShortcutCommand.showGrid)});
   });
 
@@ -178,8 +229,8 @@ void main() {
     // and the honest report is that no shortcut works.
     messenger.setMockMethodCallHandler(channel, (_) async => null);
     final refused =
-        await HotkeyService(onCommand: (_) {}).apply(kDefaultBindings);
-    expect(refused, {for (final b in kDefaultBindings) b.command});
+        await HotkeyService(onCommand: (_) {}).apply(macDefaults);
+    expect(refused, {for (final b in macDefaults) b.command});
   });
 
   test('a reply of the wrong shape degrades instead of throwing', () async {
@@ -188,16 +239,16 @@ void main() {
     // it could simply have disbelieved.
     messenger.setMockMethodCallHandler(channel, (_) async => true);
     final refused =
-        await HotkeyService(onCommand: (_) {}).apply(kDefaultBindings);
-    expect(refused, {for (final b in kDefaultBindings) b.command});
+        await HotkeyService(onCommand: (_) {}).apply(macDefaults);
+    expect(refused, {for (final b in macDefaults) b.command});
   });
 
   test('an unbound command is neither sent nor reported as refused', () async {
     // "No shortcut assigned" and "macOS would not give us this chord" look the
     // same in the list if the second is inferred from the first's absence.
     messenger.setMockMethodCallHandler(channel, (_) async => null);
-    final bindings = withRebind(kDefaultBindings,
-        const Binding(BuiltIn(ShortcutCommand.leftHalf), 124, kControlOption));
+    final bindings = withRebind(macDefaults,
+        Binding(BuiltIn(ShortcutCommand.leftHalf), carbon(124, kControlOption)));
     final refused =
         await HotkeyService(onCommand: (_) {}).apply(bindings);
     expect(refused, isNot(contains(const BuiltIn(ShortcutCommand.rightHalf))));
@@ -213,7 +264,7 @@ void main() {
     final svc =
         HotkeyService(onCommand: (_) {}, onPlacementFailed: () => failures++);
     messenger.setMockMethodCallHandler(channel, (_) async => <int>[]);
-    await svc.apply(kDefaultBindings); // installs the inbound handler
+    await svc.apply(macDefaults); // installs the inbound handler
     await messenger.handlePlatformMessage(
       kOrthantChannel,
       const StandardMethodCodec()
@@ -232,7 +283,7 @@ void main() {
     final svc =
         HotkeyService(onCommand: (_) {}, onConfigWindowClosed: () => closes++);
     messenger.setMockMethodCallHandler(channel, (_) async => <int>[]);
-    await svc.apply(kDefaultBindings); // installs the inbound handler
+    await svc.apply(macDefaults); // installs the inbound handler
     await messenger.handlePlatformMessage(
       kOrthantChannel,
       const StandardMethodCodec()
@@ -245,21 +296,21 @@ void main() {
   group('ids come from the applied set', () {
     test('built-ins keep their enum indices', () async {
       final ids = captureIds();
-      await HotkeyService(onCommand: (_) {}).apply(kDefaultBindings);
+      await HotkeyService(onCommand: (_) {}).apply(macDefaults);
       // _completed puts the eleven built-ins first in enum order, so indexing
       // the applied list reproduces the ids they have always had.
-      expect(ids, [for (var i = 0; i < kDefaultBindings.length; i++) i]);
+      expect(ids, [for (var i = 0; i < macDefaults.length; i++) i]);
     });
 
     test('a custom region gets an id past the built-ins, clear of 900',
         () async {
       final ids = captureIds();
       await HotkeyService(onCommand: (_) {}).apply([
-        ...kDefaultBindings,
-        const Binding(Custom('r1'), 123, kControlOption | kShiftKey),
+        ...macDefaults,
+        Binding(Custom('r1'), carbon(123, kControlOption | kShiftKey)),
       ]);
 
-      expect(ids.last, kDefaultBindings.length);
+      expect(ids.last, macDefaults.length);
       expect(ids.last, lessThan(900),
           reason: 'the overlay reserves 900+ for its Esc/Return grabs');
     });
@@ -269,11 +320,11 @@ void main() {
       final fired = <CommandRef>[];
       final svc = HotkeyService(onCommand: fired.add);
       await svc.apply([
-        ...kDefaultBindings,
-        const Binding(Custom('r1'), 123, kControlOption | kShiftKey),
+        ...macDefaults,
+        Binding(Custom('r1'), carbon(123, kControlOption | kShiftKey)),
       ]);
 
-      await svc.debugHandle(kDefaultBindings.length);
+      await svc.debugHandle(macDefaults.length);
       await svc.debugHandle(1); // leftHalf
 
       expect(fired, [
@@ -288,19 +339,19 @@ void main() {
       // it — which would silently re-point a press at its neighbour.
       final ids = captureIds();
       final bindings = [
-        ...kDefaultBindings,
+        ...macDefaults,
         const Binding.unbound(Custom('gap')),
-        const Binding(Custom('r2'), 123, kControlOption | kShiftKey),
+        Binding(Custom('r2'), carbon(123, kControlOption | kShiftKey)),
       ];
       await HotkeyService(onCommand: (_) {}).apply(bindings);
 
-      expect(ids.last, kDefaultBindings.length + 1);
+      expect(ids.last, macDefaults.length + 1);
     });
 
     test('refusals come back as the refs they were sent for', () async {
       captureIds(reply: (id) => id != 1);
       final refused =
-          await HotkeyService(onCommand: (_) {}).apply(kDefaultBindings);
+          await HotkeyService(onCommand: (_) {}).apply(macDefaults);
       expect(refused, {const BuiltIn(ShortcutCommand.leftHalf)});
     });
 
@@ -438,7 +489,7 @@ void main() {
         onCommand: (_) {},
         onSummon: ({pressedAtMs}) => presses.add(pressedAtMs));
     messenger.setMockMethodCallHandler(channel, (_) async => <int>[]);
-    await svc.apply(kDefaultBindings);
+    await svc.apply(macDefaults);
     await svc.debugHandle(ShortcutCommand.showGrid.index);
     expect(presses, [null]);
   });

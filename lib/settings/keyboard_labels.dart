@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
-/// Live display labels shared by the settings window and its dialog routes.
+/// Live display labels, keyed by USB HID usage, shared by the settings window
+/// and its dialog routes.
 /// Keep this above the Navigator so an already-open picker sees layout changes.
 class KeyboardLabels extends InheritedWidget {
   const KeyboardLabels({super.key, required this.labels, required super.child});

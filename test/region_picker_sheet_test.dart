@@ -11,8 +11,9 @@ import 'package:orthant/settings/mac_control.dart';
 import 'package:orthant/settings/mac_theme.dart';
 import 'package:orthant/settings/recording_field.dart';
 import 'package:orthant/settings/region_picker_sheet.dart';
-import 'package:orthant/shortcuts/bindings.dart';
 import 'package:orthant/shortcuts/custom_region.dart';
+
+import 'support/carbon_terms.dart';
 
 const _leftTwoThirds = CustomRegion(
   id: 'r1',
@@ -277,8 +278,7 @@ void main() {
       (tester) async {
     await tester.pumpWidget(_host(RegionPickerSheet(
       initial: _leftTwoThirds,
-      initialKeyCode: 123,
-      initialModifiers: kControlOption | kShiftKey,
+      initialChord: carbon(123, kControlOption | kShiftKey),
       gridCols: 6,
       gridRows: 6,
       onSubmit: (_) {},
@@ -385,8 +385,7 @@ void main() {
       gridRows: 6,
       onSubmit: (d) => submitted = d,
       onCancel: () {},
-      initialKeyCode: 8, // ⌃⌥C, the combination being replaced
-      initialModifiers: kControlOption,
+      initialChord: carbon(8, kControlOption), // ⌃⌥C, the combination being replaced
       onCaptureStart: () async {},
       onCaptureEnd: () => resume.future,
     )));
@@ -536,14 +535,13 @@ void main() {
       (tester) async {
     await tester.pumpWidget(_host(RegionPickerSheet(
       initial: _leftTwoThirds,
-      initialKeyCode: 123,
-      initialModifiers: kControlOption,
+      initialChord: carbon(123, kControlOption),
       gridCols: 6,
       gridRows: 6,
       onSubmit: (_) {},
       onCancel: () {},
-      conflictName: (k, m) =>
-          (k == 123 && m == kControlOption) ? 'Left half' : null,
+      conflictName: (c) =>
+          (c.keyCode == 123 && c.carbonMask == kControlOption) ? 'Left half' : null,
     )));
 
     expect(find.textContaining('Left half already uses this combination'),
@@ -566,14 +564,13 @@ void main() {
     RegionDraft? saved;
     await tester.pumpWidget(_host(RegionPickerSheet(
       initial: _leftTwoThirds,
-      initialKeyCode: 123,
-      initialModifiers: kControlOption,
+      initialChord: carbon(123, kControlOption),
       gridCols: 6,
       gridRows: 6,
       onSubmit: (d) => saved = d,
       onCancel: () {},
-      conflictName: (k, m) =>
-          (k == 123 && m == kControlOption) ? 'Left half' : null,
+      conflictName: (c) =>
+          (c.keyCode == 123 && c.carbonMask == kControlOption) ? 'Left half' : null,
     )));
 
     await tester.tap(find.byKey(const ValueKey('region-take-anyway')));
@@ -603,15 +600,14 @@ void main() {
     RegionDraft? saved;
     await tester.pumpWidget(_host(RegionPickerSheet(
       initial: _leftTwoThirds,
-      initialKeyCode: 123,
-      initialModifiers: kControlOption,
+      initialChord: carbon(123, kControlOption),
       gridCols: 6,
       gridRows: 6,
       onSubmit: (d) => saved = d,
       onCancel: () {},
-      conflictName: (k, m) => switch (k) {
-        123 when m == kControlOption => 'Left half',
-        124 when m == kControlOption => 'Right half',
+      conflictName: (c) => switch (c.keyCode) {
+        123 when c.carbonMask == kControlOption => 'Left half',
+        124 when c.carbonMask == kControlOption => 'Right half',
         _ => null,
       },
     )));
@@ -675,13 +671,12 @@ void main() {
   testWidgets('a free combo says nothing', (tester) async {
     await tester.pumpWidget(_host(RegionPickerSheet(
       initial: _leftTwoThirds,
-      initialKeyCode: 123,
-      initialModifiers: kControlOption | kShiftKey,
+      initialChord: carbon(123, kControlOption | kShiftKey),
       gridCols: 6,
       gridRows: 6,
       onSubmit: (_) {},
       onCancel: () {},
-      conflictName: (k, m) => null,
+      conflictName: (_) => null,
     )));
     expect(find.textContaining('uses this combination'), findsNothing);
   });

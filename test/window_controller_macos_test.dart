@@ -19,7 +19,20 @@ void main() {
       return <Object, Object>{31: 'R', 0: 'Ä', 1: '', 2: 3, -1: 'X',
         128: 'Y', '31': 'wrong key type'};
     });
-    expect(await const MacosWindowController().keyboardLabels(), {31: 'R', 0: 'Ä'});
+    // Swift answers by Carbon code; the seam answers by key position (USB HID
+    // usage), which is how a binding names its key.
+    expect(await const MacosWindowController().keyboardLabels(), {
+      PhysicalKeyboardKey.keyO.usbHidUsage: 'R',
+      PhysicalKeyboardKey.keyA.usbHidUsage: 'Ä',
+    });
+  });
+
+  test('a label for a code no shortcut can use is dropped', () async {
+    // 48 is Tab and 53 Escape, neither bindable; 42 is the backslash key.
+    messenger.setMockMethodCallHandler(channel, (call) async =>
+        <Object, Object>{48: 'T', 53: 'E', 42: '#'});
+    expect(await const MacosWindowController().keyboardLabels(),
+        {PhysicalKeyboardKey.backslash.usbHidUsage: '#'});
   });
 
   test('a failed keyboard label read is an empty map, not a launch failure', () async {

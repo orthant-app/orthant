@@ -7,6 +7,8 @@ import 'package:orthant/shortcuts/bindings_store.dart';
 import 'package:orthant/shortcuts/custom_region.dart';
 import 'package:orthant/shortcuts/shortcut_command.dart';
 
+import 'support/carbon_terms.dart';
+
 /// Preload the prefs key the store reads, with whatever raw string a corrupt or
 /// older install might have left there.
 void _stored(String raw) =>
@@ -17,7 +19,7 @@ void main() {
 
   test('load returns defaults when nothing is stored', () async {
     SharedPreferences.setMockInitialValues({});
-    expect((await BindingsStore().load()).bindings, kDefaultBindings);
+    expect((await BindingsStore().load()).bindings, macDefaults);
   });
 
   test('save then load round-trips a custom binding', () async {
@@ -27,14 +29,40 @@ void main() {
     // so a positional edit would only pass while the edited slot happened to
     // match the command that lives there.
     final custom = [
-      for (final b in kDefaultBindings)
+      for (final b in macDefaults)
         if (b.command == const BuiltIn(ShortcutCommand.leftHalf))
-          const Binding(BuiltIn(ShortcutCommand.leftHalf), 123, kControlKey | kShiftKey)
+          Binding(BuiltIn(ShortcutCommand.leftHalf), carbon(123, kControlKey | kShiftKey))
         else
           b,
     ];
     await store.save(custom, const []);
     expect((await store.load()).bindings, custom);
+  });
+
+  test('saves exactly the bytes 1.0.3 saved', () async {
+    // Storage does not move in this commit; only what is in memory changes.
+    // This is the document 1.0.3's serializer wrote for these bindings.
+    SharedPreferences.setMockInitialValues({});
+    const left = CustomRegion(id: 'r1', name: 'Left ⅔', cols: 3, rows: 1,
+        c0: 0, c1: 1, r0: 0, r1: 0);
+    const right = CustomRegion(id: 'r2', name: 'Right ⅓', cols: 3, rows: 1,
+        c0: 2, c1: 2, r0: 0, r1: 0);
+    final bindings = [
+      for (final b in macDefaults)
+        switch ((b.command as BuiltIn).command) {
+          ShortcutCommand.showGrid =>
+            Binding(b.command, carbon(5, kControlOption | kShiftKey)),
+          ShortcutCommand.center =>
+            Binding(b.command, carbon(42, kControlOption | kCmdKey)),
+          ShortcutCommand.maximize => Binding.unbound(b.command),
+          _ => b,
+        },
+      Binding(const Custom('r1'), carbon(37, kControlOption | kShiftKey)),
+      const Binding.unbound(Custom('r2')),
+    ];
+    await BindingsStore().save(bindings, const [left, right]);
+    expect((await SharedPreferences.getInstance()).getString('orthant.bindings.v2'),
+        '{"bindings":[{"command":"showGrid","keyCode":5,"modifiers":6656},{"command":"leftHalf","keyCode":123,"modifiers":6144},{"command":"rightHalf","keyCode":124,"modifiers":6144},{"command":"topHalf","keyCode":126,"modifiers":6144},{"command":"bottomHalf","keyCode":125,"modifiers":6144},{"command":"topLeft","keyCode":32,"modifiers":6144},{"command":"topRight","keyCode":34,"modifiers":6144},{"command":"bottomLeft","keyCode":38,"modifiers":6144},{"command":"bottomRight","keyCode":40,"modifiers":6144},{"command":"maximize","keyCode":-1,"modifiers":0},{"command":"center","keyCode":42,"modifiers":6400},{"command":"custom:r1","keyCode":37,"modifiers":6656},{"command":"custom:r2","keyCode":-1,"modifiers":0}],"regions":[{"id":"r1","name":"Left ⅔","cols":3,"rows":1,"c0":0,"c1":1,"r0":0,"r1":0},{"id":"r2","name":"Right ⅓","cols":3,"rows":1,"c0":2,"c1":2,"r0":0,"r1":0}]}');
   });
 
   // Everything below is about surviving a prefs file we did not write. load()
@@ -44,12 +72,12 @@ void main() {
 
   test('unparseable JSON falls back to the defaults', () async {
     _stored('{ this is not json');
-    expect((await BindingsStore().load()).bindings, kDefaultBindings);
+    expect((await BindingsStore().load()).bindings, macDefaults);
   });
 
   test('JSON of the wrong shape falls back to the defaults', () async {
     _stored('{"command":"leftHalf"}'); // an object where a list belongs
-    expect((await BindingsStore().load()).bindings, kDefaultBindings);
+    expect((await BindingsStore().load()).bindings, macDefaults);
   });
 
   test('an entry naming a command that no longer exists is dropped', () async {
@@ -60,7 +88,7 @@ void main() {
     final loaded = (await BindingsStore().load()).bindings;
     expect(loaded.length, ShortcutCommand.values.length);
     expect(loaded.firstWhere((b) => b.command == const BuiltIn(ShortcutCommand.center)),
-        const Binding(BuiltIn(ShortcutCommand.center), 99, kCmdKey));
+        Binding(BuiltIn(ShortcutCommand.center), carbon(99, kCmdKey)));
   });
 
   test('an entry with a malformed field is dropped, not the whole file',
@@ -72,7 +100,7 @@ void main() {
     final loaded = (await BindingsStore().load()).bindings;
     // leftHalf reverts to its default; center keeps what was stored.
     expect(loaded.firstWhere((b) => b.command == const BuiltIn(ShortcutCommand.leftHalf)),
-        kDefaultBindings.firstWhere((b) => b.command == const BuiltIn(ShortcutCommand.leftHalf)));
+        macDefaults.firstWhere((b) => b.command == const BuiltIn(ShortcutCommand.leftHalf)));
     expect(loaded.firstWhere((b) => b.command == const BuiltIn(ShortcutCommand.center)).keyCode, 99);
   });
 
@@ -88,7 +116,7 @@ void main() {
       final loaded = (await BindingsStore().load()).bindings;
       expect(
           loaded.firstWhere((b) => b.command == const BuiltIn(ShortcutCommand.leftHalf)),
-          kDefaultBindings
+          macDefaults
               .firstWhere((b) => b.command == const BuiltIn(ShortcutCommand.leftHalf)),
           reason: 'keyCode $bad must not survive into a registration');
     }
@@ -133,7 +161,7 @@ void main() {
   test('a stored unbound command stays unbound', () async {
     // Clearing a shortcut is a real choice; "no combo" must not read as
     // "missing entry" and get quietly restored to the default.
-    _stored(jsonEncode([Binding.unbound(BuiltIn(ShortcutCommand.maximize)).toJson()]));
+    _stored(jsonEncode([{'command': 'maximize', 'keyCode': -1, 'modifiers': 0}]));
     final loaded = (await BindingsStore().load()).bindings;
     expect(loaded.firstWhere((b) => b.command == const BuiltIn(ShortcutCommand.maximize)).isBound,
         isFalse);
@@ -156,8 +184,8 @@ void main() {
       final store = BindingsStore();
       await store.save(
         [
-          ...kDefaultBindings,
-          const Binding(Custom('r1'), 123, kControlOption | kShiftKey),
+          ...macDefaults,
+          Binding(Custom('r1'), carbon(123, kControlOption | kShiftKey)),
         ],
         const [region],
       );
@@ -172,7 +200,7 @@ void main() {
         () async {
       SharedPreferences.setMockInitialValues({});
       final store = BindingsStore();
-      await store.save(kDefaultBindings, [
+      await store.save(macDefaults, [
         region,
         region.copyWithId('r2').copyWith(name: 'Right ⅔'),
       ]);
@@ -189,7 +217,7 @@ void main() {
     test('a region with no combo still gets an unbound row', () async {
       SharedPreferences.setMockInitialValues({});
       final store = BindingsStore();
-      await store.save(kDefaultBindings, const [region]);
+      await store.save(macDefaults, const [region]);
 
       final loaded = await store.load();
       expect(loaded.bindings.last.command, const Custom('r1'));

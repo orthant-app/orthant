@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -100,5 +101,13 @@ void main() {
     expect(of('maximize').isBound, isFalse);
     expect(of('custom:r1').chord, carbon(37, kControlOption | kShiftKey));
     expect(of('custom:r2').isBound, isFalse);
+  });
+
+  test('the preferences of a real 1.0.3 install migrate unchanged', () async {
+    // Exported from an installed 1.0.3 with a shortcut rebound, one cleared
+    // and a region added; only the bindings document is kept, as stored.
+    final v2 = File('test/fixtures/bindings_v2_from_1.0.3.json')
+        .readAsStringSync();
+    await expectMigratesUnchanged(v2);
   });
 }

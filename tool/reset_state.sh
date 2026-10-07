@@ -4,7 +4,7 @@
 #
 #   tool/reset_state.sh onboarding      # show the onboarding + "try it" screens again
 #   tool/reset_state.sh settings        # grid, gaps, launch-at-login back to defaults
-#   tool/reset_state.sh bindings        # every shortcut back to its default
+#   tool/reset_state.sh bindings        # every shortcut back to its default, custom regions deleted
 #   tool/reset_state.sh accessibility   # revoke the Accessibility grant
 #   tool/reset_state.sh all             # all of the above — a true first launch
 #

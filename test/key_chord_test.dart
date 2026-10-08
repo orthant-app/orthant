@@ -96,5 +96,64 @@ void main() {
       expect(usO.sameChordAs(dvorakR), isFalse);
       expect(usR.sameChordAs(dvorakR), isTrue);
     });
+
+    test('on Windows, different modifiers are a different chord too', () {
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      expect(
+          usR.sameChordAs(_chord(PhysicalKeyboardKey.keyR,
+              LogicalKeyboardKey.keyR, Modifiers.ctrl)),
+          isFalse);
+      expect(
+          dvorakR.sameChordAs(_chord(PhysicalKeyboardKey.keyP,
+              LogicalKeyboardKey.keyR, Modifiers.ctrl | Modifiers.shift)),
+          isFalse,
+          reason: 'the same meaning under other modifiers');
+    });
+
+    test("on Windows, Brazil's keypad separator is not the ISO key", () {
+      // The engine names both 0xE2; Windows registers them as two keys.
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      final iso = KeyChord(
+          physical: PhysicalKeyboardKey.intlBackslash.usbHidUsage,
+          logical: 0xE2,
+          modifiers: Modifiers.ctrl);
+      final separator = KeyChord(
+          physical: PhysicalKeyboardKey.numpadComma.usbHidUsage,
+          logical: 0xE2,
+          modifiers: Modifiers.ctrl);
+      expect(iso.sameChordAs(separator), isFalse);
+      expect(separator.sameChordAs(separator), isTrue);
+      expect(separator.labelKey, 0xC2);
+      expect(iso.labelKey, 0xE2);
+    });
+  });
+
+  group('labelKey', () {
+    final dvorakR = _chord(PhysicalKeyboardKey.keyO, LogicalKeyboardKey.keyR);
+    tearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    test('is the position on macOS', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      expect(dvorakR.labelKey, PhysicalKeyboardKey.keyO.usbHidUsage);
+    });
+
+    test('is the meaning on Windows', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      expect(dvorakR.labelKey, LogicalKeyboardKey.keyR.keyId);
+    });
+  });
+
+  test('usPhysicalFor finds the US position of a logical key', () {
+    expect(usPhysicalFor(LogicalKeyboardKey.keyZ.keyId),
+        PhysicalKeyboardKey.keyZ.usbHidUsage);
+    expect(usPhysicalFor(LogicalKeyboardKey.quote.keyId),
+        PhysicalKeyboardKey.quote.usbHidUsage);
+    expect(usPhysicalFor(0xE2), isNull, reason: 'no US key types it');
+    for (final physical in bindableKeys) {
+      expect(usPhysicalFor(KeyChord.us(physical, Modifiers.ctrl)!.logical),
+          physical);
+    }
   });
 }

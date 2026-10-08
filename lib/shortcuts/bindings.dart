@@ -64,49 +64,43 @@ class Binding {
 /// quarters cluster too, keeping every letter shortcut in one hand and region.
 /// That it is also Orthant's initial is a free bonus, not the reason.
 ///
-/// **Windows' set is provisional, and its milestone owns it.** On a layout
-/// with AltGr, right Alt is Ctrl+Alt, so a Ctrl+Alt letter chord swallows a
-/// character the user meant to type; Shift does not escape it, so the six
-/// letter chords move to Win+Shift there ([altGr]), and the arrows and Enter,
-/// which AltGr never combines with, stay. Every Windows chord here still holds
-/// Alt, and a registered hotkey holding Alt has been measured leaving a WinUI
-/// app (Notepad) typing nothing afterwards, so this table is expected to
-/// change before Windows registers anything. macOS ignores [altGr].
+/// **Windows uses Win+Ctrl+Shift in place of ⌃⌥, with the same keys, on
+/// every layout.** Each of the Ctrl+Alt families was measured to cost
+/// something there, and this one nothing: on a layout with AltGr, right Alt is
+/// Ctrl+Alt, so a Ctrl+Alt chord swallows a character the user meant to type
+/// (Shift+AltGr is Ctrl+Alt+Shift, so Shift does not escape it), and WinUI
+/// apps such as Notepad lose the keys typed after some Ctrl+Alt chords even
+/// with nothing registered. A chord holding Win matches no AltGr form, so no
+/// layout needs a different table and nothing is detected. All eleven
+/// register, and none is a documented shortcut of Windows or a common app.
 ///
 /// Every platform but Windows gets the macOS set, which includes the test host
 /// (Flutter reports Android there).
-List<Binding> defaultBindings({
-  required TargetPlatform platform,
-  required bool altGr,
-}) {
-  final ctrlAlt = Modifiers.ctrl | Modifiers.alt;
-  final letters = platform == TargetPlatform.windows && altGr
-      ? Modifiers.meta | Modifiers.shift
-      : ctrlAlt;
-  Binding bind(ShortcutCommand command, PhysicalKeyboardKey key, Modifiers m) =>
+List<Binding> defaultBindings({required TargetPlatform platform}) {
+  final m = platform == TargetPlatform.windows
+      ? Modifiers.meta | Modifiers.ctrl | Modifiers.shift
+      : Modifiers.ctrl | Modifiers.alt;
+  Binding bind(ShortcutCommand command, PhysicalKeyboardKey key) =>
       Binding(BuiltIn(command), KeyChord.us(key.usbHidUsage, m));
   return [
-    bind(ShortcutCommand.showGrid, PhysicalKeyboardKey.keyO, letters),
-    bind(ShortcutCommand.leftHalf, PhysicalKeyboardKey.arrowLeft, ctrlAlt),
-    bind(ShortcutCommand.rightHalf, PhysicalKeyboardKey.arrowRight, ctrlAlt),
-    bind(ShortcutCommand.topHalf, PhysicalKeyboardKey.arrowUp, ctrlAlt),
-    bind(ShortcutCommand.bottomHalf, PhysicalKeyboardKey.arrowDown, ctrlAlt),
-    bind(ShortcutCommand.topLeft, PhysicalKeyboardKey.keyU, letters),
-    bind(ShortcutCommand.topRight, PhysicalKeyboardKey.keyI, letters),
-    bind(ShortcutCommand.bottomLeft, PhysicalKeyboardKey.keyJ, letters),
-    bind(ShortcutCommand.bottomRight, PhysicalKeyboardKey.keyK, letters),
-    bind(ShortcutCommand.maximize, PhysicalKeyboardKey.enter, ctrlAlt),
-    bind(ShortcutCommand.center, PhysicalKeyboardKey.keyC, letters),
+    bind(ShortcutCommand.showGrid, PhysicalKeyboardKey.keyO),
+    bind(ShortcutCommand.leftHalf, PhysicalKeyboardKey.arrowLeft),
+    bind(ShortcutCommand.rightHalf, PhysicalKeyboardKey.arrowRight),
+    bind(ShortcutCommand.topHalf, PhysicalKeyboardKey.arrowUp),
+    bind(ShortcutCommand.bottomHalf, PhysicalKeyboardKey.arrowDown),
+    bind(ShortcutCommand.topLeft, PhysicalKeyboardKey.keyU),
+    bind(ShortcutCommand.topRight, PhysicalKeyboardKey.keyI),
+    bind(ShortcutCommand.bottomLeft, PhysicalKeyboardKey.keyJ),
+    bind(ShortcutCommand.bottomRight, PhysicalKeyboardKey.keyK),
+    bind(ShortcutCommand.maximize, PhysicalKeyboardKey.enter),
+    bind(ShortcutCommand.center, PhysicalKeyboardKey.keyC),
   ];
 }
 
 /// [defaultBindings] for the platform this build runs on: what a first launch
 /// starts from and what *Reset Shortcuts* returns to.
-///
-/// Whether a Windows layout has AltGr is not detected yet, so it is answered
-/// as "no" until the Windows hotkey work asks the system.
 List<Binding> runningDefaults() =>
-    defaultBindings(platform: defaultTargetPlatform, altGr: false);
+    defaultBindings(platform: defaultTargetPlatform);
 
 /// What [ref] is bound to once *Reset Shortcuts* has run.
 ///
@@ -233,18 +227,23 @@ const Map<int, String> _keySymbols = {
 /// The combo as individual symbols, in macOS order (⌃⌥⇧⌘ then the key), for
 /// rendering one keycap per element. Empty when unbound.
 ///
-/// [keyLabels] is the keyboard layout's own labels, keyed by USB HID usage
-/// (`WindowController.keyboardLabels`); a key it does not name falls back to
-/// the US glyph.
+/// [keyLabels] is the keyboard layout's own labels, keyed by
+/// [KeyChord.labelKey] (`WindowController.keyboardLabels`); a key it does not
+/// name falls back to the US glyph. On Windows the key is named by its
+/// logical key, so a letter recorded on any layout reads as that letter and
+/// that is the glyph of the US position with the same logical key.
 List<String> comboSymbols(KeyChord? chord, {
   Map<int, String> keyLabels = const {},
 }) {
   if (chord == null) return const [];
+  final glyph = defaultTargetPlatform == TargetPlatform.windows
+      ? usPhysicalFor(chord.logical)
+      : chord.physical;
   return [
     ...modifierSymbols(chord.modifiers),
-    keyLabels[chord.physical] ??
-        _keySymbols[chord.physical] ??
-        'key:0x${chord.physical.toRadixString(16)}',
+    keyLabels[chord.labelKey] ??
+        _keySymbols[glyph] ??
+        'key:0x${chord.labelKey.toRadixString(16)}',
   ];
 }
 

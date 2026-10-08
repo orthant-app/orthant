@@ -1,8 +1,17 @@
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/services.dart';
 import '../core/key_chord.dart';
+import '../core/windows_keys.dart';
 
 /// The chord a key press records, or null if the key isn't one a shortcut may
 /// use or no modifier is held.
+///
+/// On Windows the key must also have a virtual key to register
+/// ([windowsVirtualKey]): a keypad digit has none, since it is a different
+/// virtual key in each NumLock state. Refused here, the press is ignored and
+/// the recorder keeps listening, rather than recording a shortcut that could
+/// never fire.
 ///
 /// Both of the key's identities come from this one event: its position, which
 /// macOS registers, and what it typed under the current layout, which Windows
@@ -11,12 +20,17 @@ import '../core/key_chord.dart';
 KeyChord? chordFromKeyEvent(KeyEvent event) {
   final physical = event.physicalKey.usbHidUsage;
   if (!isBindableKey(physical)) return null;
+  final logical = event.logicalKey.keyId;
+  if (defaultTargetPlatform == TargetPlatform.windows &&
+      windowsVirtualKey(windowsKeyId(logical, physical)) == null) {
+    return null;
+  }
   final modifiers = heldModifiers();
   // A bare key is unsafe as a global hotkey: it would be taken from every app.
   if (modifiers.isEmpty) return null;
   return KeyChord(
     physical: physical,
-    logical: event.logicalKey.keyId,
+    logical: logical,
     modifiers: modifiers,
   );
 }

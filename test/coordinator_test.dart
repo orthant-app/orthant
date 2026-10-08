@@ -16,6 +16,8 @@ import 'package:orthant/shortcuts/shortcut_command.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:orthant/shortcuts/custom_region.dart';
 
+import 'support/carbon_terms.dart';
+
 /// Records what the app asked the platform to do, and lets a test decide what
 /// the platform says back.
 class _FakeWc implements WindowController {
@@ -192,16 +194,16 @@ void main() {
 
   test('input source changes update the tray without rebinding shortcuts', () async {
     final t = build(granted: true);
-    t.wc.labels = const {31: 'R'};
+    t.wc.labels = labelsByCarbon(const {31: 'R'});
     await t.app.start();
     expect(t.app.openGridLabel, 'Open Grid   ⌃⌥R');
     final originalBindings = List<Binding>.of(t.app.bindings);
     final registrations = t.keys.applied.length;
 
-    t.wc.labels = const {31: 'О'}; // Cyrillic O, a different input source.
+    t.wc.labels = labelsByCarbon(const {31: 'О'}); // Cyrillic O, a different input source.
     await t.app.refreshKeyboardLabels();
     expect(t.app.openGridLabel, 'Open Grid   ⌃⌥О');
-    expect(t.app.keyboardLabels, {31: 'О'});
+    expect(t.app.keyboardLabels, labelsByCarbon(const {31: 'О'}));
     expect(t.app.bindings, originalBindings);
     expect(t.keys.applied.length, registrations,
         reason: 'a label refresh must not suspend or re-register shortcuts');
@@ -266,7 +268,7 @@ void main() {
       // branch, so the list was empty for the whole ungranted session — which is
       // exactly when someone opens settings to find out what is wrong.
       SharedPreferences.setMockInitialValues({});
-      await BindingsStore().save(kDefaultBindings, const []);
+      await BindingsStore().save(macDefaults, const []);
       await SettingsStore().save(const Settings(gridCols: 4, gridRows: 3));
 
       final t = build();
@@ -647,7 +649,7 @@ void main() {
       final t = build(granted: true);
       await t.app.start();
       await t.app.rebind(
-        const Binding(BuiltIn(ShortcutCommand.leftHalf), 124, kControlOption),
+        Binding(BuiltIn(ShortcutCommand.leftHalf), carbon(124, kControlOption)),
       );
 
       final right = t.app.bindings.firstWhere(
@@ -655,7 +657,7 @@ void main() {
       );
       expect(right.isBound, isFalse, reason: 'it lost ⌃⌥→ to leftHalf');
       expect((await BindingsStore().load()).bindings.length,
-          kDefaultBindings.length);
+          macDefaults.length);
     });
 
     test('reset restores every default, including the summon', () async {
@@ -665,7 +667,7 @@ void main() {
       expect(t.app.bindings.first.isBound, isFalse);
 
       await t.app.resetBindings();
-      expect(t.app.bindings, kDefaultBindings);
+      expect(t.app.bindings, macDefaults);
     });
 
     test('closing the window revives hotkeys a recording suspended', () async {
@@ -759,8 +761,8 @@ void main() {
       // region list has to reach applyRegion, not just exist in the store.
       SharedPreferences.setMockInitialValues({});
       await BindingsStore().save([
-        ...kDefaultBindings,
-        const Binding(Custom('r1'), 123, kControlOption | kShiftKey),
+        ...macDefaults,
+        Binding(Custom('r1'), carbon(123, kControlOption | kShiftKey)),
       ], const [region]);
 
       final t = build(granted: true);
@@ -773,7 +775,7 @@ void main() {
 
     test('regions load alongside the bindings', () async {
       SharedPreferences.setMockInitialValues({});
-      await BindingsStore().save(kDefaultBindings, const [region]);
+      await BindingsStore().save(macDefaults, const [region]);
 
       final t = build(granted: true);
       await t.app.start();
@@ -787,8 +789,8 @@ void main() {
       // drew would be a larger, unrecoverable promise than the button makes.
       SharedPreferences.setMockInitialValues({});
       await BindingsStore().save([
-        ...kDefaultBindings,
-        const Binding(Custom('r1'), 123, kControlOption | kShiftKey),
+        ...macDefaults,
+        Binding(Custom('r1'), carbon(123, kControlOption | kShiftKey)),
       ], const [region]);
 
       final t = build(granted: true);
@@ -813,8 +815,8 @@ void main() {
       // else to notice.
       SharedPreferences.setMockInitialValues({});
       await BindingsStore().save([
-        ...kDefaultBindings,
-        const Binding(Custom('r1'), 123, kControlOption | kShiftKey),
+        ...macDefaults,
+        Binding(Custom('r1'), carbon(123, kControlOption | kShiftKey)),
       ], const [region]);
 
       final t = build(granted: true);
@@ -853,7 +855,7 @@ void main() {
 
       await t.app.resetBindings();
       await t.app.rebind(
-          const Binding(BuiltIn(ShortcutCommand.showGrid), 6, kControlOption));
+          Binding(BuiltIn(ShortcutCommand.showGrid), carbon(6, kControlOption)));
       expect(
           t.app.bindings
               .firstWhere(
@@ -871,8 +873,8 @@ void main() {
     test('drops a binding whose region has gone since the snapshot', () async {
       SharedPreferences.setMockInitialValues({});
       await BindingsStore().save([
-        ...kDefaultBindings,
-        const Binding(Custom('r1'), 6, kControlOption),
+        ...macDefaults,
+        Binding(Custom('r1'), carbon(6, kControlOption)),
       ], const [region]);
       final t = build(granted: true);
       await t.app.start();
@@ -893,7 +895,7 @@ void main() {
       final before = [...t.app.bindings];
 
       await t.app
-          .saveRegion((region: region, keyCode: 6, modifiers: kControlOption));
+          .saveRegion((region: region, chord: carbon(6, kControlOption)));
       await t.app.restoreBindings(before);
 
       final row =
@@ -913,7 +915,7 @@ void main() {
 
       // Exactly what the picker's "Use it here" does.
       await t.app.saveRegion(
-          (region: region, keyCode: 123, modifiers: kControlOption));
+          (region: region, chord: carbon(123, kControlOption)));
       expect(
           t.app.bindings
               .firstWhere(
@@ -943,11 +945,11 @@ void main() {
       await t.app.start();
       final before = [...t.app.bindings];
       // A *rebind*, not a reset: with no regions defined, `resetBindings` puts
-      // back the very `kDefaultBindings` instances the snapshot holds, so the
+      // back bindings equal to the ones the snapshot holds, so the
       // stale set and the restored one compare equal and the assertion below
       // cannot tell them apart. It has to be a state the snapshot differs from.
       await t.app.rebind(
-          const Binding(BuiltIn(ShortcutCommand.center), 6, kControlOption));
+          Binding(BuiltIn(ShortcutCommand.center), carbon(6, kControlOption)));
       final applies = t.keys.applied.length;
 
       await t.app.restoreBindings(before);
@@ -983,7 +985,7 @@ void main() {
       await t.app.start();
 
       await t.app.saveRegion(
-          (region: region, keyCode: 123, modifiers: kControlOption | kShiftKey));
+          (region: region, chord: carbon(123, kControlOption | kShiftKey)));
 
       expect(t.app.regions, const [region]);
       final row =
@@ -1000,17 +1002,15 @@ void main() {
       final t = build(granted: true);
       await t.app.start();
       await t.app.saveRegion(
-          (region: region, keyCode: 123, modifiers: kControlOption | kShiftKey));
+          (region: region, chord: carbon(123, kControlOption | kShiftKey)));
       await t.app.saveRegion((
         region: region.copyWithId('r2'),
-        keyCode: 124,
-        modifiers: kControlOption | kShiftKey
+        chord: carbon(124, kControlOption | kShiftKey)
       ));
 
       await t.app.saveRegion((
         region: region.copyWith(name: 'Reading pane'),
-        keyCode: 123,
-        modifiers: kControlOption | kShiftKey
+        chord: carbon(123, kControlOption | kShiftKey)
       ));
 
       expect(t.app.regions.map((r) => r.id), ['r1', 'r2']);
@@ -1026,7 +1026,7 @@ void main() {
 
       // ⌃⌥← is leftHalf by default.
       await t.app.saveRegion(
-          (region: region, keyCode: 123, modifiers: kControlOption));
+          (region: region, chord: carbon(123, kControlOption)));
 
       final left = t.app.bindings.firstWhere(
           (b) => b.command == const BuiltIn(ShortcutCommand.leftHalf));
@@ -1038,7 +1038,7 @@ void main() {
       final t = build(granted: true);
       await t.app.start();
       await t.app.saveRegion(
-          (region: region, keyCode: 123, modifiers: kControlOption | kShiftKey));
+          (region: region, chord: carbon(123, kControlOption | kShiftKey)));
 
       await t.app.deleteRegion('r1');
 
@@ -1077,8 +1077,7 @@ void main() {
       await t.app.start();
       await t.app.saveRegion((
         region: region,
-        keyCode: kUnboundKey,
-        modifiers: 0,
+        chord: null,
       ));
       expect(t.wc.grid?.saveHint, isFalse);
     });
@@ -1091,8 +1090,7 @@ void main() {
       await t.app.start();
       await t.app.saveRegion((
         region: region,
-        keyCode: kUnboundKey,
-        modifiers: 0,
+        chord: null,
       ));
       await t.app.deleteRegion('r1');
       expect(t.wc.grid?.saveHint, isTrue);
@@ -1141,8 +1139,7 @@ void main() {
         region: const CustomRegion(
           id: 'r0', name: 'Kept', cols: 2, rows: 2,
           c0: 0, c1: 0, r0: 0, r1: 0),
-        keyCode: kUnboundKey,
-        modifiers: 0,
+        chord: null,
       ));
 
       await t.app.requestSaveRegion(block());
@@ -1170,9 +1167,9 @@ void main() {
 
       // And the ids hold up through the save that used to collapse them.
       await t.app.saveRegion(
-          (region: first, keyCode: kUnboundKey, modifiers: 0));
+          (region: first, chord: null));
       await t.app.saveRegion(
-          (region: second, keyCode: kUnboundKey, modifiers: 0));
+          (region: second, chord: null));
 
       expect(t.app.regions.length, 2, reason: 'the second replaced the first');
       expect(t.app.regions.map((r) => r.id).toSet().length, 2);

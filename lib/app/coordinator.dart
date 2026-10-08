@@ -697,7 +697,7 @@ class OrthantCoordinator extends ChangeNotifier {
     ];
 
     final ref = Custom(region.id);
-    final updated = Binding(ref, draft.keyCode, draft.modifiers);
+    final updated = Binding(ref, draft.chord);
     // withRebind both inserts the row and unbinds whoever held that combo. It
     // matches on command, so a brand-new region needs its row to exist first.
     final withRow = [
@@ -728,7 +728,7 @@ class OrthantCoordinator extends ChangeNotifier {
     // defaults; deleting the user's own regions would be a different, much
     // larger promise than the button makes — and an unrecoverable one.
     _bindings = [
-      ...kDefaultBindings,
+      ...runningDefaults(),
       for (final r in _regions) Binding.unbound(Custom(r.id)),
     ];
     await _bindingsStore.save(_bindings, _regions);

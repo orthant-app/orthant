@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../shortcuts/bindings.dart';
+import '../core/key_chord.dart';
 import 'mac_theme.dart';
 import 'keyboard_labels.dart';
 
@@ -50,21 +51,20 @@ class Keycap extends StatelessWidget {
 class KeycapRow extends StatelessWidget {
   const KeycapRow({
     super.key,
-    required this.keyCode,
-    required this.modifiers,
+    required this.chord,
     this.unsetLabel = 'Not set',
     this.mainAxisAlignment = MainAxisAlignment.start,
   });
 
-  final int keyCode;
-  final int modifiers;
+  /// Null draws [unsetLabel].
+  final KeyChord? chord;
   final String unsetLabel;
   final MainAxisAlignment mainAxisAlignment;
 
   @override
   Widget build(BuildContext context) {
     final t = context.mac;
-    final symbols = comboSymbols(keyCode, modifiers, keyLabels: KeyboardLabels.of(context));
+    final symbols = comboSymbols(chord, keyLabels: KeyboardLabels.of(context));
     if (symbols.isEmpty) {
       return Text(unsetLabel,
           style: TextStyle(fontSize: 12, color: t.labelTertiary));

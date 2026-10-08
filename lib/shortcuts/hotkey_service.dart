@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../core/channel.dart';
 import '../core/geometry.dart';
 import 'bindings.dart';
+import '../core/carbon_keys.dart';
 import 'command_ref.dart';
 import 'shortcut_command.dart';
 
@@ -106,12 +107,29 @@ class HotkeyService implements HotkeyRegistrar {
   @override
   Future<Set<CommandRef>> apply(List<Binding> bindings) async {
     final applied = <int, CommandRef>{};
+    final unsendable = <CommandRef>{};
     final payload = <Map<String, Object?>>[];
     for (var id = 0; id < bindings.length && id <= _maxId; id++) {
       final b = bindings[id];
-      if (!b.isBound) continue;
+      final chord = b.chord;
+      if (chord == null) continue;
+      // macOS's wire format, byte for byte what 1.0.x sent: a Carbon key code
+      // and mask. The Windows runner reads only `id` until Windows hotkeys
+      // give it a format of its own.
+      final keyCode = carbonKeyCode(chord.physical);
+      if (keyCode == null) {
+        // Not something the native side could register, so refused here: a
+        // command that is never sent is never refused either, and would read
+        // as live.
+        unsendable.add(b.command);
+        continue;
+      }
       applied[id] = b.command;
-      payload.add({'id': id, 'keyCode': b.keyCode, 'modifiers': b.modifiers});
+      payload.add({
+        'id': id,
+        'keyCode': keyCode,
+        'modifiers': carbonModifiers(chord.modifiers),
+      });
     }
     _applied = applied;
 
@@ -121,11 +139,12 @@ class HotkeyService implements HotkeyRegistrar {
     // report eleven dead shortcuts.
     final reply = await _channel
         .invokeMethod<Object?>('replaceHotkeys', {'bindings': payload});
-    if (reply is! List) return applied.values.toSet();
+    if (reply is! List) return {...applied.values, ...unsendable};
     final refusedIds = reply.whereType<int>().toSet();
     return {
       for (final entry in applied.entries)
-        if (refusedIds.contains(entry.key)) entry.value
+        if (refusedIds.contains(entry.key)) entry.value,
+      ...unsendable,
     };
   }
 

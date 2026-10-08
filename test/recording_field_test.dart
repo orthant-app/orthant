@@ -4,14 +4,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/settings/mac_theme.dart';
 import 'package:orthant/settings/recording_field.dart';
 import 'package:orthant/shortcuts/bindings.dart';
+import 'package:orthant/core/key_chord.dart';
+
+import 'support/carbon_terms.dart';
 
 void main() {
-  Future<List<({int keyCode, int modifiers})>> pump(
+  Future<List<KeyChord>> pump(
     WidgetTester tester, {
-    ({int keyCode, int modifiers})? pending,
+    KeyChord? pending,
     VoidCallback? onCancel,
   }) async {
-    final combos = <({int keyCode, int modifiers})>[];
+    final combos = <KeyChord>[];
     await tester.pumpWidget(MaterialApp(
       theme: macTheme(Brightness.light),
       home: Scaffold(
@@ -76,7 +79,29 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     await tester.pumpAndSettle();
 
-    expect(combos, [(keyCode: 123, modifiers: kControlOption)]);
+    expect(combos, [carbon(123, kControlOption)]);
+  });
+
+  testWidgets('keeps what the key typed, from the same event', (tester) async {
+    // AZERTY puts Q where US has A. The chord holds the position (what macOS
+    // registers) and the meaning (what Windows registers) from one key event:
+    // neither can be worked out from the other once that layout is gone.
+    final combos = await pump(tester);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyQ,
+        physicalKey: PhysicalKeyboardKey.keyA);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyQ,
+        physicalKey: PhysicalKeyboardKey.keyA);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    expect(combos, [
+      KeyChord(
+        physical: PhysicalKeyboardKey.keyA.usbHidUsage,
+        logical: LogicalKeyboardKey.keyQ.keyId,
+        modifiers: Modifiers.ctrl,
+      ),
+    ]);
   });
 
   testWidgets('a bare key is not a combination', (tester) async {
@@ -84,6 +109,17 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
     await tester.pumpAndSettle();
     expect(combos, isEmpty, reason: 'a global hotkey needs a modifier');
+  });
+
+  testWidgets('Tab is not a combination either', (tester) async {
+    // ⌃⇥ and ⌘⇥ switch tabs and apps everywhere; a global hotkey on either
+    // would take it from every app without a word.
+    final combos = await pump(tester);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(combos, isEmpty);
   });
 
   for (final entry in <LogicalKeyboardKey, int>{
@@ -109,8 +145,9 @@ void main() {
       await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
       await tester.sendKeyEvent(entry.key);
       await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
-      expect(combos, [(keyCode: entry.value, modifiers: kControlKey)]);
-      expect(formatCombo(entry.value, kControlKey), isNot(contains('key:')),
+      expect(combos, [carbon(entry.value, kControlKey)]);
+      expect(formatCombo(carbon(entry.value, kControlKey)),
+          isNot(contains('key:')),
           reason: 'every accepted key needs a usable fallback label');
     });
   }
@@ -128,7 +165,7 @@ void main() {
       (tester) async {
     // What the shortcuts pane shows on the row its footer is asking about, so
     // the question has a visible subject.
-    await pump(tester, pending: (keyCode: 123, modifiers: kControlOption));
+    await pump(tester, pending: carbon(123, kControlOption));
     expect(find.text('⌃ ⌥ ←'), findsOneWidget);
 
     // And it holds, rather than being overwritten by whatever is held now.
@@ -149,7 +186,7 @@ void main() {
     await pump(tester);
     final listening = fill();
 
-    await pump(tester, pending: (keyCode: 123, modifiers: kControlOption));
+    await pump(tester, pending: carbon(123, kControlOption));
     expect(fill(), isNot(listening),
         reason: 'the row carrying the question looks like every other row');
     expect(fill(), macTheme(Brightness.light).extension<MacTokens>()!.warning);

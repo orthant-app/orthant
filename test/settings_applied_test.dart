@@ -7,6 +7,8 @@ import 'package:orthant/shortcuts/bindings.dart';
 import 'package:orthant/shortcuts/command_ref.dart';
 import 'package:orthant/shortcuts/shortcut_command.dart';
 
+import 'support/carbon_terms.dart';
+
 /// Records what a placement was actually asked to do.
 class _RecordingWc implements WindowController {
   WinRect? applied;
@@ -99,20 +101,20 @@ void main() {
 
   group('the tray only advertises a shortcut that can fire', () {
     test('shows the bound combo', () {
-      expect(comboLabelFor(kDefaultBindings, const BuiltIn(ShortcutCommand.showGrid)),
+      expect(comboLabelFor(macDefaults, const BuiltIn(ShortcutCommand.showGrid)),
           '⌃⌥O');
     });
 
     test('shows a rebound combo, not the default', () {
-      final rebound = withRebind(kDefaultBindings,
-          const Binding(BuiltIn(ShortcutCommand.showGrid), 17, kCmdKey | kShiftKey));
+      final rebound = withRebind(macDefaults,
+          Binding(BuiltIn(ShortcutCommand.showGrid), carbon(17, kCmdKey | kShiftKey)));
       expect(comboLabelFor(rebound, const BuiltIn(ShortcutCommand.showGrid)),
           '⇧⌘T');
     });
 
     test('is null when the command is unbound', () {
       final cleared = withRebind(
-          kDefaultBindings, Binding.unbound(BuiltIn(ShortcutCommand.showGrid)));
+          macDefaults, Binding.unbound(BuiltIn(ShortcutCommand.showGrid)));
       expect(comboLabelFor(cleared, const BuiltIn(ShortcutCommand.showGrid)),
           isNull);
     });
@@ -122,7 +124,7 @@ void main() {
       // advertise a shortcut that cannot fire — the silence `unavailable`
       // exists to break.
       expect(
-          comboLabelFor(kDefaultBindings, const BuiltIn(ShortcutCommand.showGrid),
+          comboLabelFor(macDefaults, const BuiltIn(ShortcutCommand.showGrid),
               unavailable: {const BuiltIn(ShortcutCommand.showGrid)}),
           isNull);
     });

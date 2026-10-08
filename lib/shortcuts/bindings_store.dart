@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show debugPrint, kReleaseMode;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'bindings.dart';
+import '../core/carbon_keys.dart';
 import 'command_ref.dart';
 import 'custom_region.dart';
 import 'shortcut_command.dart';
@@ -18,56 +20,82 @@ class StoredBindings {
 }
 
 class BindingsStore {
-  /// v1 was a bare JSON list of bindings. v2 is an object that also carries the
-  /// user's custom regions.
+  /// v1 was a bare JSON list of bindings, each a Carbon key code and mask. v2
+  /// is an object that also carries the user's custom regions, with v1's
+  /// bindings inside it. v3 is v2's object with each combo held as a chord,
+  /// which names its key both ways a platform can register one.
   ///
-  /// v1 is still read when v2 is absent, so upgrading keeps every rebind.
+  /// **The newest key present is the only one read.** When it is v1 or v2,
+  /// it is migrated: converted, written as v3, and from then on never read
+  /// again.
   ///
-  /// **Downgrading does not work, and an earlier version of this comment
-  /// claimed it did.** `CommandRef.tryParse` returning null for an unknown
-  /// `custom:` name is real, but irrelevant here: an older build never reads
-  /// the v2 key at all. It reads whatever v1 held when it last ran, so every
-  /// change made since — custom rows *and* rebinds of the built-ins — is
-  /// invisible to it.
-  ///
-  /// Deliberately not fixed by dual-writing v1. That would leave a second file
-  /// that is silently a subset of the truth, and downgrade is not a path this
-  /// app supports: it has never been released.
+  /// The older key is left in place, not deleted, so a downgrade reads what it
+  /// always did. What it reads is the shortcuts as they were at the migration:
+  /// nothing writes v2 any more, so a change made since is invisible to the
+  /// older build, and a change the older build makes is invisible to this one,
+  /// which reads v3 alone. Writing both was rejected for the reason v1 was
+  /// never dual-written: a second copy that is silently a subset of the truth.
   static const _v1Key = 'orthant.bindings.v1';
   static const _v2Key = 'orthant.bindings.v2';
+  static const _v3Key = 'orthant.bindings.v3';
 
   Future<StoredBindings> load() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final v2 = prefs.getString(_v2Key);
-    if (v2 != null) {
-      final parsed = _tryDecode(v2);
-      final map = parsed is Map ? parsed : const {};
-      final regions = _regionsFrom(map['regions']);
-      return StoredBindings(
-        _completed(_bindingsFrom(map['bindings']), regions),
-        regions,
-      );
+    // Chosen by presence, then read: a key that is present but unreadable is
+    // still the newest, and means the defaults, never an older key.
+    if (prefs.containsKey(_v3Key)) {
+      return _documentFrom(_decoded(prefs, _v3Key), Binding.tryFromJson);
     }
 
-    final v1 = prefs.getString(_v1Key);
-    if (v1 == null) return const StoredBindings(kDefaultBindings, []);
-    return StoredBindings(
-      _completed(_bindingsFrom(_tryDecode(v1)), const []),
-      const [],
-    );
+    // Before any shortcut registers, on every platform: a file this old was
+    // written on macOS, but nothing about reading it needs to know that.
+    final StoredBindings migrated;
+    if (prefs.containsKey(_v2Key)) {
+      migrated = _documentFrom(_decoded(prefs, _v2Key), _bindingFromCarbon);
+    } else if (prefs.containsKey(_v1Key)) {
+      migrated = StoredBindings(
+        _completed(
+            _bindingsFrom(_decoded(prefs, _v1Key), _bindingFromCarbon), const []),
+        const [],
+      );
+    } else {
+      return StoredBindings(runningDefaults(), const []);
+    }
+    try {
+      await save(migrated.bindings, migrated.regions);
+    } catch (e) {
+      // Deliberately swallowed. A write that fails costs a repeat, not the
+      // shortcuts: v3 stays absent, so the next launch migrates the same file
+      // the same way. Thrown from here it would cost every shortcut instead.
+      // A debug build says why, so a write that keeps failing is seen.
+      if (!kReleaseMode) {
+        debugPrint('[orthant] bindings: migration write failed: $e');
+      }
+    }
+    return migrated;
   }
 
   Future<void> save(List<Binding> bindings, List<CustomRegion> regions) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
-      _v2Key,
+      _v3Key,
       jsonEncode({
         'bindings': [for (final b in bindings) b.toJson()],
         'regions': [for (final r in regions) r.toJson()],
       }),
     );
   }
+}
+
+/// The JSON stored under [key], or null when it is not text holding JSON.
+///
+/// Not `getString`, which casts and so throws on a value of any other type: a
+/// hand-written preference would then stop the launch, before any shortcut
+/// registers, which is what every tolerance in this file exists to prevent.
+Object? _decoded(SharedPreferences prefs, String key) {
+  final raw = prefs.get(key);
+  return raw is String ? _tryDecode(raw) : null;
 }
 
 Object? _tryDecode(String raw) {
@@ -78,18 +106,56 @@ Object? _tryDecode(String raw) {
   }
 }
 
+/// A v2 or v3 document: an object holding bindings and regions.
+StoredBindings _documentFrom(
+  Object? parsed,
+  Binding? Function(Object? entry) binding,
+) {
+  final map = parsed is Map ? parsed : const {};
+  final regions = _regionsFrom(map['regions']);
+  return StoredBindings(
+    _completed(_bindingsFrom(map['bindings'], binding), regions),
+    regions,
+  );
+}
+
+/// One v1 or v2 entry: a command, and a Carbon key code and mask.
+///
+/// The validation those versions applied, with one narrowing: the key code
+/// must be one the recorder can produce, and the mask may hold only the four
+/// modifiers. Every file Orthant wrote passes both, so the narrowing reaches
+/// only a hand-edited one, where a stray value used to go straight to
+/// `RegisterEventHotKey` and would now leave that command at its default.
+Binding? _bindingFromCarbon(Object? entry) {
+  if (entry is! Map) return null;
+  final name = entry['command'];
+  final keyCode = entry['keyCode'];
+  final modifiers = entry['modifiers'];
+  if (name is! String || keyCode is! int || modifiers is! int) return null;
+  final command = CommandRef.tryParse(name);
+  if (command == null) return null;
+  if (keyCode == kUnboundKey) {
+    return modifiers == 0 ? Binding.unbound(command) : null;
+  }
+  final chord = chordFromCarbon(keyCode, modifiers);
+  return chord == null ? null : Binding(command, chord);
+}
+
 /// The bindings we could make sense of. A truncated file, a list of something
 /// other than objects, an entry naming a command this build doesn't have — all
 /// skipped rather than thrown. [BindingsStore.load] runs before any shortcut is
 /// registered, so an exception here would leave the app with no shortcuts at
 /// all and no way for the user to recover short of deleting the preferences by
 /// hand.
-List<Binding> _bindingsFrom(Object? parsed) {
+List<Binding> _bindingsFrom(
+  Object? parsed,
+  Binding? Function(Object? entry) binding,
+) {
   if (parsed is! List) return const [];
   final out = <Binding>[];
   for (final entry in parsed) {
-    final binding = Binding.tryFromJson(entry);
-    if (binding != null) out.add(binding);
+    final b = binding(entry);
+    if (b != null) out.add(b);
   }
   return out;
 }
@@ -125,7 +191,7 @@ List<CustomRegion> _regionsFrom(Object? parsed) {
 List<Binding> _completed(List<Binding> stored, List<CustomRegion> regions) {
   final byCommand = <CommandRef, Binding>{for (final b in stored) b.command: b};
   final defaults = <CommandRef, Binding>{
-    for (final b in kDefaultBindings) b.command: b
+    for (final b in runningDefaults()) b.command: b
   };
   return [
     for (final command in ShortcutCommand.values)

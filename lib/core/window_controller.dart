@@ -176,8 +176,9 @@ abstract class WindowController {
   /// prevent.
   Future<AppVersion> appVersion();
 
-  /// Printable labels for physical key codes in the current input source.
-  /// Display data only: bindings continue to store their original key codes.
+  /// Printable labels for keys in the current input source, keyed by USB HID
+  /// usage, which is how a binding's chord names its physical key. Display
+  /// data only: a binding keeps its key whatever this says.
   Future<Map<int, String>> keyboardLabels();
 
   /// Whether the app currently launches at login, per the OS.

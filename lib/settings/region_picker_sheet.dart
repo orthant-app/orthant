@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../overlay/grid_selection.dart';
+import '../core/key_chord.dart';
 import '../shortcuts/bindings.dart';
 import '../shortcuts/custom_region.dart';
 import 'keycap.dart';
@@ -16,7 +17,7 @@ import 'recording_field.dart';
 /// that creating a shortcut is one transaction. Two steps would let a region
 /// exist for a moment with no way to fire it, which is the state the list would
 /// then have to explain.
-typedef RegionDraft = ({CustomRegion region, int keyCode, int modifiers});
+typedef RegionDraft = ({CustomRegion region, KeyChord? chord});
 
 /// Draw a region, name it, bind it.
 ///
@@ -29,8 +30,7 @@ class RegionPickerSheet extends StatefulWidget {
   const RegionPickerSheet({
     super.key,
     this.initial,
-    this.initialKeyCode = kUnboundKey,
-    this.initialModifiers = 0,
+    this.initialChord,
     required this.gridCols,
     required this.gridRows,
     required this.onSubmit,
@@ -55,12 +55,11 @@ class RegionPickerSheet extends StatefulWidget {
   /// Warning *before* the combo is committed is the point. The list rows can
   /// only report a theft afterwards, in a snackbar, because a row has nowhere
   /// to put a sentence; this sheet does.
-  final String? Function(int keyCode, int modifiers)? conflictName;
+  final String? Function(KeyChord chord)? conflictName;
 
   /// The region being edited, or null to create a new one.
   final CustomRegion? initial;
-  final int initialKeyCode;
-  final int initialModifiers;
+  final KeyChord? initialChord;
 
   /// The grid a *new* region is drawn on — the user's live overlay grid.
   ///
@@ -143,8 +142,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
             r1: widget.initial!.r1,
           );
 
-  late int _keyCode = widget.initialKeyCode;
-  late int _modifiers = widget.initialModifiers;
+  late KeyChord? _chord = widget.initialChord;
   bool _recording = false;
 
   /// The cell the pointer went down on — the drag's true anchor.
@@ -208,9 +206,10 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
       (_conflict == null || _takeAnyway);
 
   /// The command this combo would displace, or null.
-  String? get _conflict => _keyCode == kUnboundKey
-      ? null
-      : widget.conflictName?.call(_keyCode, _modifiers);
+  String? get _conflict {
+    final chord = _chord;
+    return chord == null ? null : widget.conflictName?.call(chord);
+  }
 
   void _select(Cell anchor, Cell focus) {
     // A pan update arrives on **every pointer move** — well over a hundred a
@@ -293,12 +292,11 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
   /// that family — *a failed hotkey resume must never eat what the user just
   /// did* is a property of every one of them, not of the one where it was
   /// noticed.
-  Future<void> _stopRecording({({int keyCode, int modifiers})? combo}) async {
+  Future<void> _stopRecording({KeyChord? combo}) async {
     if (mounted) {
       setState(() {
         if (combo != null) {
-          _keyCode = combo.keyCode;
-          _modifiers = combo.modifiers;
+          _chord = combo;
           // A new combination is a new question: carrying the acceptance over
           // would let a second collision be taken without ever having been
           // shown.
@@ -353,8 +351,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
               r0: b.r0,
               r1: b.r1,
             ),
-      keyCode: _keyCode,
-      modifiers: _modifiers,
+      chord: _chord,
     ));
   }
 
@@ -560,10 +557,11 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
             : MacControl(
                 key: const ValueKey('region-record'),
                 onPressed: _startRecording,
-                semanticLabel: _keyCode == kUnboundKey
-                    ? 'Record shortcut, none set'
-                    : 'Record shortcut, currently '
-                          '${formatCombo(_keyCode, _modifiers, keyLabels: KeyboardLabels.of(context))}',
+                semanticLabel: switch (_chord) {
+                  null => 'Record shortcut, none set',
+                  final chord => 'Record shortcut, currently '
+                      '${formatCombo(chord, keyLabels: KeyboardLabels.of(context))}',
+                },
                 focusRingRadius: 6,
                 inset: 1,
                 child: Align(
@@ -573,12 +571,9 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
                     // than plain grey text. This sheet had the list's original
                     // defect — a status where a button belongs — on a field
                     // that is *only* ever clicked.
-                    child: _keyCode == kUnboundKey
+                    child: _chord == null
                         ? const SetShortcutPill(label: 'Click to record')
-                        : KeycapRow(
-                            keyCode: _keyCode,
-                            modifiers: _modifiers,
-                          ),
+                        : KeycapRow(chord: _chord),
                   ),
                 ),
               ),

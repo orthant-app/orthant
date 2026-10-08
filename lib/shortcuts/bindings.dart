@@ -1,127 +1,150 @@
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
+import 'package:flutter/services.dart' show PhysicalKeyboardKey;
+
 import 'command_ref.dart';
+import '../core/key_chord.dart';
 import 'shortcut_command.dart';
 
-/// Carbon modifier masks.
-const int kControlKey = 4096;
-const int kOptionKey = 2048;
-const int kCmdKey = 256;
-const int kShiftKey = 512;
-const int kControlOption = kControlKey | kOptionKey; // 6144
-
-/// Sentinel [Binding.keyCode] meaning "no shortcut assigned".
-const int kUnboundKey = -1;
-
-/// A command bound to a Carbon virtual key code + Carbon modifier mask.
-/// A command may also be *unbound* ([kUnboundKey]) — it then has no shortcut
-/// and is skipped when registering hotkeys.
+/// A command and the chord that fires it.
+/// A command may also be *unbound* (no [chord]); it then has no shortcut and
+/// is skipped when registering hotkeys.
 class Binding {
   final CommandRef command;
-  final int keyCode;
-  final int modifiers;
-  const Binding(this.command, this.keyCode, this.modifiers);
+
+  /// Null when the command has no shortcut.
+  final KeyChord? chord;
+
+  const Binding(this.command, this.chord);
 
   /// An entry with no shortcut assigned.
-  const Binding.unbound(this.command) : keyCode = kUnboundKey, modifiers = 0;
+  const Binding.unbound(this.command) : chord = null;
 
-  bool get isBound => keyCode != kUnboundKey;
+  bool get isBound => chord != null;
 
-  Map<String, dynamic> toJson() =>
-      {'command': command.jsonName, 'keyCode': keyCode, 'modifiers': modifiers};
+  /// As v3 stores it. An unbound command keeps its entry, with a null chord:
+  /// clearing a shortcut is a choice, and the next launch must not read its
+  /// absence as "missing" and restore the default.
+  Map<String, Object?> toJson() =>
+      {'command': command.jsonName, 'chord': chord?.toJson()};
 
-  /// One persisted entry, or null if it isn't one we can trust.
+  /// One stored entry, or null if it isn't one we can trust.
   ///
-  /// Tolerant by design. This reads a file we did not necessarily write — an
-  /// older release's, a newer one's, or a corrupt one — and it is read before
-  /// any shortcut is registered, so anything thrown here takes the entire
-  /// feature down at launch with no user-visible way back. A rejected entry
-  /// costs that one command its saved combo; a thrown one costs all eleven.
+  /// Tolerant by design. This reads a file we did not necessarily write (a
+  /// newer release's, or a corrupt one), and it is read before any shortcut is
+  /// registered, so anything thrown here takes the entire feature down at
+  /// launch with no user-visible way back. A rejected entry costs that one
+  /// command its saved combo; a thrown one costs all of them.
   static Binding? tryFromJson(Object? entry) {
-    if (entry is! Map) return null;
+    if (entry is! Map || !entry.containsKey('chord')) return null;
     final name = entry['command'];
-    final keyCode = entry['keyCode'];
-    final modifiers = entry['modifiers'];
-    if (name is! String || keyCode is! int || modifiers is! int) return null;
-    if (!_isRegistrable(keyCode, modifiers)) return null;
+    if (name is! String) return null;
     final command = CommandRef.tryParse(name);
-    return command == null ? null : Binding(command, keyCode, modifiers);
+    if (command == null) return null;
+    final raw = entry['chord'];
+    if (raw == null) return Binding.unbound(command);
+    final chord = KeyChord.tryFromJson(raw);
+    return chord == null ? null : Binding(command, chord);
   }
-
-  /// Whether this pair is something the native side can actually be handed.
-  ///
-  /// Being an `int` is not enough. Both cross to Swift as `UInt32`, whose
-  /// initialiser **traps** on a negative value — so a stored `keyCode: -2` is
-  /// not a bad shortcut, it is a hard crash on the launch path that reads the
-  /// preferences, every launch, with no way out but deleting them by hand.
-  ///
-  /// A bound combo must also carry a modifier. The recorder enforces that
-  /// ("Combinations need ⌃, ⌥, ⇧ or ⌘"), but a hand-edited file need not, and
-  /// registering a bare key would take that key away from *every* app on the
-  /// system for as long as Orthant runs.
-  static bool _isRegistrable(int keyCode, int modifiers) {
-    if (keyCode == kUnboundKey) return modifiers == 0;
-    if (keyCode < 0 || keyCode > 0x7F) return false; // Carbon virtual key codes
-    if (modifiers < 0 || modifiers > 0xFFFF) return false;
-    return modifiers & (kControlKey | kOptionKey | kShiftKey | kCmdKey) != 0;
-  }
-
-  Binding copyWith({int? keyCode, int? modifiers}) =>
-      Binding(command, keyCode ?? this.keyCode, modifiers ?? this.modifiers);
 
   @override
   bool operator ==(Object other) =>
-      other is Binding &&
-      other.command == command &&
-      other.keyCode == keyCode &&
-      other.modifiers == modifiers;
+      other is Binding && other.command == command && other.chord == chord;
   @override
-  int get hashCode => Object.hash(command, keyCode, modifiers);
+  int get hashCode => Object.hash(command, chord);
 }
 
-/// Collision-safe ⌃⌥ defaults.
+/// The default shortcuts for [platform].
 ///
 /// The summon leads, because it is the one that opens the grid rather than
-/// placing a window — and because it is the first row of the Shortcuts pane.
+/// placing a window, and because it is the first row of the Shortcuts pane.
 ///
-/// `O` for **Open grid**, which is what the row and the menu item both say —
+/// `O` for **Open grid**, which is what the row and the menu item both say:
 /// macOS convention leans on the verb (`⌘O` is Open), so the letter matches the
 /// words on screen rather than the object. It sits beside the `U`/`I`/`J`/`K`
 /// quarters cluster too, keeping every letter shortcut in one hand and region.
 /// That it is also Orthant's initial is a free bonus, not the reason.
-const List<Binding> kDefaultBindings = [
-  Binding(BuiltIn(ShortcutCommand.showGrid), 31, kControlOption),    // ⌃⌥O
-  Binding(BuiltIn(ShortcutCommand.leftHalf), 123, kControlOption),   // ⌃⌥←
-  Binding(BuiltIn(ShortcutCommand.rightHalf), 124, kControlOption),  // ⌃⌥→
-  Binding(BuiltIn(ShortcutCommand.topHalf), 126, kControlOption),    // ⌃⌥↑
-  Binding(BuiltIn(ShortcutCommand.bottomHalf), 125, kControlOption), // ⌃⌥↓
-  Binding(BuiltIn(ShortcutCommand.topLeft), 32, kControlOption),     // ⌃⌥U
-  Binding(BuiltIn(ShortcutCommand.topRight), 34, kControlOption),    // ⌃⌥I
-  Binding(BuiltIn(ShortcutCommand.bottomLeft), 38, kControlOption),  // ⌃⌥J
-  Binding(BuiltIn(ShortcutCommand.bottomRight), 40, kControlOption), // ⌃⌥K
-  Binding(BuiltIn(ShortcutCommand.maximize), 36, kControlOption),    // ⌃⌥↩
-  Binding(BuiltIn(ShortcutCommand.center), 8, kControlOption),       // ⌃⌥C
-];
+///
+/// **Windows' set is provisional, and its milestone owns it.** On a layout
+/// with AltGr, right Alt is Ctrl+Alt, so a Ctrl+Alt letter chord swallows a
+/// character the user meant to type; Shift does not escape it, so the six
+/// letter chords move to Win+Shift there ([altGr]), and the arrows and Enter,
+/// which AltGr never combines with, stay. Every Windows chord here still holds
+/// Alt, and a registered hotkey holding Alt has been measured leaving a WinUI
+/// app (Notepad) typing nothing afterwards, so this table is expected to
+/// change before Windows registers anything. macOS ignores [altGr].
+///
+/// Every platform but Windows gets the macOS set, which includes the test host
+/// (Flutter reports Android there).
+List<Binding> defaultBindings({
+  required TargetPlatform platform,
+  required bool altGr,
+}) {
+  final ctrlAlt = Modifiers.ctrl | Modifiers.alt;
+  final letters = platform == TargetPlatform.windows && altGr
+      ? Modifiers.meta | Modifiers.shift
+      : ctrlAlt;
+  Binding bind(ShortcutCommand command, PhysicalKeyboardKey key, Modifiers m) =>
+      Binding(BuiltIn(command), KeyChord.us(key.usbHidUsage, m));
+  return [
+    bind(ShortcutCommand.showGrid, PhysicalKeyboardKey.keyO, letters),
+    bind(ShortcutCommand.leftHalf, PhysicalKeyboardKey.arrowLeft, ctrlAlt),
+    bind(ShortcutCommand.rightHalf, PhysicalKeyboardKey.arrowRight, ctrlAlt),
+    bind(ShortcutCommand.topHalf, PhysicalKeyboardKey.arrowUp, ctrlAlt),
+    bind(ShortcutCommand.bottomHalf, PhysicalKeyboardKey.arrowDown, ctrlAlt),
+    bind(ShortcutCommand.topLeft, PhysicalKeyboardKey.keyU, letters),
+    bind(ShortcutCommand.topRight, PhysicalKeyboardKey.keyI, letters),
+    bind(ShortcutCommand.bottomLeft, PhysicalKeyboardKey.keyJ, letters),
+    bind(ShortcutCommand.bottomRight, PhysicalKeyboardKey.keyK, letters),
+    bind(ShortcutCommand.maximize, PhysicalKeyboardKey.enter, ctrlAlt),
+    bind(ShortcutCommand.center, PhysicalKeyboardKey.keyC, letters),
+  ];
+}
+
+/// [defaultBindings] for the platform this build runs on: what a first launch
+/// starts from and what *Reset Shortcuts* returns to.
+///
+/// Whether a Windows layout has AltGr is not detected yet, so it is answered
+/// as "no" until the Windows hotkey work asks the system.
+List<Binding> runningDefaults() =>
+    defaultBindings(platform: defaultTargetPlatform, altGr: false);
 
 /// What [ref] is bound to once *Reset Shortcuts* has run.
 ///
-/// A region is not in [kDefaultBindings] and so comes back unbound — regions
+/// A region is not among the defaults and so comes back unbound: regions
 /// survive a reset, their combos do not. Stated once because two places need
 /// it: `OrthantCoordinator.resetBindings`, which performs the reset, and the
 /// pane's Undo, which has to know **which rows a reset actually changed** so it
 /// can leave every other row alone. A coordinator test asserts the two agree.
-Binding defaultBindingFor(CommandRef ref) => kDefaultBindings.firstWhere(
+Binding defaultBindingFor(CommandRef ref) => runningDefaults().firstWhere(
       (b) => b.command == ref,
       orElse: () => Binding.unbound(ref),
     );
 
+/// Whether [a] and [b] are the same shortcut on the platform running now:
+/// both unbound, or bound to chords that are one hotkey there
+/// ([KeyChord.sameChordAs]).
+///
+/// Not `==`, which also compares the logical key and so tells apart two
+/// recordings of one macOS hotkey made under different layouts. Ask this
+/// wherever the question is "would pressing it do the same thing".
+bool sameShortcut(Binding a, Binding b) {
+  final x = a.chord;
+  final y = b.chord;
+  return x == null ? y == null : y != null && x.sameChordAs(y);
+}
+
 /// The command already using [candidate]'s combo, or null if it is free.
 /// The command being rebound is ignored (keeping its own combo isn't a clash).
+///
+/// "The same combo" is the platform's own question ([KeyChord.sameChordAs]):
+/// the same key position on macOS, whatever each chord's layout typed there.
 CommandRef? conflictFor(List<Binding> bindings, Binding candidate) {
+  final wanted = candidate.chord;
+  if (wanted == null) return null;
   for (final b in bindings) {
     if (b.command == candidate.command) continue;
-    if (!b.isBound) continue;
-    if (b.keyCode == candidate.keyCode && b.modifiers == candidate.modifiers) {
-      return b.command;
-    }
+    final held = b.chord;
+    if (held != null && held.sameChordAs(wanted)) return b.command;
   }
   return null;
 }
@@ -164,73 +187,86 @@ List<Binding> withRebind(List<Binding> bindings, Binding updated) {
   ];
 }
 
-/// Carbon virtual key code → how macOS displays that key in a shortcut.
+/// A key's USB HID usage → how macOS displays that key in a shortcut.
 ///
-/// Must cover everything `carbonFromKeyEvent` (settings/key_capture.dart) can
-/// produce, or a rebound key shows up as a raw `key:<code>`. Letters are
-/// uppercase because that is how macOS renders shortcuts (⌘C, not ⌘c).
+/// Must cover every key `isBindableKey` accepts, or a rebound key shows up as
+/// a raw `key:0x…`. Letters are uppercase because that is how macOS renders
+/// shortcuts (⌘C, not ⌘c). Tab and Escape are labelled though neither can be
+/// bound.
 const Map<int, String> _keySymbols = {
-  // Letters (kVK_ANSI_A …), in alphabetical order of the letter.
-  0: 'A', 11: 'B', 8: 'C', 2: 'D', 14: 'E', 3: 'F', 5: 'G', 4: 'H',
-  34: 'I', 38: 'J', 40: 'K', 37: 'L', 46: 'M', 45: 'N', 31: 'O', 35: 'P',
-  12: 'Q', 15: 'R', 1: 'S', 17: 'T', 32: 'U', 9: 'V', 13: 'W', 7: 'X',
-  16: 'Y', 6: 'Z',
+  // Letters, in alphabetical order.
+  0x00070004: 'A', 0x00070005: 'B', 0x00070006: 'C', 0x00070007: 'D',
+  0x00070008: 'E', 0x00070009: 'F', 0x0007000A: 'G', 0x0007000B: 'H',
+  0x0007000C: 'I', 0x0007000D: 'J', 0x0007000E: 'K', 0x0007000F: 'L',
+  0x00070010: 'M', 0x00070011: 'N', 0x00070012: 'O', 0x00070013: 'P',
+  0x00070014: 'Q', 0x00070015: 'R', 0x00070016: 'S', 0x00070017: 'T',
+  0x00070018: 'U', 0x00070019: 'V', 0x0007001A: 'W', 0x0007001B: 'X',
+  0x0007001C: 'Y', 0x0007001D: 'Z',
   // Digits 1…9, 0.
-  18: '1', 19: '2', 20: '3', 21: '4', 23: '5',
-  22: '6', 26: '7', 28: '8', 25: '9', 29: '0',
+  0x0007001E: '1', 0x0007001F: '2', 0x00070020: '3', 0x00070021: '4',
+  0x00070022: '5', 0x00070023: '6', 0x00070024: '7', 0x00070025: '8',
+  0x00070026: '9', 0x00070027: '0',
   // Editing / navigation.
-  123: '←', 124: '→', 125: '↓', 126: '↑',
-  36: '↩', 49: '␣', 48: '⇥', 51: '⌫', 53: '⎋',
-  115: '↖', 119: '↘', 116: '⇞', 121: '⇟', 117: '⌦',
+  0x00070050: '←', 0x0007004F: '→', 0x00070051: '↓', 0x00070052: '↑',
+  0x00070028: '↩', 0x0007002C: '␣', 0x0007002B: '⇥', 0x0007002A: '⌫',
+  0x00070029: '⎋', 0x0007004A: '↖', 0x0007004D: '↘', 0x0007004B: '⇞',
+  0x0007004E: '⇟', 0x0007004C: '⌦',
   // ANSI fallbacks; the live input source supplies printable labels on macOS.
-  27: '-', 24: '=', 33: '[', 30: ']', 42: '\\', 41: ';', 39: "'",
-  50: '`', 43: ',', 47: '.', 44: '/', 10: '§', 93: '¥', 94: '_',
-  122: 'F1', 120: 'F2', 99: 'F3', 118: 'F4', 96: 'F5', 97: 'F6',
-  98: 'F7', 100: 'F8', 101: 'F9', 109: 'F10', 103: 'F11', 111: 'F12',
-  105: 'F13', 107: 'F14', 113: 'F15', 106: 'F16', 64: 'F17',
-  79: 'F18', 80: 'F19', 90: 'F20',
-  71: '⌧', 76: '⌤', 75: 'Num /', 67: 'Num *', 78: 'Num -',
-  69: 'Num +', 81: 'Num =', 65: 'Num .', 95: 'Num ,',
-  82: 'Num 0', 83: 'Num 1', 84: 'Num 2', 85: 'Num 3', 86: 'Num 4',
-  87: 'Num 5', 88: 'Num 6', 89: 'Num 7', 91: 'Num 8', 92: 'Num 9',
+  0x0007002D: '-', 0x0007002E: '=', 0x0007002F: '[', 0x00070030: ']',
+  0x00070031: '\\', 0x00070033: ';', 0x00070034: "'", 0x00070035: '`',
+  0x00070036: ',', 0x00070037: '.', 0x00070038: '/', 0x00070064: '§',
+  0x00070089: '¥', 0x00070087: '_',
+  0x0007003A: 'F1', 0x0007003B: 'F2', 0x0007003C: 'F3', 0x0007003D: 'F4',
+  0x0007003E: 'F5', 0x0007003F: 'F6', 0x00070040: 'F7', 0x00070041: 'F8',
+  0x00070042: 'F9', 0x00070043: 'F10', 0x00070044: 'F11', 0x00070045: 'F12',
+  0x00070068: 'F13', 0x00070069: 'F14', 0x0007006A: 'F15', 0x0007006B: 'F16',
+  0x0007006C: 'F17', 0x0007006D: 'F18', 0x0007006E: 'F19', 0x0007006F: 'F20',
+  0x00070053: '⌧', 0x00070058: '⌤', 0x00070054: 'Num /', 0x00070055: 'Num *',
+  0x00070056: 'Num -', 0x00070057: 'Num +', 0x00070067: 'Num =',
+  0x00070063: 'Num .', 0x00070085: 'Num ,',
+  0x00070062: 'Num 0', 0x00070059: 'Num 1', 0x0007005A: 'Num 2',
+  0x0007005B: 'Num 3', 0x0007005C: 'Num 4', 0x0007005D: 'Num 5',
+  0x0007005E: 'Num 6', 0x0007005F: 'Num 7', 0x00070060: 'Num 8',
+  0x00070061: 'Num 9',
 };
 
 /// The combo as individual symbols, in macOS order (⌃⌥⇧⌘ then the key), for
 /// rendering one keycap per element. Empty when unbound.
-List<String> comboSymbols(int keyCode, int modifiers, {
+///
+/// [keyLabels] is the keyboard layout's own labels, keyed by USB HID usage
+/// (`WindowController.keyboardLabels`); a key it does not name falls back to
+/// the US glyph.
+List<String> comboSymbols(KeyChord? chord, {
   Map<int, String> keyLabels = const {},
 }) {
-  if (keyCode == kUnboundKey) return const [];
-  return [...modifierSymbols(modifiers),
-    keyLabels[keyCode] ?? _keySymbols[keyCode] ?? 'key:$keyCode'];
+  if (chord == null) return const [];
+  return [
+    ...modifierSymbols(chord.modifiers),
+    keyLabels[chord.physical] ??
+        _keySymbols[chord.physical] ??
+        'key:0x${chord.physical.toRadixString(16)}',
+  ];
 }
 
 /// The modifier glyphs held, in macOS's canonical order.
 ///
 /// Split out of [comboSymbols], which answers with **nothing at all** for an
-/// unbound key code — precisely the moment the recorder needs to draw: while
+/// unbound command, precisely the moment the recorder needs to draw: while
 /// modifiers are down and no key has completed the combination yet. A field
 /// that shows the same "Press keys…" whether or not ⌃⌥ is held reads as one
 /// that is not listening.
-List<String> modifierSymbols(int modifiers) => [
-  if (modifiers & kControlKey != 0) '⌃',
-  if (modifiers & kOptionKey != 0) '⌥',
-  if (modifiers & kShiftKey != 0) '⇧',
-  if (modifiers & kCmdKey != 0) '⌘',
+List<String> modifierSymbols(Modifiers modifiers) => [
+  if (modifiers.has(Modifiers.ctrl)) '⌃',
+  if (modifiers.has(Modifiers.alt)) '⌥',
+  if (modifiers.has(Modifiers.shift)) '⇧',
+  if (modifiers.has(Modifiers.meta)) '⌘',
 ];
 
-/// Human-readable combo, e.g. `⌃⌥←`. Falls back to `key:<code>` for unmapped keys.
-String formatCombo(int keyCode, int modifiers, {
+/// Human-readable combo, e.g. `⌃⌥←`.
+String formatCombo(KeyChord chord, {
   Map<int, String> keyLabels = const {},
-}) {
-  final b = StringBuffer();
-  if (modifiers & kControlKey != 0) b.write('⌃');
-  if (modifiers & kOptionKey != 0) b.write('⌥');
-  if (modifiers & kShiftKey != 0) b.write('⇧');
-  if (modifiers & kCmdKey != 0) b.write('⌘');
-  b.write(keyLabels[keyCode] ?? _keySymbols[keyCode] ?? 'key:$keyCode');
-  return b.toString();
-}
+}) =>
+    comboSymbols(chord, keyLabels: keyLabels).join();
 
 /// [command]'s combo for display outside the settings list, or null when there
 /// is nothing honest to show.
@@ -248,9 +284,8 @@ String? comboLabelFor(
   if (unavailable.contains(command)) return null;
   for (final b in bindings) {
     if (b.command != command) continue;
-    return b.isBound
-        ? formatCombo(b.keyCode, b.modifiers, keyLabels: keyLabels)
-        : null;
+    final chord = b.chord;
+    return chord == null ? null : formatCombo(chord, keyLabels: keyLabels);
   }
   return null;
 }

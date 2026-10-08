@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'carbon_keys.dart';
 import 'channel.dart';
 import 'geometry.dart';
 import 'window_controller.dart';
@@ -22,12 +23,19 @@ class MacosWindowController implements WindowController {
       return const {};
     }
     if (reply is! Map) return const {};
-    return Map.unmodifiable({
-      for (final entry in reply.entries)
-        if (entry.key is int && entry.key >= 0 && entry.key <= 127 &&
-            entry.value is String && (entry.value as String).trim().isNotEmpty)
-          entry.key as int: entry.value as String,
-    });
+    // Swift answers by Carbon key code, the only name the system's layout data
+    // has for a key; the seam answers by USB HID usage, which is how a binding
+    // names its key. A code no bindable key has is dropped here, which also
+    // covers anything outside 0...127.
+    final labels = <int, String>{};
+    for (final entry in reply.entries) {
+      final code = entry.key;
+      final label = entry.value;
+      if (code is! int || label is! String || label.trim().isEmpty) continue;
+      final physical = physicalFromCarbon(code);
+      if (physical != null) labels[physical] = label;
+    }
+    return Map.unmodifiable(labels);
   }
 
   @override

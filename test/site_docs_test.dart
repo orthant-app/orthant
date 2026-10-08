@@ -8,6 +8,8 @@ import 'package:orthant/shortcuts/bindings.dart';
 import 'package:orthant/shortcuts/command_ref.dart';
 import 'package:orthant/shortcuts/region_commands.dart';
 
+import 'support/carbon_terms.dart';
+
 /// The site documents behaviour, and behaviour lives in Dart. These assertions
 /// are the reason the site shares this repo: a separate repo could not have
 /// them, and a stale install command or shortcut table would ship silently.
@@ -50,9 +52,9 @@ void main() {
     }
 
     final expected = {
-      for (final b in kDefaultBindings)
+      for (final b in macDefaults)
         kCommandLabels[(b.command as BuiltIn).command]!:
-            formatCombo(b.keyCode, b.modifiers),
+            formatCombo(b.chord!),
     };
     expect(documented, expected);
   });
@@ -176,10 +178,10 @@ void main() {
     // it, so the catalogue could have advertised "Left half" for the RIGHT half
     // and the guard would have passed.
     final expected = {
-      for (final b in kDefaultBindings)
+      for (final b in macDefaults)
         (b.command as BuiltIn).command.name: [
           kCommandLabels[(b.command as BuiltIn).command]!,
-          formatCombo(b.keyCode, b.modifiers),
+          formatCombo(b.chord!),
         ],
     };
     expect(found, expected);

@@ -275,11 +275,7 @@ class GeneralPane extends StatelessWidget {
           ),
           const SizedBox(width: 5),
         ],
-        KeycapRow(
-          keyCode: summon.keyCode,
-          modifiers: summon.modifiers,
-          unsetLabel: 'Not set',
-        ),
+        KeycapRow(chord: summon.chord, unsetLabel: 'Not set'),
         const SizedBox(width: 14),
         _LinkButton(label: 'Change…', tokens: t, onPressed: onEditShortcuts),
       ],

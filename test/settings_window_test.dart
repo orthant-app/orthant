@@ -10,10 +10,12 @@ import 'package:orthant/shortcuts/custom_region.dart';
 import 'package:orthant/shortcuts/shortcut_command.dart';
 import 'package:orthant/shortcuts/command_ref.dart';
 
+import 'support/carbon_terms.dart';
+
 void main() {
   Widget host({
     Settings settings = const Settings(),
-    List<Binding> bindings = kDefaultBindings,
+    List<Binding>? bindings,
     LoginItemStatus loginStatus = LoginItemStatus.disabled,
     bool permissionGranted = true,
     void Function(Settings)? onSettingsChanged,
@@ -30,7 +32,7 @@ void main() {
         home: SettingsWindow(
           initialTab: initialTab,
           settings: settings,
-          bindings: bindings,
+          bindings: bindings ?? macDefaults,
           loginStatus: loginStatus,
           permissionGranted: permissionGranted,
           onSettingsChanged: onSettingsChanged ?? (_) {},
@@ -162,7 +164,7 @@ void main() {
               child: SettingsWindow(
                 initialTab: tab,
                 settings: const Settings(),
-                bindings: kDefaultBindings,
+                bindings: macDefaults,
                 permissionGranted: permissionGranted,
                 onSettingsChanged: (_) {},
                 onRebound: (_) {},

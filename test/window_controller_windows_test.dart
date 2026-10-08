@@ -610,6 +610,45 @@ void main() {
         expect(calls, [kHideOverlay]);
       });
 
+      test('a summon that finds nothing marks the grid closed', () async {
+        // Its hide goes through hideOverlay, so a capture after it has no
+        // grid left to end.
+        final desktop = FakeDesktop(ownPid: 1)
+          ..windows.add(windowFacts(0x10, pid: 7))
+          ..foreground = 0x10;
+        answer = (call) => call.method == kShowOverlay ? true : null;
+        final c = wc(
+            desktop: desktop,
+            placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)));
+        await c.showOverlay();
+        desktop.windows.clear();
+        desktop.foreground = 0;
+        await c.showOverlay();
+        desktop.windows.add(windowFacts(0x10, pid: 7));
+        desktop.foreground = 0x10;
+        calls.clear();
+        await c.captureFrontmost();
+        expect(calls, isEmpty);
+      });
+
+      test('a refused summon whose hide fails leaves the grid marked open',
+          () async {
+        // The runner can refuse before it replaces the live session, so the
+        // old grid may still be up: the next capture tries the hide again.
+        final c = shown();
+        await c.showOverlay();
+        answer = (call) => switch (call.method) {
+              kShowOverlay => false,
+              kHideOverlay => throw PlatformException(code: 'gone'),
+              _ => null,
+            };
+        await expectLater(c.showOverlay(), throwsA(isA<PlatformException>()));
+        answer = (_) => null;
+        calls.clear();
+        await c.captureFrontmost();
+        expect(calls, [kHideOverlay]);
+      });
+
       test('a second summon leaves replacing the grid to the runner', () async {
         // The runner ends a live session when a new summon shows (its
         // "replaced" path): Dart sends no hide of its own on that path.

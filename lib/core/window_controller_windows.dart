@@ -318,7 +318,7 @@ class WindowsWindowController implements WindowController {
       _placer.beep();
       _log('summon: outcome=no-capture capture=${captureMs}ms');
       // Ends a grid still open, whose capture was just cleared.
-      await _channel.invokeMethod<void>(kHideOverlay);
+      await hideOverlay();
       return;
     }
     final shown = await _channel.invokeMethod<Object?>(kShowOverlay, {
@@ -328,14 +328,17 @@ class WindowsWindowController implements WindowController {
     });
     _log('summon: outcome=${shown == true ? 'shown' : 'refused'} id=$id '
         'capture=${captureMs}ms');
-    _gridOpen = shown == true;
-    if (shown != true) {
+    if (shown == true) {
+      _gridOpen = true;
+    } else {
       // The capture slot was just replaced, so a grid still open names a
       // capture that no longer exists: every commit from it would be dropped
       // while it holds Esc, Enter and the arrows. The runner refuses for a
       // stale press, engines not ready, displays changing, or Esc or Enter
       // held, and some of those return before it replaces the session.
-      await _channel.invokeMethod<void>(kHideOverlay);
+      // Through hideOverlay: a hide that fails leaves a grid still open
+      // marked open, so the next capture ends it.
+      await hideOverlay();
     }
   }
 

@@ -163,10 +163,14 @@ abstract class WindowController {
     required bool saveHint,
   });
 
-  /// [pressedAtMs] is Windows only: the epoch-ms time of the key press that
-  /// asked for this summon, so the runner can refuse a summon that reached it
-  /// more than a second after its press. Null for a summon with no press (the
-  /// tray). macOS stamps its own press natively and ignores it.
+  /// [pressedAtMs] is Windows only: the time of the key press that asked for
+  /// this summon, in milliseconds on the system's monotonic tick clock, which
+  /// only the runner reads (Dart passes it back untouched). The runner refuses
+  /// a summon that reached it more than a second after its press, and times
+  /// the overlay's first frame from it. A tick, not the wall clock, so a clock
+  /// step (time sync after a wake) cannot make a fresh press look stale. Null
+  /// for a summon with no press (the tray). macOS stamps its own press
+  /// natively and ignores it.
   Future<void> showOverlay({double? pressedAtMs});
   Future<void> hideOverlay();
 

@@ -463,26 +463,6 @@ void main() {
     expect(const StandardMethodCodec().decodeEnvelope(reply!), isNull);
   });
 
-  test('the debug summon summons', () async {
-    var summons = 0;
-    HotkeyService(onCommand: (_) {}, onSummon: ({pressedAtMs}) => summons++);
-    await fromNative(kDebugSummon);
-    expect(summons, 1);
-  });
-
-  test('the debug summon carries its press time, and only a number',
-      () async {
-    final presses = <double?>[];
-    HotkeyService(
-        onCommand: (_) {},
-        onSummon: ({pressedAtMs}) => presses.add(pressedAtMs));
-    await fromNative(kDebugSummon, {'pressedAtMs': 123.5});
-    await fromNative(kDebugSummon, {'pressedAtMs': 1700000000000});
-    await fromNative(kDebugSummon);
-    await fromNative(kDebugSummon, {'pressedAtMs': 'soon'});
-    expect(presses, [123.5, 1700000000000.0, null, null]);
-  });
-
   group('on Windows', () {
     setUp(() => debugDefaultTargetPlatformOverride = TargetPlatform.windows);
     tearDown(() => debugDefaultTargetPlatformOverride = null);

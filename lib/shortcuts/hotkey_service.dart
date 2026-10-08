@@ -233,14 +233,6 @@ class HotkeyService implements HotkeyRegistrar {
       } else {
         _logDropped(call.method);
       }
-    } else if (call.method == kDebugSummon) {
-      // W3's temporary Ctrl+Shift+O, until W2 registers the real summon. It
-      // carries its own press time, which the runner's stale check reads.
-      final args = call.arguments;
-      final pressed = args is Map ? args['pressedAtMs'] : null;
-      onSummon?.call(
-          pressedAtMs:
-              pressed is num && pressed.isFinite ? pressed.toDouble() : null);
     } else if (call.method == kKeyboardLayoutChanged) {
       onKeyboardLayoutChanged?.call();
     }

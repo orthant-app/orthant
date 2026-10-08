@@ -31,7 +31,3 @@ const String kKeyboardLayoutChanged = 'onKeyboardLayoutChanged';
 // captured window there.
 const String kOverlayCommit = 'onOverlayCommit';
 const String kOverlaySaveRegion = 'onOverlaySaveRegion';
-
-// Windows Debug and Profile builds only, until W2's real hotkeys: the
-// runner's temporary Ctrl+Shift+O summon.
-const String kDebugSummon = 'onDebugSummon';

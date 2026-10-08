@@ -176,9 +176,11 @@ abstract class WindowController {
   /// prevent.
   Future<AppVersion> appVersion();
 
-  /// Printable labels for keys in the current input source, keyed by USB HID
-  /// usage, which is how a binding's chord names its physical key. Display
-  /// data only: a binding keeps its key whatever this says.
+  /// Printable labels for keys in the current input source, keyed by
+  /// `KeyChord.labelKey`: the physical key's USB HID usage on macOS, which
+  /// registers by position, and the key's Windows id (`KeyChord.windowsKey`,
+  /// its logical key but for two Brazilian keys) on Windows, which registers
+  /// by meaning. Display data only: a binding keeps its key whatever this says.
   Future<Map<int, String>> keyboardLabels();
 
   /// Whether the app currently launches at login, per the OS.

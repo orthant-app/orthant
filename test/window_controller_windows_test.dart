@@ -48,12 +48,14 @@ void main() {
     Win32Desktop? desktop,
     Win32Placer? placer,
     PlacementClock? clock,
+    String? Function(int vk)? keyLabel,
   }) =>
       WindowsWindowController.forTest(
         readVersion: () => (short: '1.0.3', build: '7'),
         desktop: desktop ?? NoWindows(),
         placer: placer ?? NoWindows(),
         clock: clock ?? FakeClock(),
+        keyLabel: keyLabel,
       );
 
   test('permission is always granted and the prompts are no-ops', () async {
@@ -80,7 +82,6 @@ void main() {
 
   test('the remaining stubs answer safely and never reach native', () async {
     final c = wc();
-    expect(await c.keyboardLabels(), isEmpty);
     expect(await c.loginItemStatus(), LoginItemStatus.unavailable);
     expect(await c.setLoginItem(true), LoginItemStatus.unavailable);
     await c.openLoginItemsSettings();
@@ -90,6 +91,40 @@ void main() {
     expect(calls, isEmpty,
         reason: 'a stub that reaches native hits a handler that does not '
             'exist yet and throws MissingPluginException');
+  });
+
+  group('keyboard labels', () {
+    test('label the layout-dependent keys by their logical key', () async {
+      // German: the key that types Ä is VK_OEM_7, which Flutter names quote.
+      // Brazil's ABNT_C1 (0xC1) keeps its own id, not VK_OEM_AX's.
+      final labels = await wc(
+          keyLabel: (vk) =>
+              {0xDE: 'Ä', 0xBA: 'Ü', 0xE2: '<', 0xC1: '/'}[vk]).keyboardLabels();
+      expect(labels, {
+        LogicalKeyboardKey.quote.keyId: 'Ä',
+        LogicalKeyboardKey.semicolon.keyId: 'Ü',
+        0xE2: '<',
+        0xC1: '/',
+      });
+      expect(calls, isEmpty, reason: 'read over FFI, not the channel');
+    });
+
+    test('read only the keys whose symbol depends on the layout', () async {
+      final asked = <int>[];
+      await wc(keyLabel: (vk) {
+        asked.add(vk);
+        return null;
+      }).keyboardLabels();
+      expect(asked, isNot(contains(0x41)), reason: 'letters name themselves');
+      expect(asked, containsAll([0xBA, 0xDE, 0xE2]));
+    });
+
+    test('a key that types nothing, or a failing read, leaves the glyph',
+        () async {
+      expect(await wc(keyLabel: (_) => ' ').keyboardLabels(), isEmpty);
+      expect(await wc(keyLabel: (_) => throw StateError('ffi'))
+          .keyboardLabels(), isEmpty);
+    });
   });
 
   group('capture and placement', () {
@@ -485,6 +520,113 @@ void main() {
               placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)))
           .showOverlay(pressedAtMs: 1);
       expect(calls, [kShowOverlay, kHideOverlay]);
+    });
+
+    group('a capture that replaces the slot', () {
+      WindowsWindowController shown() {
+        final desktop = FakeDesktop(ownPid: 1)
+          ..windows.add(windowFacts(0x10, pid: 7))
+          ..foreground = 0x10;
+        answer = (call) => call.method == kShowOverlay ? true : null;
+        return wc(
+            desktop: desktop,
+            placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)));
+      }
+
+      test('ends a grid still open, before capturing', () async {
+        // A shortcut pressed just before the grid showed waits behind the
+        // summon in the command queue; its capture would leave the grid on a
+        // capture that no longer exists.
+        final c = shown();
+        await c.showOverlay();
+        final grid = c.captureId;
+        await c.captureFrontmost();
+        expect(calls, [kShowOverlay, kHideOverlay]);
+        expect(c.captureId, isNot(grid));
+      });
+
+      test('hides nothing once a commit has closed the grid', () async {
+        final c = shown();
+        await c.showOverlay();
+        await c.applyOverlayCommit(c.captureId!, const WinRect(0, 0, 400, 300));
+        await c.captureFrontmost();
+        expect(calls, [kShowOverlay]);
+      });
+
+      test('hides nothing after the grid was hidden', () async {
+        final c = shown();
+        await c.showOverlay();
+        await c.hideOverlay();
+        await c.captureFrontmost();
+        expect(calls, [kShowOverlay, kHideOverlay]);
+      });
+
+      test('ends the grid even when the capture then finds nothing', () async {
+        // The slot is cleared either way, so the grid's capture is gone.
+        final desktop = FakeDesktop(ownPid: 1)
+          ..windows.add(windowFacts(0x10, pid: 7))
+          ..foreground = 0x10;
+        answer = (call) => call.method == kShowOverlay ? true : null;
+        final c = wc(
+            desktop: desktop,
+            placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)));
+        await c.showOverlay();
+        desktop.windows.clear();
+        desktop.foreground = 0;
+        expect(await c.captureFrontmost(), isNull);
+        expect(calls, [kShowOverlay, kHideOverlay]);
+      });
+
+      test('a failed hide captures nothing, and the next capture hides again',
+          () async {
+        // The grid may still be up: its capture stays, and nothing escapes
+        // into the command queue.
+        final c = shown();
+        await c.showOverlay();
+        final grid = c.captureId;
+        answer = (call) => call.method == kHideOverlay
+            ? throw PlatformException(code: 'gone')
+            : null;
+        expect(await c.captureFrontmost(), isNull);
+        expect(c.captureId, grid);
+        answer = (_) => null;
+        calls.clear();
+        expect(await c.captureFrontmost(), isNotNull);
+        expect(calls, [kHideOverlay]);
+      });
+
+      test('a stale commit leaves the newer grid open', () async {
+        // A commit from a grid a newer summon replaced is dropped, and must
+        // not mark the newer grid closed: a capture after it ends that grid.
+        final c = shown();
+        await c.showOverlay();
+        final first = c.captureId!;
+        await c.showOverlay();
+        expect(
+            await c.applyOverlayCommit(first, const WinRect(0, 0, 400, 300)),
+            isFalse);
+        calls.clear();
+        await c.captureFrontmost();
+        expect(calls, [kHideOverlay]);
+      });
+
+      test('a second summon leaves replacing the grid to the runner', () async {
+        // The runner ends a live session when a new summon shows (its
+        // "replaced" path): Dart sends no hide of its own on that path.
+        final c = shown();
+        await c.showOverlay();
+        await c.showOverlay();
+        expect(calls, [kShowOverlay, kShowOverlay]);
+      });
+
+      test('hides nothing after a refused summon', () async {
+        final c = shown();
+        answer = (_) => false;
+        await c.showOverlay();
+        calls.clear();
+        await c.captureFrontmost();
+        expect(calls, isEmpty);
+      });
     });
 
     test('hideOverlay asks the runner', () async {

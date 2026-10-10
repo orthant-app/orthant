@@ -587,19 +587,29 @@ void main() {
       await fromNative('onHotkey', {'id': grid, 'pressedAtMs': 1700000000000});
       await fromNative('onHotkey', {'id': grid, 'pressedAtMs': 'soon'});
       await fromNative('onHotkey', {'id': grid});
-      expect(presses, [123.5, 1700000000000.0, null, null]);
+      // The codec carries both; a press time that is not a finite number is no
+      // press time, and the summon must hear null rather than a number the
+      // runner's stale check would compare against.
+      await fromNative('onHotkey', {'id': grid, 'pressedAtMs': double.nan});
+      await fromNative(
+          'onHotkey', {'id': grid, 'pressedAtMs': double.infinity});
+      expect(presses, [123.5, 1700000000000.0, null, null, null, null]);
       await fromNative('onHotkey',
           {'id': ShortcutCommand.leftHalf.index, 'pressedAtMs': 9.0});
       expect(commands, [const BuiltIn(ShortcutCommand.leftHalf)]);
     });
 
-    test('a hotkey notice of the wrong shape is ignored, and answered',
+    test('a hotkey notice of the wrong shape is ignored, logged, and answered',
         () async {
       var calls = 0;
       final svc = HotkeyService(
           onCommand: (_) => calls++, onSummon: ({pressedAtMs}) => calls++);
       capturePayload();
       await svc.apply(defaultBindings(platform: TargetPlatform.windows));
+      final logged = <String?>[];
+      final realDebugPrint = debugPrint;
+      debugPrint = (message, {wrapWidth}) => logged.add(message);
+      addTearDown(() => debugPrint = realDebugPrint);
       ByteData? reply;
       await messenger.handlePlatformMessage(
         kOrthantChannel,
@@ -609,6 +619,8 @@ void main() {
       );
       expect(calls, 0);
       expect(const StandardMethodCodec().decodeEnvelope(reply!), isNull);
+      expect(logged, hasLength(1));
+      expect(logged.single, contains('onHotkey'));
     });
   });
 
@@ -622,5 +634,27 @@ void main() {
     await svc.apply(macDefaults);
     await svc.debugHandle(ShortcutCommand.showGrid.index);
     expect(presses, [null]);
+  });
+
+  test('a macOS hotkey arrives as a bare id and dispatches through the channel',
+      () async {
+    // Swift sends `Int(hkID.id)`: no map, no press time. Every macOS shortcut
+    // takes this branch of the handler, so it is driven the way native drives
+    // it rather than through debugHandle.
+    final presses = <double?>[];
+    final commands = <CommandRef>[];
+    final svc = HotkeyService(
+        onCommand: commands.add,
+        onSummon: ({pressedAtMs}) => presses.add(pressedAtMs));
+    messenger.setMockMethodCallHandler(channel, (_) async => <int>[]);
+    await svc.apply(macDefaults);
+
+    await fromNative('onHotkey', ShortcutCommand.showGrid.index);
+    expect(presses, [null]);
+    expect(commands, isEmpty, reason: 'the summon places nothing itself');
+
+    await fromNative('onHotkey', ShortcutCommand.leftHalf.index);
+    expect(commands, [const BuiltIn(ShortcutCommand.leftHalf)]);
+    expect(presses, [null], reason: 'a placement is not a summon');
   });
 }

@@ -72,7 +72,8 @@ class Binding {
 /// apps such as Notepad lose the keys typed after some Ctrl+Alt chords even
 /// with nothing registered. A chord holding Win matches no AltGr form, so no
 /// layout needs a different table and nothing is detected. All eleven
-/// register, and none is a documented shortcut of Windows or a common app.
+/// register, and none was found to clash with a documented shortcut of
+/// Windows or of a common app.
 ///
 /// Every platform but Windows gets the macOS set, which includes the test host
 /// (Flutter reports Android there).

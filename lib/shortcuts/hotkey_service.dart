@@ -29,7 +29,8 @@ abstract class HotkeyRegistrar {
 }
 
 /// Registers global hotkeys natively (id = [ShortcutCommand] index) and
-/// dispatches native `onHotkey(id)` callbacks — to [onSummon] for the grid,
+/// dispatches native hotkey callbacks (`onHotkey(id)` on macOS and
+/// `onHotkey({id, pressedAtMs})` on Windows) to [onSummon] for the grid,
 /// to [onCommand] for a placement.
 ///
 /// Dismissal is deliberately not a binding: Esc is grabbed natively, because
@@ -209,6 +210,8 @@ class HotkeyService implements HotkeyRegistrar {
         await debugHandle(args['id'] as int,
             pressedAtMs:
                 pressed is num && pressed.isFinite ? pressed.toDouble() : null);
+      } else {
+        _logDropped(call.method);
       }
     } else if (call.method == 'onPlacementFailed') {
       onPlacementFailed?.call();
@@ -240,12 +243,12 @@ class HotkeyService implements HotkeyRegistrar {
   }
 
   /// The runner dismisses the overlay before it sends a commit, so a payload
-  /// dropped here is a window that silently does not move: leave a trace.
+  /// dropped here is a window that silently does not move; a hotkey notice
+  /// dropped here is a shortcut that silently does nothing: leave a trace.
   /// Debug and Profile only.
   static void _logDropped(String method) {
     if (!kReleaseMode) {
-      debugPrint('[orthant] overlay commit: dropped malformed payload '
-          'method=$method');
+      debugPrint('[orthant] dropped malformed payload method=$method');
     }
   }
 

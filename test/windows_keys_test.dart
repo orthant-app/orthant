@@ -78,6 +78,12 @@ void main() {
     final numpadComma = PhysicalKeyboardKey.numpadComma.usbHidUsage;
     expect(windowsKeyId(0xE1, intlRo), 0xC1);
     expect(windowsKeyId(0xE2, numpadComma), 0xC2);
+    // Everywhere else the same ids keep their own: Japan's ろ key is
+    // VK_OEM_102 at that position and must stay the ISO key's id, and
+    // VK_OEM_AX elsewhere is still 0xE1.
+    expect(windowsKeyId(0xE2, intlRo), 0xE2);
+    expect(
+        windowsKeyId(0xE1, PhysicalKeyboardKey.intlBackslash.usbHidUsage), 0xE1);
     expect(windowsVirtualKey(0xC1), 0xC1);
     expect(windowsVirtualKey(0xC2), 0xC2);
     expect(windowsKeyOf(0xC1), 0xC1, reason: 'its label is its own');

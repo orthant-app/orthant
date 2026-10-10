@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter/services.dart'
     show LogicalKeyboardKey, PhysicalKeyboardKey;
 
+import 'windows_keys.dart' show windowsKeyId;
+
 /// The modifiers a shortcut holds, in no platform's encoding.
 ///
 /// Its own type rather than a bare `int`. Bindings carried Carbon's masks (⌃
@@ -62,18 +64,31 @@ class KeyChord {
     return KeyChord(physical: physical, logical: logical, modifiers: modifiers);
   }
 
+  /// What Windows registers, compares and labels this chord's key by: its
+  /// [logical] key, except for the two keys the engine names with another
+  /// key's id ([windowsKeyId]).
+  int get windowsKey => windowsKeyId(logical, physical);
+
   /// Whether pressing [other] fires this chord on the platform running now:
   /// the same modifiers on the same key, where "the same key" is the position
-  /// on macOS and the meaning on Windows. Two commands holding chords that
-  /// answer yes would be one hotkey registered twice.
+  /// on macOS and the meaning ([windowsKey]) on Windows. Two commands holding
+  /// chords that answer yes would be one hotkey registered twice.
   ///
   /// Read from [defaultTargetPlatform], like `createWindowController`, so a
   /// test can choose with `debugDefaultTargetPlatformOverride`.
   bool sameChordAs(KeyChord other) =>
       modifiers == other.modifiers &&
       (defaultTargetPlatform == TargetPlatform.windows
-          ? logical == other.logical
+          ? windowsKey == other.windowsKey
           : physical == other.physical);
+
+  /// The key `WindowController.keyboardLabels` names this chord's key by on
+  /// the platform running now: the position on macOS, the meaning
+  /// ([windowsKey]) on Windows, the same split as [sameChordAs], so a label
+  /// always describes the key that registers.
+  int get labelKey => defaultTargetPlatform == TargetPlatform.windows
+      ? windowsKey
+      : physical;
 
   /// As v3 stores it: both keys, and the modifiers by name.
   Map<String, Object?> toJson() => {
@@ -139,6 +154,15 @@ final Map<String, Modifiers> _modifierFlags = {
 
 /// Whether a shortcut may use the key at [physical], a USB HID usage.
 bool isBindableKey(int physical) => _usLogicalKeys.containsKey(physical);
+
+/// The key position whose US logical key is [logical], or null when no
+/// bindable key has it. For a label: Windows names a chord's key by its
+/// logical key, and the US glyph of that position describes it.
+int? usPhysicalFor(int logical) => _usPhysicalKeys[logical];
+
+final Map<int, int> _usPhysicalKeys = {
+  for (final e in _usLogicalKeys.entries) e.value: e.key,
+};
 
 /// Every key a shortcut may use, as USB HID usages.
 @visibleForTesting

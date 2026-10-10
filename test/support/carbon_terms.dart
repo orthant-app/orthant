@@ -25,7 +25,7 @@ KeyChord carbon(int keyCode, int mask) {
 
 /// The macOS defaults, which is what `kDefaultBindings` was.
 List<Binding> get macDefaults =>
-    defaultBindings(platform: TargetPlatform.macOS, altGr: false);
+    defaultBindings(platform: TargetPlatform.macOS);
 
 /// Keyboard labels written by Carbon key code, keyed the way the seam keys
 /// them now (USB HID usage).

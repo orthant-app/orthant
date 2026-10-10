@@ -5,6 +5,7 @@ import 'channel.dart';
 import 'geometry.dart';
 import 'window_controller.dart';
 import 'windows_capture.dart';
+import 'windows_keys.dart';
 import 'windows_placement.dart';
 import 'windows_version_resource.dart';
 import 'windows_win32_ops.dart';
@@ -26,8 +27,8 @@ import 'windows_window_ops.dart';
 /// `MissingPluginException` (`test/windows_channel_contract_test.dart` guards
 /// the methods that do call it).
 class WindowsWindowController implements WindowController {
-  WindowsWindowController._(
-      this._readVersion, this._desktop, this._placer, this._clock);
+  WindowsWindowController._(this._readVersion, this._desktop, this._placer,
+      this._clock, this._keyLabel);
 
   /// The one way to obtain the controller in production.
   ///
@@ -37,8 +38,8 @@ class WindowsWindowController implements WindowController {
   /// was a lazy static nothing read until the settings window did (spec §5.6).
   static WindowsWindowController start() {
     final win32 = FfiWin32WindowOps();
-    return WindowsWindowController._(
-        readFixedFileVersion, win32, win32, RealPlacementClock());
+    return WindowsWindowController._(readFixedFileVersion, win32, win32,
+        RealPlacementClock(), win32.keyLabel);
   }
 
   /// The same controller with its OS supplied, for a suite that runs on a Mac
@@ -49,14 +50,19 @@ class WindowsWindowController implements WindowController {
     required Win32Desktop desktop,
     required Win32Placer placer,
     PlacementClock? clock,
+    String? Function(int vk)? keyLabel,
   }) =>
-      WindowsWindowController._(
-          readVersion, desktop, placer, clock ?? RealPlacementClock());
+      WindowsWindowController._(readVersion, desktop, placer,
+          clock ?? RealPlacementClock(), keyLabel ?? (_) => null);
 
   final VersionReader _readVersion;
   final Win32Desktop _desktop;
   final Win32Placer _placer;
   final PlacementClock _clock;
+
+  /// What a virtual key types under the layout in front
+  /// (`FfiWin32WindowOps.keyLabel`), for [keyboardLabels].
+  final String? Function(int vk) _keyLabel;
 
   /// The capture slot: the window the next placement moves. A handle, so it
   /// stays here, private to this backend; the seam sees only the
@@ -76,6 +82,12 @@ class WindowsWindowController implements WindowController {
   /// Whether the overlay has committed [_captured] already. Applying consumes
   /// the slot, so a duplicate commit is refused.
   bool _consumed = false;
+
+  /// Whether the runner may still be showing a grid for [_captured]: set when
+  /// a summon showed, cleared by a commit (the runner dismisses before it
+  /// forwards one) and by [hideOverlay]. An Esc the runner handles itself
+  /// leaves it set, which costs one unneeded hide at the next capture.
+  bool _gridOpen = false;
 
   /// The current capture's id, or null when nothing is captured.
   @visibleForTesting
@@ -116,8 +128,31 @@ class WindowsWindowController implements WindowController {
     return v == null ? const AppVersion('', '') : AppVersion(v.short, v.build);
   }
 
+  /// The capture a shortcut makes. It first ends a grid still open: that grid
+  /// names the capture this one replaces, so every commit from it would be
+  /// dropped while it holds Esc, Enter and the arrows. The runner swallows
+  /// hotkeys while a grid is live, but a shortcut pressed just before the
+  /// grid showed waits in the command queue behind the summon, and lands here
+  /// after it. Ended before the capture, so a capture that finds nothing ends
+  /// it too. A summon does not come here ([showOverlay] captures for itself):
+  /// the runner replaces a live session with the new one.
   @override
   Future<CapturedWindow?> captureFrontmost() async {
+    if (_gridOpen) {
+      try {
+        await hideOverlay();
+      } catch (e) {
+        // The boundary below: logged, never thrown into the command queue.
+        // And nothing captured: the grid may still be up, and replacing its
+        // capture would leave it on a dead one. The next capture tries again.
+        _log('capture: hide of the open grid threw ($e); nothing captured');
+        return null;
+      }
+    }
+    return _capture();
+  }
+
+  Future<CapturedWindow?> _capture() async {
     // Cleared first, so every early return leaves nothing captured and a later
     // applyFrame cannot move whatever an earlier capture held: the rule the
     // macOS slot follows for the same reason (WindowControl.swift).
@@ -198,10 +233,14 @@ class WindowsWindowController implements WindowController {
   Future<bool> applyOverlayCommit(int sessionId, WinRect target) async {
     final captured = _captured;
     if (captured == null || captured.id != sessionId) {
+      // Not the open grid's: a newer summon may have replaced that grid, and
+      // it is still up.
       _log('overlay commit: id=$sessionId outcome=dropped why=stale '
           'slot=${captured?.id ?? 'none'}');
       return false;
     }
+    // The runner ended the session before sending its commit.
+    _gridOpen = false;
     if (_consumed) {
       _log('overlay commit: id=$sessionId outcome=dropped why=consumed');
       return false;
@@ -272,14 +311,14 @@ class WindowsWindowController implements WindowController {
   @override
   Future<void> showOverlay({double? pressedAtMs}) async {
     final started = _clock.elapsedMs;
-    final captured = await captureFrontmost();
+    final captured = await _capture();
     final id = captureId;
     final captureMs = _clock.elapsedMs - started;
     if (captured == null || id == null) {
       _placer.beep();
       _log('summon: outcome=no-capture capture=${captureMs}ms');
       // Ends a grid still open, whose capture was just cleared.
-      await _channel.invokeMethod<void>(kHideOverlay);
+      await hideOverlay();
       return;
     }
     final shown = await _channel.invokeMethod<Object?>(kShowOverlay, {
@@ -289,23 +328,49 @@ class WindowsWindowController implements WindowController {
     });
     _log('summon: outcome=${shown == true ? 'shown' : 'refused'} id=$id '
         'capture=${captureMs}ms');
-    if (shown != true) {
+    if (shown == true) {
+      _gridOpen = true;
+    } else {
       // The capture slot was just replaced, so a grid still open names a
       // capture that no longer exists: every commit from it would be dropped
       // while it holds Esc, Enter and the arrows. The runner refuses for a
       // stale press, engines not ready, displays changing, or Esc or Enter
       // held, and some of those return before it replaces the session.
-      await _channel.invokeMethod<void>(kHideOverlay);
+      // Through hideOverlay: a hide that fails leaves a grid still open
+      // marked open, so the next capture ends it.
+      await hideOverlay();
     }
   }
 
   @override
-  Future<void> hideOverlay() => _channel.invokeMethod<void>(kHideOverlay);
+  Future<void> hideOverlay() async {
+    await _channel.invokeMethod<void>(kHideOverlay);
+    // Cleared once the runner has answered: a hide that fails leaves the grid
+    // marked open, so the next capture ends it.
+    _gridOpen = false;
+  }
 
-  // R2: labels keyed by HID usage; on Windows the stored logical key labels
-  // letters and named keys itself, so this serves punctuation only (§5.4).
+  /// Labels for the keys whose symbol depends on the layout, keyed by their
+  /// Windows id (`KeyChord.labelKey` on Windows). Letters, digits and named
+  /// keys are labelled from the chord's logical key itself, so they are not
+  /// read here.
   @override
-  Future<Map<int, String>> keyboardLabels() async => const {};
+  Future<Map<int, String>> keyboardLabels() async {
+    final labels = <int, String>{};
+    try {
+      for (final vk in windowsLabelledKeys) {
+        final label = _keyLabel(vk);
+        if (label != null && label.trim().isNotEmpty) {
+          labels[windowsKeyOf(vk)] = label;
+        }
+      }
+    } catch (e) {
+      // Display data only: a key with no label shows its US glyph.
+      _log('labels: threw ($e)');
+      return const {};
+    }
+    return labels;
+  }
 
   // W5: the Run key plus StartupApproved (§5.2). `unavailable` is the one
   // status the pane never renders as "on".

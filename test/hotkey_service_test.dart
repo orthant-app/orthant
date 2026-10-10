@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/channel.dart';
@@ -462,24 +463,165 @@ void main() {
     expect(const StandardMethodCodec().decodeEnvelope(reply!), isNull);
   });
 
-  test('the debug summon summons', () async {
-    var summons = 0;
-    HotkeyService(onCommand: (_) {}, onSummon: ({pressedAtMs}) => summons++);
-    await fromNative(kDebugSummon);
-    expect(summons, 1);
-  });
+  group('on Windows', () {
+    setUp(() => debugDefaultTargetPlatformOverride = TargetPlatform.windows);
+    tearDown(() => debugDefaultTargetPlatformOverride = null);
 
-  test('the debug summon carries its press time, and only a number',
-      () async {
-    final presses = <double?>[];
-    HotkeyService(
-        onCommand: (_) {},
-        onSummon: ({pressedAtMs}) => presses.add(pressedAtMs));
-    await fromNative(kDebugSummon, {'pressedAtMs': 123.5});
-    await fromNative(kDebugSummon, {'pressedAtMs': 1700000000000});
-    await fromNative(kDebugSummon);
-    await fromNative(kDebugSummon, {'pressedAtMs': 'soon'});
-    expect(presses, [123.5, 1700000000000.0, null, null]);
+    List<Map<Object?, Object?>> capturePayload() {
+      final sent = <Map<Object?, Object?>>[];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method != 'replaceHotkeys') return null;
+        for (final e in (call.arguments as Map)['bindings'] as List<Object?>) {
+          sent.add(e as Map<Object?, Object?>);
+        }
+        return <int>[];
+      });
+      return sent;
+    }
+
+    test('apply sends a virtual key from the logical key, and the flags',
+        () async {
+      final sent = capturePayload();
+      await HotkeyService(onCommand: (_) {})
+          .apply(defaultBindings(platform: TargetPlatform.windows));
+      // Win+Ctrl+Shift is MOD_WIN | MOD_CONTROL | MOD_SHIFT.
+      expect(sent, [
+        {'id': 0, 'vk': 0x4F, 'modifiers': 0xE}, // O, the grid
+        {'id': 1, 'vk': 0x25, 'modifiers': 0xE}, // Left
+        {'id': 2, 'vk': 0x27, 'modifiers': 0xE}, // Right
+        {'id': 3, 'vk': 0x26, 'modifiers': 0xE}, // Up
+        {'id': 4, 'vk': 0x28, 'modifiers': 0xE}, // Down
+        {'id': 5, 'vk': 0x55, 'modifiers': 0xE}, // U
+        {'id': 6, 'vk': 0x49, 'modifiers': 0xE}, // I
+        {'id': 7, 'vk': 0x4A, 'modifiers': 0xE}, // J
+        {'id': 8, 'vk': 0x4B, 'modifiers': 0xE}, // K
+        {'id': 9, 'vk': 0x0D, 'modifiers': 0xE}, // Enter
+        {'id': 10, 'vk': 0x43, 'modifiers': 0xE}, // C
+      ]);
+    });
+
+    test('a chord recorded on German registers the key that typed it',
+        () async {
+      final sent = capturePayload();
+      final german = Binding(
+        const BuiltIn(ShortcutCommand.showGrid),
+        KeyChord(
+          physical: PhysicalKeyboardKey.keyY.usbHidUsage,
+          logical: LogicalKeyboardKey.keyZ.keyId,
+          modifiers: Modifiers.ctrl | Modifiers.alt,
+        ),
+      );
+      await HotkeyService(onCommand: (_) {}).apply([german]);
+      expect(sent, [
+        {'id': 0, 'vk': 0x5A, 'modifiers': 0x3},
+      ]);
+    });
+
+    test("Brazil's keypad separator registers its own key, not the ISO key's",
+        () async {
+      // ABNT_C2 reaches Flutter as logical 0xE2, VK_OEM_102's id; its
+      // position is what tells them apart.
+      final sent = capturePayload();
+      final abnt = Binding(
+        const BuiltIn(ShortcutCommand.center),
+        KeyChord(
+          physical: PhysicalKeyboardKey.numpadComma.usbHidUsage,
+          logical: 0xE2,
+          modifiers: Modifiers.ctrl | Modifiers.alt,
+        ),
+      );
+      await HotkeyService(onCommand: (_) {}).apply([abnt]);
+      expect(sent, [
+        {'id': 0, 'vk': 0xC2, 'modifiers': 0x3},
+      ]);
+    });
+
+    test('a chord Windows cannot register is refused, never sent', () async {
+      final sent = capturePayload();
+      final keypad = Binding(
+        const BuiltIn(ShortcutCommand.center),
+        KeyChord(
+          physical: PhysicalKeyboardKey.numpad1.usbHidUsage,
+          logical: LogicalKeyboardKey.numpad1.keyId,
+          modifiers: Modifiers.ctrl,
+        ),
+      );
+      final refused = await HotkeyService(onCommand: (_) {}).apply([
+        ...defaultBindings(platform: TargetPlatform.windows).take(10),
+        keypad,
+      ]);
+      expect(refused, {const BuiltIn(ShortcutCommand.center)});
+      expect(sent.map((e) => e['id']), isNot(contains(10)));
+      expect(sent, hasLength(10));
+    });
+
+    test('a chord with no modifier is refused, never registered bare',
+        () async {
+      // The reader refuses one; this is the payload's own guard, since a bare
+      // global hotkey would take its key from every app.
+      final sent = capturePayload();
+      final bare = Binding(
+        const BuiltIn(ShortcutCommand.center),
+        KeyChord(
+          physical: PhysicalKeyboardKey.keyC.usbHidUsage,
+          logical: LogicalKeyboardKey.keyC.keyId,
+          modifiers: Modifiers.none,
+        ),
+      );
+      final refused = await HotkeyService(onCommand: (_) {}).apply([bare]);
+      expect(refused, {const BuiltIn(ShortcutCommand.center)});
+      expect(sent, isEmpty);
+    });
+
+    test('a hotkey carries its press to the summon, and only the summon',
+        () async {
+      final presses = <double?>[];
+      final commands = <CommandRef>[];
+      final svc = HotkeyService(
+          onCommand: commands.add,
+          onSummon: ({pressedAtMs}) => presses.add(pressedAtMs));
+      capturePayload();
+      await svc.apply(defaultBindings(platform: TargetPlatform.windows));
+      final grid = ShortcutCommand.showGrid.index;
+      await fromNative('onHotkey', {'id': grid, 'pressedAtMs': 123.5});
+      await fromNative('onHotkey', {'id': grid, 'pressedAtMs': 1700000000000});
+      await fromNative('onHotkey', {'id': grid, 'pressedAtMs': 'soon'});
+      await fromNative('onHotkey', {'id': grid});
+      // The codec carries both; a press time that is not a finite number is no
+      // press time, and the summon must hear null rather than a number the
+      // runner's stale check would compare against.
+      await fromNative('onHotkey', {'id': grid, 'pressedAtMs': double.nan});
+      await fromNative(
+          'onHotkey', {'id': grid, 'pressedAtMs': double.infinity});
+      expect(presses, [123.5, 1700000000000.0, null, null, null, null]);
+      await fromNative('onHotkey',
+          {'id': ShortcutCommand.leftHalf.index, 'pressedAtMs': 9.0});
+      expect(commands, [const BuiltIn(ShortcutCommand.leftHalf)]);
+    });
+
+    test('a hotkey notice of the wrong shape is ignored, logged, and answered',
+        () async {
+      var calls = 0;
+      final svc = HotkeyService(
+          onCommand: (_) => calls++, onSummon: ({pressedAtMs}) => calls++);
+      capturePayload();
+      await svc.apply(defaultBindings(platform: TargetPlatform.windows));
+      final logged = <String?>[];
+      final realDebugPrint = debugPrint;
+      debugPrint = (message, {wrapWidth}) => logged.add(message);
+      addTearDown(() => debugPrint = realDebugPrint);
+      ByteData? reply;
+      await messenger.handlePlatformMessage(
+        kOrthantChannel,
+        const StandardMethodCodec().encodeMethodCall(
+            const MethodCall('onHotkey', {'id': 'grid', 'pressedAtMs': 1.0})),
+        (r) => reply = r,
+      );
+      expect(calls, 0);
+      expect(const StandardMethodCodec().decodeEnvelope(reply!), isNull);
+      expect(logged, hasLength(1));
+      expect(logged.single, contains('onHotkey'));
+    });
   });
 
   test('a hotkey summon carries no press time: macOS stamps its own',
@@ -492,5 +634,27 @@ void main() {
     await svc.apply(macDefaults);
     await svc.debugHandle(ShortcutCommand.showGrid.index);
     expect(presses, [null]);
+  });
+
+  test('a macOS hotkey arrives as a bare id and dispatches through the channel',
+      () async {
+    // Swift sends `Int(hkID.id)`: no map, no press time. Every macOS shortcut
+    // takes this branch of the handler, so it is driven the way native drives
+    // it rather than through debugHandle.
+    final presses = <double?>[];
+    final commands = <CommandRef>[];
+    final svc = HotkeyService(
+        onCommand: commands.add,
+        onSummon: ({pressedAtMs}) => presses.add(pressedAtMs));
+    messenger.setMockMethodCallHandler(channel, (_) async => <int>[]);
+    await svc.apply(macDefaults);
+
+    await fromNative('onHotkey', ShortcutCommand.showGrid.index);
+    expect(presses, [null]);
+    expect(commands, isEmpty, reason: 'the summon places nothing itself');
+
+    await fromNative('onHotkey', ShortcutCommand.leftHalf.index);
+    expect(commands, [const BuiltIn(ShortcutCommand.leftHalf)]);
+    expect(presses, [null], reason: 'a placement is not a summon');
   });
 }

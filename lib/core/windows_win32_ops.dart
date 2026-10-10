@@ -92,6 +92,18 @@ class FfiWin32WindowOps implements Win32Desktop, Win32Placer {
   @override
   bool setForeground(int hwnd) => SetForegroundWindow(_h(hwnd));
 
+  /// What [vk] types, unshifted and uppercased, under the layout of the
+  /// window in front: the layout a hotkey is matched against, since layouts
+  /// are per thread. Null when it types nothing. `MapVirtualKeyEx` marks a
+  /// dead key in its top bit; the character is in the low word either way.
+  String? keyLabel(int vk) {
+    final thread = GetWindowThreadProcessId(GetForegroundWindow(), null);
+    final mapped =
+        MapVirtualKeyEx(vk, MAPVK_VK_TO_CHAR, GetKeyboardLayout(thread));
+    final char = mapped & 0xFFFF;
+    return char == 0 ? null : String.fromCharCode(char).toUpperCase();
+  }
+
   @override
   bool isWindow(int hwnd) => IsWindow(_h(hwnd));
 

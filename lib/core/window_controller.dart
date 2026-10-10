@@ -163,10 +163,14 @@ abstract class WindowController {
     required bool saveHint,
   });
 
-  /// [pressedAtMs] is Windows only: the epoch-ms time of the key press that
-  /// asked for this summon, so the runner can refuse a summon that reached it
-  /// more than a second after its press. Null for a summon with no press (the
-  /// tray). macOS stamps its own press natively and ignores it.
+  /// [pressedAtMs] is Windows only: the time of the key press that asked for
+  /// this summon, in milliseconds on the system's monotonic tick clock, which
+  /// only the runner reads (Dart passes it back untouched). The runner refuses
+  /// a summon that reached it more than a second after its press, and times
+  /// the overlay's first frame from it. A tick, not the wall clock, so a clock
+  /// step (time sync after a wake) cannot make a fresh press look stale. Null
+  /// for a summon with no press (the tray). macOS stamps its own press
+  /// natively and ignores it.
   Future<void> showOverlay({double? pressedAtMs});
   Future<void> hideOverlay();
 
@@ -176,9 +180,11 @@ abstract class WindowController {
   /// prevent.
   Future<AppVersion> appVersion();
 
-  /// Printable labels for keys in the current input source, keyed by USB HID
-  /// usage, which is how a binding's chord names its physical key. Display
-  /// data only: a binding keeps its key whatever this says.
+  /// Printable labels for keys in the current input source, keyed by
+  /// `KeyChord.labelKey`: the physical key's USB HID usage on macOS, which
+  /// registers by position, and the key's Windows id (`KeyChord.windowsKey`,
+  /// its logical key but for two Brazilian keys) on Windows, which registers
+  /// by meaning. Display data only: a binding keeps its key whatever this says.
   Future<Map<int, String>> keyboardLabels();
 
   /// Whether the app currently launches at login, per the OS.

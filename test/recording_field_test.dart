@@ -104,6 +104,20 @@ void main() {
     ]);
   });
 
+  testWidgets('on Windows a keypad digit is not a combination', (tester) async {
+    // A keypad digit is a different virtual key in each NumLock state, so no
+    // registration fires in both: recording one would make a shortcut that
+    // cannot fire. A keypad operator is one key either way, and records.
+    final combos = await pump(tester);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.numpad1);
+    await tester.sendKeyEvent(LogicalKeyboardKey.numpadAdd);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(combos.map((c) => c.logical),
+        [LogicalKeyboardKey.numpadAdd.keyId]);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
+
   testWidgets('a bare key is not a combination', (tester) async {
     final combos = await pump(tester);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyA);

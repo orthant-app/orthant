@@ -79,28 +79,21 @@ class WindowsOverlaySet {
   // nothing can capture anew underneath an open grid.
   bool HandleHotkey(int id);
 
-#ifdef ORTHANT_DEV_BUILD
-  // A summon hotkey's press, from its WM_HOTKEY's GetMessageTime, in epoch
-  // milliseconds (Dart's clock). It travels with that summon, through Dart and
-  // back to Show, so the session's trigger is the press, not the dispatch.
-  static double PressedAtMs(LONG message_time);
-#endif
+  // A hotkey's press, from its WM_HOTKEY's GetMessageTime, in milliseconds on
+  // the monotonic tick clock (GetTickCount64). It travels with the press to
+  // Dart and, for a summon, back to Show, so the session's trigger is the
+  // press, not the dispatch. A tick rather than the wall clock, so a clock
+  // step (time sync after a wake) cannot make a fresh press look stale.
+  static double PressTick(LONG message_time);
 
   void SetGrid(int cols, int rows, double gap, bool save_hint);
   // `pressed_ms` is the key press that asked for this summon, carried with it
-  // (PressedAtMs), or 0 for a summon with no press (the tray). A summon that
+  // (PressTick), or 0 for a summon with no press (the tray). A summon that
   // reaches Show more than a second after its press is refused as stale.
   ShowResult Show(int64_t session_id, const std::string& app_name,
                   double pressed_ms);
   void Dismiss(const char* why);
   bool live() const { return session_.has_value(); }
-
-#ifdef ORTHANT_DEV_BUILD
-  // Parks every panel and reconciles, which reuses them all: an attach and
-  // detach of every monitor through the real reconcile path, for the
-  // acceptance's memory measurement (a real detach is not scriptable).
-  void DebugCyclePanels();
-#endif
 
   struct Panel;
 

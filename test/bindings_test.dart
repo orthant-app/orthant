@@ -124,32 +124,18 @@ void main() {
       expect(grid.logical, LogicalKeyboardKey.keyO.keyId);
     });
 
-    test('macOS ignores AltGr, which is a Windows notion', () {
-      expect(defaultBindings(platform: TargetPlatform.macOS, altGr: true),
-          macDefaults);
-    });
-
-    test('Windows without AltGr: the same keys on Ctrl+Alt', () {
-      expect(defaultBindings(platform: TargetPlatform.windows, altGr: false),
-          macDefaults);
-    });
-
-    test('Windows with AltGr: the six letter chords move to Win+Shift', () {
-      final winShift = Modifiers.meta | Modifiers.shift;
-      final moved = {
-        ShortcutCommand.showGrid, ShortcutCommand.topLeft,
-        ShortcutCommand.topRight, ShortcutCommand.bottomLeft,
-        ShortcutCommand.bottomRight, ShortcutCommand.center,
-      };
-      final altGr = defaultBindings(platform: TargetPlatform.windows, altGr: true);
-      final mac = macDefaults;
-      for (var i = 0; i < altGr.length; i++) {
-        final command = (altGr[i].command as BuiltIn).command;
-        expect(altGr[i].chord!.physical, mac[i].chord!.physical,
+    test('Windows: the same keys on Win+Ctrl+Shift, on every layout', () {
+      final windows = defaultBindings(platform: TargetPlatform.windows);
+      final winCtrlShift = Modifiers.meta | Modifiers.ctrl | Modifiers.shift;
+      expect(windows.map((b) => b.command).toList(),
+          macDefaults.map((b) => b.command).toList());
+      for (var i = 0; i < windows.length; i++) {
+        final command = (windows[i].command as BuiltIn).command;
+        expect(windows[i].chord!.physical, macDefaults[i].chord!.physical,
             reason: '$command keeps its key');
-        expect(altGr[i].chord!.modifiers,
-            moved.contains(command) ? winShift : _ctrlAlt,
-            reason: '$command');
+        expect(windows[i].chord!.logical, macDefaults[i].chord!.logical,
+            reason: '$command registers the key that types it');
+        expect(windows[i].chord!.modifiers, winCtrlShift, reason: '$command');
       }
     });
 
@@ -160,7 +146,61 @@ void main() {
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
       debugDefaultTargetPlatformOverride = TargetPlatform.windows;
       expect(runningDefaults(),
-          defaultBindings(platform: TargetPlatform.windows, altGr: false));
+          defaultBindings(platform: TargetPlatform.windows));
+    });
+  });
+
+  group('labels on Windows', () {
+    setUp(() => debugDefaultTargetPlatformOverride = TargetPlatform.windows);
+    tearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    test('name the logical key: Z recorded on German reads Z', () {
+      // German puts Z where US has Y. Windows registers the key that types Z,
+      // so the label must say Z, not the Y of the position.
+      final german = KeyChord(
+        physical: PhysicalKeyboardKey.keyY.usbHidUsage,
+        logical: LogicalKeyboardKey.keyZ.keyId,
+        modifiers: Modifiers.ctrl,
+      );
+      expect(comboSymbols(german), ['⌃', 'Z']);
+    });
+
+    test('take the layout label for punctuation, by logical key', () {
+      final quote = KeyChord(
+        physical: PhysicalKeyboardKey.quote.usbHidUsage,
+        logical: LogicalKeyboardKey.quote.keyId,
+        modifiers: Modifiers.ctrl,
+      );
+      expect(comboSymbols(quote), ['⌃', "'"]);
+      expect(
+          comboSymbols(quote,
+              keyLabels: {LogicalKeyboardKey.quote.keyId: 'Ä'}),
+          ['⌃', 'Ä']);
+      expect(
+          comboSymbols(quote,
+              keyLabels: {PhysicalKeyboardKey.quote.usbHidUsage: 'X'}),
+          ['⌃', "'"],
+          reason: 'a label keyed by position is macOS\'s, not this one');
+    });
+
+    test('a key with no US position reads as its layout label', () {
+      // The ISO key beside left Shift: logical 0xE2 on Windows.
+      final iso = KeyChord(
+        physical: PhysicalKeyboardKey.intlBackslash.usbHidUsage,
+        logical: 0xE2,
+        modifiers: Modifiers.ctrl,
+      );
+      expect(comboSymbols(iso, keyLabels: {0xE2: '<'}), ['⌃', '<']);
+      // Brazil's keypad separator shares the ISO key's logical id and has a
+      // label of its own.
+      final separator = KeyChord(
+        physical: PhysicalKeyboardKey.numpadComma.usbHidUsage,
+        logical: 0xE2,
+        modifiers: Modifiers.ctrl,
+      );
+      expect(comboSymbols(separator, keyLabels: {0xE2: '\\', 0xC2: '.'}),
+          ['⌃', '.']);
+      expect(comboSymbols(iso), ['⌃', 'key:0xe2']);
     });
   });
 
@@ -218,10 +258,11 @@ void main() {
       () {
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    final winCtrlShift = Modifiers.meta | Modifiers.ctrl | Modifiers.shift;
     final dvorakU = KeyChord(
       physical: PhysicalKeyboardKey.keyU.usbHidUsage,
       logical: LogicalKeyboardKey.keyG.keyId,
-      modifiers: _ctrlAlt,
+      modifiers: winCtrlShift,
     );
     final defaults = runningDefaults();
     expect(conflictFor(defaults, Binding(const BuiltIn(ShortcutCommand.center), dvorakU)),
@@ -229,7 +270,7 @@ void main() {
     final dvorakC = KeyChord(
       physical: PhysicalKeyboardKey.keyI.usbHidUsage,
       logical: LogicalKeyboardKey.keyC.keyId,
-      modifiers: _ctrlAlt,
+      modifiers: winCtrlShift,
     );
     expect(
       conflictFor(defaults, Binding(const BuiltIn(ShortcutCommand.topLeft), dvorakC)),

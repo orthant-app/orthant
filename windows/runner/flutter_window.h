@@ -25,10 +25,12 @@ class FlutterWindow : public Win32Window {
                          LPARAM const lparam) noexcept override;
 
  private:
-#ifdef ORTHANT_DEV_BUILD
-  // The temporary chords that drive W3's acceptance until W2's real hotkeys.
-  bool HandleDevChord(int id);
-#endif
+  // A subclass of the engine's view window. A layout switch is announced to
+  // the focused window, which is the view, never this one (measured), and the
+  // engine ignores it there; this forwards it to Dart.
+  static LRESULT CALLBACK ViewProc(HWND hwnd, UINT message, WPARAM wparam,
+                                   LPARAM lparam, UINT_PTR id,
+                                   DWORD_PTR data);
 
   // The project to run.
   flutter::DartProject project_;

@@ -6,48 +6,13 @@
 #include <cstdint>
 #include <iostream>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 
 namespace {
 
 constexpr char kChannelName[] = "app.orthant/window";
-
-// Every `id` in a replaceHotkeys payload, as the list of refused ids Dart
-// expects back. W0 registers nothing, so every id is refused; the pane
-// renders those as "Not set" and the tray as unavailable, which is the
-// truth.
-//
-// A payload of an unexpected shape yields nullopt and the caller answers
-// null. The polarity matters: Dart's HotkeyService.apply treats any reply
-// that is not a list as "everything refused", but an EMPTY list as
-// "nothing refused", so returning an empty list here would report every
-// shortcut live when nothing is registered. The same polarity applies per
-// entry: Dart's whereType<int>() silently drops a non-int id, so an id of
-// the wrong type must not be let through either, or that shortcut is
-// reported as live when nothing is registered for it.
-std::optional<flutter::EncodableList> AllIdsRefused(
-    const flutter::EncodableValue* arguments) {
-  const auto* args = std::get_if<flutter::EncodableMap>(arguments);
-  if (!args) return std::nullopt;
-  const auto bindings = args->find(flutter::EncodableValue("bindings"));
-  if (bindings == args->end()) return std::nullopt;
-  const auto* list = std::get_if<flutter::EncodableList>(&bindings->second);
-  if (!list) return std::nullopt;
-  flutter::EncodableList refused;
-  for (const auto& entry : *list) {
-    const auto* binding = std::get_if<flutter::EncodableMap>(&entry);
-    if (!binding) return std::nullopt;
-    const auto id = binding->find(flutter::EncodableValue("id"));
-    if (id == binding->end()) return std::nullopt;
-    if (!std::get_if<int32_t>(&id->second) &&
-        !std::get_if<int64_t>(&id->second)) {
-      return std::nullopt;
-    }
-    refused.push_back(id->second);
-  }
-  return refused;
-}
 
 // A display as Dart's displayFromReply reads it: the work area in physical
 // pixels, which is Windows' global placement space (spec §5.2), and the
@@ -85,6 +50,49 @@ std::optional<int64_t> IntOf(const flutter::EncodableValue* value) {
   return std::nullopt;
 }
 
+// Dart's ids for the shortcuts: 0 to 899. The overlay's grabs are 900 to 917
+// on the same window, and RegisterHotKey wants 0x0000 to 0xBFFF.
+constexpr int64_t kMaxShortcutId = 899;
+
+// One replaceHotkeys entry: {id, vk, modifiers}, from Dart's _windowsEntry.
+struct HotkeyRequest {
+  int64_t id;
+  UINT vk;         // 0: unusable, refused
+  UINT modifiers;  // MOD_ALT | MOD_CONTROL | MOD_SHIFT | MOD_WIN
+};
+
+// Every entry of a replaceHotkeys payload, or nullopt for a payload of an
+// unexpected shape. The polarity matters: Dart's HotkeyService.apply treats a
+// reply that is not a list as "everything refused" and an EMPTY list as
+// "nothing refused", and its whereType<int>() drops a non-int id, so an entry
+// whose id cannot be read fails the whole payload rather than vanishing (it
+// would read as live). So does an id that repeats: one entry could register
+// it while another refused it, leaving a live chord Dart reads as refused. An
+// entry whose id is readable but whose key or flags are not is kept, with vk
+// 0, and refused.
+std::optional<std::vector<HotkeyRequest>> ParseHotkeys(
+    const flutter::EncodableValue* arguments) {
+  const auto* bindings = Field(arguments, "bindings");
+  const auto* list =
+      bindings ? std::get_if<flutter::EncodableList>(bindings) : nullptr;
+  if (!list) return std::nullopt;
+  std::vector<HotkeyRequest> requests;
+  std::set<int64_t> ids;
+  for (const auto& entry : *list) {
+    const auto id = IntOf(Field(&entry, "id"));
+    if (!id || !ids.insert(*id).second) return std::nullopt;
+    const auto vk = IntOf(Field(&entry, "vk"));
+    const auto mods = IntOf(Field(&entry, "modifiers"));
+    const bool usable = *id >= 0 && *id <= kMaxShortcutId && vk &&
+                        *vk >= 0x01 && *vk <= 0xFE && mods && *mods > 0 &&
+                        (*mods & ~int64_t{MOD_ALT | MOD_CONTROL | MOD_SHIFT |
+                                          MOD_WIN}) == 0;
+    requests.push_back({*id, usable ? static_cast<UINT>(*vk) : 0,
+                        usable ? static_cast<UINT>(*mods) : 0});
+  }
+  return requests;
+}
+
 }  // namespace
 
 WindowChannel::WindowChannel(flutter::BinaryMessenger* messenger,
@@ -100,6 +108,7 @@ WindowChannel::WindowChannel(flutter::BinaryMessenger* messenger,
 }
 
 WindowChannel::~WindowChannel() {
+  UnregisterHotkeys();
   channel_->SetMethodCallHandler(nullptr);
 }
 
@@ -108,9 +117,6 @@ void WindowChannel::NotifyConfigWindowClosed() {
 }
 
 void WindowChannel::NotifyOverlayCommit(flutter::EncodableMap payload) {
-#ifdef ORTHANT_DEV_BUILD
-  last_commit_ = payload;
-#endif
   channel_->InvokeMethod("onOverlayCommit",
                          std::make_unique<flutter::EncodableValue>(
                              std::move(payload)));
@@ -122,35 +128,58 @@ void WindowChannel::NotifyOverlaySaveRegion(flutter::EncodableMap payload) {
                              std::move(payload)));
 }
 
-#ifdef ORTHANT_DEV_BUILD
-void WindowChannel::NotifyDebugSummon(double pressed_at_ms) {
-  // The press goes with the summon and comes back in its showOverlay, so a
-  // summon Dart never hears of leaves nothing behind, and no reply is needed.
+void WindowChannel::NotifyHotkey(int id, double pressed_at_ms) {
   channel_->InvokeMethod(
-      "onDebugSummon",
+      "onHotkey",
       std::make_unique<flutter::EncodableValue>(flutter::EncodableMap{
+          {flutter::EncodableValue("id"), flutter::EncodableValue(id)},
           {flutter::EncodableValue("pressedAtMs"),
            flutter::EncodableValue(pressed_at_ms)},
       }));
 }
 
-void WindowChannel::DebugReplayLastCommit() {
-  if (!last_commit_) {
-    std::cout << "[orthant] overlay commit replay: nothing to replay"
-              << std::endl;
-    return;
-  }
-  // find, not at: with exceptions off, at() on a missing key terminates.
-  const auto it = last_commit_->find(flutter::EncodableValue("sessionId"));
-  const std::optional<int64_t> id =
-      it == last_commit_->end() ? std::nullopt : IntOf(&it->second);
-  std::cout << "[orthant] overlay commit replayed: id=" << id.value_or(-1)
+void WindowChannel::NotifyKeyboardLayoutChanged(const char* why) {
+#ifdef ORTHANT_DEV_BUILD
+  // The acceptance parses this line: change it only together with it.
+  std::cout << "[orthant] keyboard layout changed (" << why << ")"
             << std::endl;
-  channel_->InvokeMethod(
-      "onOverlayCommit",
-      std::make_unique<flutter::EncodableValue>(*last_commit_));
-}
+#else
+  (void)why;
 #endif
+  channel_->InvokeMethod("onKeyboardLayoutChanged", nullptr);
+}
+
+std::optional<flutter::EncodableList> WindowChannel::ReplaceHotkeys(
+    const flutter::EncodableValue* arguments) {
+  // The previous set goes first, whatever the payload holds: a payload Dart
+  // will read as "everything refused" must not leave the old chords live.
+  UnregisterHotkeys();
+  const auto requests = ParseHotkeys(arguments);
+  if (!requests) return std::nullopt;
+  flutter::EncodableList refused;
+  for (const HotkeyRequest& r : *requests) {
+    // Only an entry parsing kept (vk not 0) has an id from 0 to 899 to narrow;
+    // a refused one goes back as it came, so an id past int's range cannot
+    // read as another's.
+    if (r.vk != 0 && RegisterHotKey(config_window_, static_cast<int>(r.id),
+                                    r.modifiers | MOD_NOREPEAT, r.vk)) {
+      registered_.push_back(static_cast<int>(r.id));
+    } else {
+      refused.push_back(flutter::EncodableValue(r.id));
+    }
+  }
+#ifdef ORTHANT_DEV_BUILD
+  // The acceptance parses this line: change it only together with it.
+  std::cout << "[orthant] hotkeys: registered " << registered_.size()
+            << " refused " << refused.size() << std::endl;
+#endif
+  return refused;
+}
+
+void WindowChannel::UnregisterHotkeys() {
+  for (int id : registered_) UnregisterHotKey(config_window_, id);
+  registered_.clear();
+}
 
 void WindowChannel::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue>& call,
@@ -178,13 +207,14 @@ void WindowChannel::HandleMethodCall(
     // the real reveal-on-first-frame, with a deadline.
     result->Success();
   } else if (method == "replaceHotkeys") {
-    const auto refused = AllIdsRefused(call.arguments());
+    const auto refused = ReplaceHotkeys(call.arguments());
     if (refused) {
       result->Success(flutter::EncodableValue(*refused));
     } else {
       result->Success();  // null: Dart reads "everything refused"
     }
   } else if (method == "unregisterAllHotkeys") {
+    UnregisterHotkeys();
     result->Success();
   } else if (method == "getScreenFrames") {
     flutter::EncodableList list;

@@ -653,16 +653,16 @@ bool WindowsOverlaySet::HandleHotkey(int id) {
   return true;
 }
 
-#ifdef ORTHANT_DEV_BUILD
-double WindowsOverlaySet::PressedAtMs(LONG message_time) {
+double WindowsOverlaySet::PressTick(LONG message_time) {
   // The press, not the dispatch: a WM_HOTKEY waits in the queue while this
   // thread is busy (an engine attaching takes over a second, measured), and
-  // that wait is what the stale check is for. Message times are GetTickCount's,
-  // to its resolution; the press time is in Dart's clock.
-  const DWORD queued = GetTickCount() - static_cast<DWORD>(message_time);
-  return EpochMs() - static_cast<double>(queued);
+  // that wait is what the stale check is for. A message time is the low 32
+  // bits of the same tick count, to its resolution.
+  const ULONGLONG now = GetTickCount64();
+  const DWORD queued =
+      static_cast<DWORD>(now) - static_cast<DWORD>(message_time);
+  return static_cast<double>(now - queued);
 }
-#endif
 
 void WindowsOverlaySet::SetGrid(int cols, int rows, double gap,
                                 bool save_hint) {
@@ -710,16 +710,19 @@ flutter::EncodableMap WindowsOverlaySet::SummonPayload(
 WindowsOverlaySet::ShowResult WindowsOverlaySet::Show(
     int64_t session_id, const std::string& app_name, double pressed_ms) {
   // Timed from the summon's key press when there is one, as macOS times from
-  // its Carbon press; a tray summon has none (0) and is timed from here.
+  // its Carbon press; a tray summon has none (0) and is timed from here. The
+  // age is read on the tick clock the press was stamped on; the trigger the
+  // overlay times its first frame from is that press, in Dart's clock.
   const double now = EpochMs();
-  const double age = now - pressed_ms;
+  const double age =
+      pressed_ms > 0 ? static_cast<double>(GetTickCount64()) - pressed_ms : 0;
   if (pressed_ms > 0 && age > kStaleSummonMs) {
     DevLog("overlay summon refused: stale, " + Ms(age) +
            " ms after its hotkey");
     MessageBeep(MB_OK);
     return ShowResult::kStale;
   }
-  const double trigger = pressed_ms > 0 ? pressed_ms : now;
+  const double trigger = pressed_ms > 0 ? now - age : now;
 
   // Not while the panels are being re-read after a display change, whose
   // geometry and DPI are mid-change; and not from inside a resize, which can
@@ -1064,16 +1067,3 @@ void WindowsOverlaySet::NoteReady() {
          Ms(MsSince(started_)) + " ms after launch");
 }
 
-#ifdef ORTHANT_DEV_BUILD
-void WindowsOverlaySet::DebugCyclePanels() {
-  Dismiss("cycle");
-  // Every panel parked, then the list rotated so that each is reused for the
-  // next monitor: a detach and re-attach where every panel moves to a monitor
-  // of another size and scale, through the same reconcile a real one takes.
-  for (auto& panel : panels_) panel->monitor = nullptr;
-  if (panels_.size() > 1) {
-    std::rotate(panels_.begin(), panels_.begin() + 1, panels_.end());
-  }
-  Reconcile("cycle");
-}
-#endif

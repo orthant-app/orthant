@@ -91,13 +91,20 @@ class WindowsOverlaySet {
   // (PressTick), or 0 for a summon with no press (the tray). A summon that
   // reaches Show more than a second after its press is refused as stale.
   // `app_icon` is the captured app's icon as PNG bytes, empty when Dart had
-  // none cached; it then follows as SetAppIcon.
+  // none cached; it then follows as SetAppIcon. `owner_pid` is the captured
+  // window's process: the session ends when the foreground moves to a window
+  // of any other process, or to the taskbar (click-away), and 0 turns that
+  // off.
   ShowResult Show(int64_t session_id, const std::string& app_name,
-                  const std::vector<uint8_t>& app_icon, double pressed_ms);
+                  const std::vector<uint8_t>& app_icon, double pressed_ms,
+                  DWORD owner_pid);
   // An icon Dart read after the summon, for the panels of the live session
   // it names; dropped for any other.
   void SetAppIcon(int64_t session_id, const std::vector<uint8_t>& png);
   void Dismiss(const char* why);
+  // Dart's hideOverlay: ends the live session only if it is `session_id`'s,
+  // so a hide meant for one grid cannot end a newer one.
+  void Hide(int64_t session_id);
   bool live() const { return session_.has_value(); }
 
   struct Panel;
@@ -106,9 +113,21 @@ class WindowsOverlaySet {
   struct Session {
     int64_t id;
     double trigger_ms;
+    DWORD owner_pid = 0;
     Panel* active = nullptr;
     Panel* press_locked = nullptr;
   };
+
+  // Click-away: macOS dismisses on a click outside every panel through event
+  // monitors. A panel covers its monitor's work area, so the click that lands
+  // outside every panel is on the taskbar, which takes the foreground; so does
+  // Alt+Tab, the Start menu, or a notification. Hooked only while a session
+  // is live, so a hidden overlay costs nothing.
+  static void CALLBACK ForegroundChanged(HWINEVENTHOOK hook, DWORD event,
+                                         HWND hwnd, LONG object, LONG child,
+                                         DWORD thread, DWORD time);
+  void OnForeground(HWINEVENTHOOK hook, HWND hwnd);
+  void Unhook();
 
   static LRESULT CALLBACK PanelProc(HWND hwnd, UINT message, WPARAM wparam,
                                     LPARAM lparam);
@@ -172,6 +191,7 @@ class WindowsOverlaySet {
 
   std::optional<Session> session_;
   bool showing_ = false;  // inside Show, which a resize can re-enter
+  HWINEVENTHOOK foreground_hook_ = nullptr;
   std::vector<int> grabbed_;
 
   int cols_ = 6;

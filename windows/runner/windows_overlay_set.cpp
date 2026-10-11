@@ -150,6 +150,43 @@ UINT MonitorDpi(HMONITOR monitor) {
                                                                           : 0;
 }
 
+// The set whose session the foreground hook watches. One overlay set exists
+// per process, and a WinEvent callback carries no context of its own.
+WindowsOverlaySet* g_foreground_watcher = nullptr;
+
+// The shell's own surfaces: the desktop (Win+D), the taskbars, the tray's
+// overflow, Start and Search, Alt+Tab (whose first foreground window is a
+// ForegroundStaging, measured) and Task View. Explorer owns most of them, and
+// a File Explorer window can share its process (on the VM it had one of its
+// own), so for a grid opened over a File Explorer window the process alone
+// cannot tell the user going elsewhere from the target: these end a grid
+// whatever their process. The capture never
+// takes one as a target either (windows_capture.dart's three sets, which a
+// test holds this list to). Menus are left out: the captured app's own menu is
+// not the user going elsewhere.
+constexpr const wchar_t* kShellSurfaces[] = {
+    L"Progman",
+    L"WorkerW",
+    L"Shell_TrayWnd",
+    L"Shell_SecondaryTrayWnd",
+    L"NotifyIconOverflowWindow",
+    L"TopLevelWindowForOverflowXamlIsland",
+    L"Windows.UI.Core.CoreWindow",
+    L"XamlExplorerHostIslandWindow",
+    L"ForegroundStaging",
+    L"MultitaskingViewFrame",
+};
+
+bool IsShellSurface(HWND hwnd) {
+  wchar_t name[64] = {};
+  const int length = GetClassNameW(hwnd, name, 64);
+  if (length <= 0) return false;
+  for (const wchar_t* cls : kShellSurfaces) {
+    if (wcscmp(name, cls) == 0) return true;
+  }
+  return false;
+}
+
 const flutter::EncodableValue* Field(const flutter::EncodableMap& map,
                                      const char* key) {
   const auto it = map.find(flutter::EncodableValue(key));
@@ -241,6 +278,7 @@ WindowsOverlaySet::WindowsOverlaySet(HWND host, Forward forward)
 }
 
 WindowsOverlaySet::~WindowsOverlaySet() {
+  Unhook();
   ReleaseKeys();
   for (auto& panel : panels_) {
     if (panel->channel) panel->channel->SetMethodCallHandler(nullptr);
@@ -714,7 +752,8 @@ flutter::EncodableMap WindowsOverlaySet::SummonPayload(
 
 WindowsOverlaySet::ShowResult WindowsOverlaySet::Show(
     int64_t session_id, const std::string& app_name,
-    const std::vector<uint8_t>& app_icon, double pressed_ms) {
+    const std::vector<uint8_t>& app_icon, double pressed_ms,
+    DWORD owner_pid) {
   // Timed from the summon's key press when there is one, as macOS times from
   // its Carbon press; a tray summon has none (0) and is timed from here. The
   // age is read on the tick clock the press was stamped on; the trigger the
@@ -782,7 +821,7 @@ WindowsOverlaySet::ShowResult WindowsOverlaySet::Show(
     return ShowResult::kNotReady;
   }
 
-  session_ = Session{session_id, trigger};
+  session_ = Session{session_id, trigger, owner_pid};
   POINT cursor{};
   GetCursorPos(&cursor);
   const HMONITOR under = MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST);
@@ -806,6 +845,19 @@ WindowsOverlaySet::ShowResult WindowsOverlaySet::Show(
         "summon", std::make_unique<flutter::EncodableValue>(payload));
     ArmFrame(*panel);
     SetTimer(panel->hwnd, kRevealTimer, kRevealDeadlineMs, nullptr);
+  }
+  // Last, once nothing above can end the session: a change of foreground from
+  // here on ends it. Out of context, so the callback runs from this thread's
+  // message loop, never inside another process.
+  if (owner_pid != 0) {
+    g_foreground_watcher = this;
+    foreground_hook_ = SetWinEventHook(
+        EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr,
+        ForegroundChanged, 0, 0, WINEVENT_OUTOFCONTEXT);
+    if (!foreground_hook_) DevLog("overlay click-away not hooked");
+    // A move made before the hook existed, between Dart's capture and here,
+    // is read once now by the same rule; any later one arrives as an event.
+    if (foreground_hook_) OnForeground(foreground_hook_, GetForegroundWindow());
   }
   NoteReady();
   return ShowResult::kShown;
@@ -840,10 +892,47 @@ void WindowsOverlaySet::SetAppIcon(int64_t session_id,
          std::to_string(png.size()) + " bytes");
 }
 
+void CALLBACK WindowsOverlaySet::ForegroundChanged(HWINEVENTHOOK hook, DWORD,
+                                                   HWND hwnd, LONG object,
+                                                   LONG, DWORD, DWORD) {
+  if (object != OBJID_WINDOW || !hwnd || !g_foreground_watcher) return;
+  g_foreground_watcher->OnForeground(hook, hwnd);
+}
+
+void WindowsOverlaySet::OnForeground(HWINEVENTHOOK hook, HWND hwnd) {
+  // An event queued before an earlier session's hook was removed is not this
+  // session's; no window at all is a switch still in progress.
+  if (!session_ || hook != foreground_hook_ || !hwnd) return;
+  DWORD pid = 0;
+  GetWindowThreadProcessId(hwnd, &pid);
+  // Orthant's own windows: a tray summon's foreground is the hidden window
+  // until its capture reactivates the target.
+  if (pid == GetCurrentProcessId()) return;
+  // The captured window's own process: a tray summon's capture activates
+  // that window after the panels show, and a dialog of the app's own may come
+  // forward. Neither is the user going elsewhere.
+  const bool shell = IsShellSurface(hwnd);
+  if (pid == session_->owner_pid && !shell) return;
+  DevLog(std::string("overlay foreground moved: ") +
+         (shell ? "shell" : "process " + std::to_string(pid)));
+  Dismiss("click-away");
+}
+
+void WindowsOverlaySet::Unhook() {
+  if (foreground_hook_) UnhookWinEvent(foreground_hook_);
+  foreground_hook_ = nullptr;
+  if (g_foreground_watcher == this) g_foreground_watcher = nullptr;
+}
+
+void WindowsOverlaySet::Hide(int64_t session_id) {
+  if (session_ && session_->id == session_id) Dismiss("hideOverlay");
+}
+
 void WindowsOverlaySet::Dismiss(const char* why) {
   if (!session_) return;
   const int64_t id = session_->id;
   session_.reset();
+  Unhook();
   ReleaseKeys();
   for (const auto& owned : panels_) {
     Panel& panel = *owned;

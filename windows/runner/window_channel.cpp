@@ -279,11 +279,18 @@ void WindowChannel::HandleMethodCall(
     const auto* icon = Field(call.arguments(), "appIcon");
     const auto* icon_bytes =
         icon ? std::get_if<std::vector<uint8_t>>(icon) : nullptr;
+    // The captured window's process, for click-away. One that cannot be read
+    // is 0, which turns click-away off for this session rather than ending
+    // it on the activation a tray summon's capture causes.
+    const auto pid = IntOf(Field(call.arguments(), "pid"));
+    const DWORD owner_pid =
+        pid && *pid > 0 && *pid <= 0xFFFFFFFF ? static_cast<DWORD>(*pid) : 0;
     const bool shown =
         overlays_->Show(*capture_id,
                         app_name_value ? *app_name_value : std::string(),
                         icon_bytes ? *icon_bytes : std::vector<uint8_t>(),
-                        pressed_ms) == WindowsOverlaySet::ShowResult::kShown;
+                        pressed_ms,
+                        owner_pid) == WindowsOverlaySet::ShowResult::kShown;
     result->Success(flutter::EncodableValue(shown));
   } else if (method == "setAppIcon") {
     // {sessionId, png}: an icon Dart read after the summon, off the summon
@@ -294,9 +301,17 @@ void WindowChannel::HandleMethodCall(
     if (session && bytes) overlays_->SetAppIcon(*session, *bytes);
     result->Success();
   } else if (method == "hideOverlay") {
-    // Also how Dart ends a summon that will not reach showOverlay (nothing to
-    // capture): a grid still open names the capture that summon just cleared.
-    overlays_->Dismiss("hideOverlay");
+    // {sessionId}: the grid Dart last saw shown, which this ends only if it is
+    // the live session. Also how Dart ends a summon that will not reach
+    // showOverlay (nothing to capture): a grid still open names the capture
+    // that summon just cleared. A payload that names no session ends whatever
+    // is live: ending a grid is the safe side, a dead one holds Esc and Enter.
+    const auto session = IntOf(Field(call.arguments(), "sessionId"));
+    if (session) {
+      overlays_->Hide(*session);
+    } else {
+      overlays_->Dismiss("hideOverlay");
+    }
     result->Success();
   } else {
     result->NotImplemented();

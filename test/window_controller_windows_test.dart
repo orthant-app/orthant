@@ -461,7 +461,7 @@ void main() {
       await c.showOverlay();
       expect(calls, [kShowOverlay],
           reason: 'a summon that showed hides nothing');
-      expect(sent, {'captureId': c.captureId, 'appName': 'Notepad'},
+      expect(sent, {'captureId': c.captureId, 'appName': 'Notepad', 'pid': 7},
           reason: 'a summon with no press sends no pressedAtMs, and with no '
               'cached icon no appIcon');
       expect(c.captureId, isNotNull);
@@ -485,6 +485,7 @@ void main() {
       expect(sent, {
         'captureId': c.captureId,
         'appName': 'Notepad',
+        'pid': 7,
         'pressedAtMs': 1234.5,
       });
     });
@@ -869,6 +870,57 @@ void main() {
     test('hideOverlay asks the runner', () async {
       await wc().hideOverlay();
       expect(calls, [kHideOverlay]);
+    });
+
+    group('a hide names the grid it ends', () {
+      // So a hide meant for one grid can never end a newer one: the runner
+      // dismisses only the live session it names.
+      late List<Object?> hides;
+      setUp(() {
+        hides = [];
+        answer = (call) {
+          if (call.method == kHideOverlay) hides.add(call.arguments);
+          return call.method == kShowOverlay ? true : null;
+        };
+      });
+
+      WindowsWindowController withNotepad(FakeDesktop desktop) => wc(
+          desktop: desktop
+            ..windows.add(windowFacts(0x10, pid: 7))
+            ..foreground = 0x10,
+          placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)));
+
+      test('a capture over an open grid names that grid', () async {
+        final c = withNotepad(FakeDesktop(ownPid: 1));
+        await c.showOverlay();
+        final grid = c.captureId;
+        await c.captureFrontmost();
+        expect(hides, [
+          {'sessionId': grid},
+        ]);
+      });
+
+      test('a refused summon names the grid that was open before it',
+          () async {
+        final c = withNotepad(FakeDesktop(ownPid: 1));
+        await c.showOverlay();
+        final grid = c.captureId;
+        answer = (call) {
+          if (call.method == kHideOverlay) hides.add(call.arguments);
+          return call.method == kShowOverlay ? false : null;
+        };
+        await c.showOverlay();
+        expect(hides, [
+          {'sessionId': grid},
+        ], reason: 'the refused summon\'s own capture never had a grid');
+      });
+
+      test('with no grid ever shown, it names none', () async {
+        await wc().hideOverlay();
+        expect(hides, [
+          {'sessionId': -1},
+        ]);
+      });
     });
   });
 }

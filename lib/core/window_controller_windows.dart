@@ -358,6 +358,11 @@ class WindowsWindowController implements WindowController {
     final shown = await _channel.invokeMethod<Object?>(kShowOverlay, {
       'captureId': id,
       'appName': captured.appName,
+      // The captured window's process: the runner ends the grid when the
+      // foreground moves to any other (a click on the taskbar, Alt+Tab), and
+      // not when Windows activates the captured window itself, which a tray
+      // summon's capture does after the runner has shown the panels.
+      'pid': _captured?.pid,
       'appIcon': ?icon,
       'pressedAtMs': ?pressedAtMs,
     });
@@ -433,9 +438,13 @@ class WindowsWindowController implements WindowController {
     }
   }
 
+  /// Ends the grid the runner last showed, by its session: a hide can then
+  /// never end a newer grid than the one it was meant for. -1 when no grid
+  /// was ever shown, which ends nothing.
   @override
   Future<void> hideOverlay() async {
-    await _channel.invokeMethod<void>(kHideOverlay);
+    await _channel
+        .invokeMethod<void>(kHideOverlay, {'sessionId': _shownId ?? -1});
     // Cleared once the runner has answered: a hide that fails leaves the grid
     // marked open, so the next capture ends it.
     _gridOpen = false;

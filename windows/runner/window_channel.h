@@ -23,9 +23,11 @@
 // and a press comes back as onHotkey; the displays, answered from
 // WindowsOverlaySet's per-monitor windows (W1); and setOverlayGrid,
 // showOverlay and hideOverlay, with the overlay's commit and save-region
-// notifications to Dart (W3), and setAppIcon, the captured app's icon after
-// the summon (W4). Anything else answers NotImplemented, which
-// Dart surfaces as MissingPluginException;
+// notifications to Dart (W3); and, for W4, setAppIcon (the captured app's icon
+// after the summon), startOverlay (launch's note that the overlay's engines
+// may start) and setCommandsRunning (the command queue's notice, which holds
+// their attaches back). Anything else answers NotImplemented, which Dart
+// surfaces as MissingPluginException;
 // test/windows_channel_contract_test.dart fails if Dart calls a method this
 // file does not answer, or this file sends one Dart does not handle.
 class WindowChannel {
@@ -51,7 +53,8 @@ class WindowChannel {
   void NotifyOverlayCommit(flutter::EncodableMap payload);
   void NotifyOverlaySaveRegion(flutter::EncodableMap payload);
 
-  // A registered shortcut was pressed: its id (below 900) and its press
+  // A registered shortcut was pressed: its id (below
+  // WindowsOverlaySet::kFirstGrabId) and its press
   // (WindowsOverlaySet::PressTick). Dart dispatches the id; a summon carries
   // the press back in showOverlay.
   void NotifyHotkey(int id, double pressed_at_ms);
@@ -77,7 +80,8 @@ class WindowChannel {
   // Owned by FlutterWindow, which destroys this channel first.
   WindowsOverlaySet* overlays_;
   // The ids registered on config_window_, so a replacement or the destructor
-  // can unregister exactly them; the overlay's grabs (900 up) are not here.
+  // can unregister exactly them; the overlay's grabs (kFirstGrabId up) are
+  // not here.
   std::vector<int> registered_;
 };
 

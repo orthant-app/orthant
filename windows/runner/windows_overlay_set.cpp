@@ -176,9 +176,10 @@ bool MonitorExists(HMONITOR monitor) {
   return WorkArea(monitor, &work);
 }
 
-// The monitor's effective DPI as Windows applies it now. Used only to notice
-// that a panel's own DPI is stale (Fit): the display list answers from
-// GetDpiForWindow, the documented source for a per-monitor-aware thread.
+// The monitor's effective DPI as Windows applies it now. Used to notice that a
+// panel's own DPI is stale: Fit nudges the panel when the two disagree, and
+// until it has, DisplayFor reports no display for it. The display list answers
+// from GetDpiForWindow, the documented source for a per-monitor-aware thread.
 UINT MonitorDpi(HMONITOR monitor) {
   UINT x = 0, y = 0;
   return SUCCEEDED(GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &x, &y)) ? x
@@ -195,10 +196,11 @@ WindowsOverlaySet* g_foreground_watcher = nullptr;
 // a File Explorer window can share its process (on the VM it had one of its
 // own), so for a grid opened over a File Explorer window the process alone
 // cannot tell the user going elsewhere from the target: these end a grid
-// whatever their process. The capture never
-// takes one as a target either (windows_capture.dart's three sets, which a
-// test holds this list to). Menus are left out: the captured app's own menu is
-// not the user going elsewhere.
+// whatever their process. Every class the capture skips as a target is here
+// (windows_capture.dart's three sets; menus aside, since the captured app's
+// own menu is not the user going elsewhere), and a test holds this list to
+// that. ForegroundStaging and MultitaskingViewFrame are here too and in none
+// of those sets.
 constexpr const wchar_t* kShellSurfaces[] = {
     L"Progman",
     L"WorkerW",

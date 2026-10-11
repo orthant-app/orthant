@@ -50,7 +50,8 @@ std::optional<int64_t> IntOf(const flutter::EncodableValue* value) {
   return std::nullopt;
 }
 
-// Dart's ids for the shortcuts: 0 to 899. The overlay's grabs are 900 to 917
+// Dart's ids for the shortcuts: every id below WindowsOverlaySet::kFirstGrabId
+// (0 to 899 today). The overlay's grabs are that id and up (900 to 917 today)
 // on the same window, and RegisterHotKey wants 0x0000 to 0xBFFF.
 constexpr int64_t kMaxShortcutId = WindowsOverlaySet::kFirstGrabId - 1;
 
@@ -164,9 +165,9 @@ std::optional<flutter::EncodableList> WindowChannel::ReplaceHotkeys(
   }
   flutter::EncodableList refused;
   for (const HotkeyRequest& r : *requests) {
-    // Only an entry parsing kept (vk not 0) has an id from 0 to 899 to narrow;
-    // a refused one goes back as it came, so an id past int's range cannot
-    // read as another's.
+    // Only an entry parsing kept (vk not 0) has an id from 0 to kMaxShortcutId
+    // to narrow; a refused one goes back as it came, so an id past int's range
+    // cannot read as another's.
     if (r.vk != 0 && RegisterHotKey(config_window_, static_cast<int>(r.id),
                                     r.modifiers | MOD_NOREPEAT, r.vk)) {
       registered_.push_back(static_cast<int>(r.id));
@@ -202,9 +203,11 @@ void WindowChannel::HandleMethodCall(
   const std::string& method = call.method_name();
   if (method == "showConfigWindow") {
     // A minimized window shown with SW_SHOW stays minimized; restore it.
-    // SetForegroundWindow succeeds because the tray click that asked for
-    // this window granted the process foreground rights; there is no other
-    // path that shows it (spec §5.5).
+    // Dart asks for this window from the tray, from the grid's Ctrl+S (its
+    // picker opens here once overlaySaveRegion has placed the captured
+    // window), and at launch and on a lost permission for the onboarding. In
+    // the first two SetForegroundWindow succeeds because the click or the
+    // WM_HOTKEY that started them granted the process foreground rights.
     ShowWindow(config_window_,
                IsIconic(config_window_) ? SW_RESTORE : SW_SHOW);
     SetForegroundWindow(config_window_);
@@ -260,11 +263,12 @@ void WindowChannel::HandleMethodCall(
     }
     result->Success();
   } else if (method == "showOverlay") {
-    // {captureId, appName, appIcon?, pressedAtMs?}: Dart has captured the
-    // window already, and the session is named by that capture's id.
+    // {captureId, appName, pressedAtMs?, appIcon?, pid?}: Dart has captured
+    // the window already, and the session is named by that capture's id.
     // pressedAtMs is the key press that asked for this summon, carried with
-    // it; absent for a summon with no press (the tray). The reply is whether
-    // it showed.
+    // it; absent for a summon with no press (the tray). pid is the captured
+    // window's process, for click-away; absent, click-away is off for the
+    // session. The reply is whether it showed.
     // Show refuses, and the reply is false, for four reasons: a monitor with
     // no panel, or whose panel has no engine attached yet; Esc or Enter held
     // by another app; a hotkey press more than 1 s old (stale); or the

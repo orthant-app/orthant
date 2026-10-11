@@ -27,14 +27,14 @@ class _OverlayAppState extends State<OverlayApp> {
 
   /// Keys that arrived before there was a grid to give them to.
   ///
-  /// Native grabs `Esc`, `Return` and the arrows *before* it puts the panel on
-  /// screen, precisely so nothing falls through to the app behind — which means
-  /// the window between a summon and this engine's first frame is a window in
-  /// which real keystrokes are delivered here with `_grid.currentState` still
-  /// null. Measured summon→first-frame is a median 44 ms and has been seen at
-  /// 368 ms on a cold engine, so it is wide enough to type into. Dropped, the
-  /// keys are silent: an arrow does nothing and the `Return` behind it commits
-  /// nothing.
+  /// Native grabs `Esc`, the place key (`OverlayCopy.place`) and the arrows
+  /// *before* it puts the panel on screen, precisely so nothing falls through
+  /// to the app behind it, which means the window between a summon and this
+  /// engine's first frame is a window in which real keystrokes are delivered
+  /// here with `_grid.currentState` still null. Measured summon→first-frame
+  /// is a median 44 ms and has been seen at 368 ms on a cold engine, so it is
+  /// wide enough to type into. Dropped, the keys are silent: an arrow does
+  /// nothing and the place key behind it commits nothing.
   final _pending = <void Function(GridOverlayState)>[];
 
   int? _sessionId;
@@ -43,8 +43,9 @@ class _OverlayAppState extends State<OverlayApp> {
   Uint8List? _appIcon;
   bool _active = false;
 
-  /// Whether to offer the ⌘S hint. Pushed with the grid, so it is already
-  /// correct by the time a summon arrives — nothing on the latency path.
+  /// Whether to offer the save hint (the `OverlayCopy.save` chord). Pushed with
+  /// the grid, so it is already correct by the time a summon arrives: nothing
+  /// on the latency path.
   bool _saveHint = false;
   int _cols = 6;
   int _rows = 6;
@@ -142,8 +143,9 @@ class _OverlayAppState extends State<OverlayApp> {
         if (call.arguments == _sessionId) {
           _onGrid((g) => g.commitCurrent());
         }
-      // ⌘S — grabbed natively for the same reason Return is: the panel is
-      // non-key and never sees a key event of its own.
+      // The save chord (`OverlayCopy.save`: ⌘S, Ctrl+S on Windows), grabbed
+      // natively for the same reason the place key is: the panel is non-key
+      // and never sees a key event of its own.
       case 'saveCurrent':
         if (call.arguments == _sessionId) {
           _onGrid((g) => g.saveCurrent());
@@ -189,8 +191,8 @@ class _OverlayAppState extends State<OverlayApp> {
     action(grid);
   }
 
-  /// Replay what arrived early, in the order it arrived — an arrow and then the
-  /// `Return` behind it only mean anything in that order.
+  /// Replay what arrived early, in the order it arrived: an arrow and then the
+  /// place key behind it only mean anything in that order.
   void _drainPending() {
     final grid = _grid.currentState;
     if (grid == null || grid.widget.sessionId != _sessionId || _pending.isEmpty) {

@@ -17,7 +17,12 @@ import 'png.dart';
 /// which a background isolate's thread has not got, so it initialises COM for
 /// the call and releases it after.
 ///
-/// Every handle it creates is released on every path. It throws nothing.
+/// Once its setup (COM, the path, the info record) has allocated, every handle
+/// it creates is released on every path, and a failure after that is a null
+/// return, not a throw. Only an allocation failure in that setup can throw
+/// (off Windows, the ole32 lookup does), and it would skip `CoUninitialize`
+/// and leak the path; its one caller, the controller's icon read, treats a
+/// throw as no icon and tries again on the next summon.
 Uint8List? readAppIconPng(String exePath) {
   final com = CoInitializeEx(COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
   final path = exePath.toNativeUtf16();

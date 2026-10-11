@@ -123,8 +123,9 @@ class WindowsOverlaySet {
   // `app_icon` is the captured app's icon as PNG bytes, empty when Dart had
   // none cached; it then follows as SetAppIcon. `owner_pid` is the captured
   // window's process: the session ends when the foreground moves to a window
-  // of any other process, or to the taskbar (click-away), and 0 turns that
-  // off.
+  // of any other process, or to one of the shell's surfaces (the desktop, the
+  // taskbar, Start, Alt+Tab, Task View) whatever its process (click-away), and
+  // 0 turns click-away off.
   ShowResult Show(int64_t session_id, const std::string& app_name,
                   const std::vector<uint8_t>& app_icon, double pressed_ms,
                   DWORD owner_pid);

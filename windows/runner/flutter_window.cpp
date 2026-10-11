@@ -153,8 +153,11 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       // first-frame timing read the press, not this dispatch. Ids from
       // kFirstGrabId up are the overlay's and were handled above.
       if (id >= 0 && id < WindowsOverlaySet::kFirstGrabId && window_channel_) {
-        // No engine attaches until Dart says its command is running, which
-        // then holds the attaches until the command is done.
+        // A fixed hold (one second) keeps an engine from attaching between
+        // this press and Dart's own notice that its command is running
+        // (setCommandsRunning), which then holds the attaches until the
+        // commands are done, up to a ceiling. The hold runs out whether or
+        // not Dart says so.
         if (overlay_set_) overlay_set_->HoldAttaches();
         window_channel_->NotifyHotkey(
             id, WindowsOverlaySet::PressTick(GetMessageTime()));

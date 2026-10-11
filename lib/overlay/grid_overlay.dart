@@ -84,8 +84,9 @@ class GridOverlay extends StatefulWidget {
   final VoidCallback onEndDrag;
   final void Function(WinRect) onCommit;
 
-  /// Asked for the current block to become a shortcut — `⌘S`, grabbed natively
-  /// like `Return` and the arrows, because the panel is non-key.
+  /// Asked for the current block to become a shortcut by the save chord
+  /// (`OverlayCopy.save`: `⌘S`, `Ctrl+S` on Windows), grabbed natively like the
+  /// place key and the arrows, because the panel is non-key.
   final void Function(CellBlock block, WinRect rect)? onSave;
 
   /// Whether to offer the hint at all. False once the user has a region of
@@ -196,29 +197,31 @@ class GridOverlayState extends State<GridOverlay> {
             cols: widget.cols, rows: widget.rows, gap: widget.gap, scale: widget.scale);
   }
 
-  /// Commit whatever is currently selected. Called for `Return`, which is
-  /// grabbed natively and relayed — the panel is non-key, so the key event
-  /// never reaches Flutter directly. No selection means no-op, not a guess.
+  /// Commit whatever is currently selected. Called for the place key
+  /// (`OverlayCopy.place`: `Return`, `Enter` on Windows), which is grabbed
+  /// natively and relayed: the panel is non-key, so the key event never
+  /// reaches Flutter directly. No selection means no-op, not a guess.
   void commitCurrent() {
     final t = _effectiveTarget;
     if (t != null) widget.onCommit(t);
   }
 
   /// Hand the current block up to be turned into a shortcut. Like
-  /// [commitCurrent], no selection is a no-op rather than a guess — pressing
-  /// ⌘S at an empty grid should do nothing, not save a corner.
-  /// ⌘S is Return *plus* an offer, so it carries the rect as well as the
-  /// block: the window lands where it was going to land, and the shape becomes
-  /// a shortcut. Saving without placing would mean summoning again to use the
-  /// region you had just finished defining.
+  /// [commitCurrent], no selection is a no-op rather than a guess: pressing
+  /// the save chord at an empty grid should do nothing, not save a corner.
+  /// The save chord is the place key *plus* an offer (see `OverlayCopy`), so it
+  /// carries the rect as well as the block: the window lands where it was
+  /// going to land, and the shape becomes a shortcut. Saving without placing
+  /// would mean summoning again to use the region you had just finished
+  /// defining.
   void saveCurrent() {
     final b = _effectiveBlock;
     final t = _effectiveTarget;
     if (b != null && t != null) widget.onSave?.call(b, t);
   }
 
-  /// Move or extend the selection by one cell. Called for an arrow key, which —
-  /// like `Return` — is grabbed natively and relayed, because the panel is
+  /// Move or extend the selection by one cell. Called for an arrow key, which,
+  /// like the place key, is grabbed natively and relayed, because the panel is
   /// non-activating and no key event reaches Flutter directly.
   ///
   /// This is what makes the grid usable without a mouse: the summon was already

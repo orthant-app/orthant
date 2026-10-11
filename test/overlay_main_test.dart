@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -58,6 +60,19 @@ void main() {
       const StandardMethodCodec().encodeMethodCall(MethodCall(method, arguments)),
       (_) {},
     );
+  }
+
+  /// The same, returning what the overlay answered. An error envelope, which
+  /// is what a throwing handler produces, throws here.
+  Future<Object?> reply(String method, [Object? arguments]) async {
+    ByteData? answer;
+    await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .handlePlatformMessage(
+      channel.name,
+      const StandardMethodCodec().encodeMethodCall(MethodCall(method, arguments)),
+      (data) => answer = data,
+    );
+    return const StandardMethodCodec().decodeEnvelope(answer!);
   }
 
   Map<String, Object?> summon({int session = 1, bool active = true}) => {
@@ -257,6 +272,80 @@ void main() {
     ]);
     expect(sent.where((c) => c.method == 'announceSelection'), isEmpty,
         reason: 'announcements are Flutter\'s, not a native hop');
+  });
+
+  testWidgets('on Windows the grid announces Enter, not Return', (tester) async {
+    await tester.pumpWidget(const OverlayApp());
+    await send('summon', {...summon(), 'appName': 'Notepad'});
+    await tester.pump();
+    expect(announced, [
+      'Grid open for Notepad. 6 columns, 6 rows. Arrow keys move, '
+          'Shift and arrows extend, Enter places, Escape cancels.',
+    ]);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
+
+  group('an icon that arrives after the summon', () {
+    // A summon on Windows carries an icon only if one was cached; one that was
+    // not is fetched off the summon path and follows as setAppIcon. It belongs
+    // to the session it names, and to no other.
+    // A real one-pixel PNG: the chip decodes what it is given.
+    final png = base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQV'
+        'R42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
+    Uint8List? shownIcon(WidgetTester tester) =>
+        tester.widget<GridOverlay>(find.byType(GridOverlay)).appIcon;
+
+    testWidgets('reaches the grid of the session it names', (tester) async {
+      await tester.pumpWidget(const OverlayApp());
+      await send('summon', summon(session: 4));
+      await tester.pump();
+      expect(shownIcon(tester), isNull);
+      await send('setAppIcon', {'sessionId': 4, 'png': png});
+      await tester.pump();
+      expect(shownIcon(tester), png);
+    });
+
+    testWidgets('for another session, is dropped', (tester) async {
+      await tester.pumpWidget(const OverlayApp());
+      await send('summon', summon(session: 5));
+      await tester.pump();
+      await send('setAppIcon', {'sessionId': 4, 'png': png});
+      await tester.pump();
+      expect(shownIcon(tester), isNull,
+          reason: 'an earlier capture\'s app, on this capture\'s grid');
+    });
+
+    testWidgets('after its session ended, is not carried into the next',
+        (tester) async {
+      await tester.pumpWidget(const OverlayApp());
+      await send('summon', summon(session: 6));
+      await tester.pump();
+      await send('hidden', 6);
+      await tester.pump();
+      await send('setAppIcon', {'sessionId': 6, 'png': png});
+      await send('summon', summon(session: 7));
+      await tester.pump();
+      expect(shownIcon(tester), isNull);
+    });
+
+    testWidgets('of the wrong shape, changes nothing and throws nothing',
+        (tester) async {
+      await tester.pumpWidget(const OverlayApp());
+      await send('summon', {...summon(session: 8), 'appIcon': png});
+      await tester.pump();
+      for (final bad in <Object?>[
+        null,
+        8,
+        {'sessionId': 8},
+        {'sessionId': 8, 'png': 'not bytes'},
+        {'sessionId': '8', 'png': png},
+      ]) {
+        await expectLater(reply('setAppIcon', bad), completes,
+            reason: 'answered, not with an error envelope: $bad');
+        await tester.pump();
+        expect(tester.takeException(), isNull, reason: '$bad');
+        expect(shownIcon(tester), png, reason: '$bad');
+      }
+    });
   });
 
   testWidgets('keyboard selection announces its actual target once per change',

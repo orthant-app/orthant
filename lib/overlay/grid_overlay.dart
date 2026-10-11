@@ -7,6 +7,7 @@ import 'package:flutter/semantics.dart';
 import '../core/geometry.dart';
 import '../core/grid_config.dart';
 import 'grid_selection.dart';
+import 'overlay_copy.dart';
 
 /// The overlay's whole surface: a compact grid centred on an otherwise clear,
 /// full-screen panel, plus a true-scale preview of where the window will land.
@@ -341,10 +342,10 @@ class GridOverlayState extends State<GridOverlay> {
         ? 'Row ${b.r0 + 1}' : 'Rows ${b.r0 + 1} to ${b.r1 + 1}';
     final col = b.c0 == b.c1
         ? 'column ${b.c0 + 1}' : 'columns ${b.c0 + 1} to ${b.c1 + 1}';
-    String points(double n) => n == n.roundToDouble()
-        ? n.toInt().toString() : n.toStringAsFixed(1);
-    return '$row, $col. Target: x ${points(t.x)}, y ${points(t.y)}, '
-        'width ${points(t.width)}, height ${points(t.height)} points.';
+    String n(double v) =>
+        v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
+    return '$row, $col. Target: x ${n(t.x)}, y ${n(t.y)}, '
+        'width ${n(t.width)}, height ${n(t.height)} ${OverlayCopy.current.unit}.';
   }
 
   /// Flutter's macOS bridge dispatches the standard press action, but does
@@ -370,8 +371,7 @@ class GridOverlayState extends State<GridOverlay> {
           '${widget.cols} columns, ${widget.rows} rows',
       value: _selectionDescription,
       selected: selected,
-      hint: 'Arrow keys move. Shift and arrow keys extend. '
-          'Return places the window. Escape cancels.',
+      hint: OverlayCopy.current.gridHint,
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -475,7 +475,7 @@ class GridOverlayState extends State<GridOverlay> {
                 rect: Rect.fromLTWH(
                     _panelRect.left, _panelRect.bottom + 7, _panelRect.width, 14),
                 child: Text(
-                  '⌘S  save this shape as a shortcut',
+                  OverlayCopy.current.saveHint,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 10.5,

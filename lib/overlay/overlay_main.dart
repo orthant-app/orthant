@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../core/geometry.dart';
 import 'grid_overlay.dart';
 import 'grid_selection.dart';
+import 'overlay_copy.dart';
 
 /// Runs the overlay UI on the second Flutter engine. The `overlayMain`
 /// entrypoint itself lives in `lib/main.dart` — macOS resolves an entrypoint
@@ -100,10 +101,8 @@ class _OverlayAppState extends State<OverlayApp> {
         // are the same grid, and a screen reader saying it three times is
         // not three times as clear.
         if (_active && !_warming) {
-          GridOverlayState.announce(context,
-              'Grid open for ${_appName.isEmpty ? 'the captured window' : _appName}. '
-              '$_cols columns, $_rows rows. Arrow keys move, Shift and arrows '
-              'extend, Return places, Escape cancels.');
+          GridOverlayState.announce(
+              context, OverlayCopy.current.opened(_appName, _cols, _rows));
         }
         // Debug and Profile: the acceptance reads it, and Profile is where the
         // timings are taken. dpr is what the engine renders at; on Windows it
@@ -128,6 +127,15 @@ class _OverlayAppState extends State<OverlayApp> {
               'firstFrame', DateTime.now().millisecondsSinceEpoch - t0);
           _triggerAtMs = null;
         });
+      // {sessionId, png}: the captured app's icon, when the summon could not
+      // carry one. Windows reads an icon off the summon path and sends it
+      // after; macOS never sends this. For this session only: an icon that
+      // took longer than its grid belongs to an app no longer here.
+      case 'setAppIcon':
+        final a = call.arguments;
+        if (a is Map && a['sessionId'] == _sessionId && a['png'] is Uint8List) {
+          setState(() => _appIcon = a['png'] as Uint8List);
+        }
       case 'setActive':
         setState(() => _active = call.arguments as bool);
       case 'commitCurrent':

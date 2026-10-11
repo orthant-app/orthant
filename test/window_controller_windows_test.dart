@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -459,8 +461,9 @@ void main() {
       await c.showOverlay();
       expect(calls, [kShowOverlay],
           reason: 'a summon that showed hides nothing');
-      expect(sent, {'captureId': c.captureId, 'appName': 'Notepad'},
-          reason: 'a summon with no press sends no pressedAtMs');
+      expect(sent, {'captureId': c.captureId, 'appName': 'Notepad', 'pid': 7},
+          reason: 'a summon with no press sends no pressedAtMs, and with no '
+              'cached icon no appIcon');
       expect(c.captureId, isNotNull);
     });
 
@@ -482,7 +485,203 @@ void main() {
       expect(sent, {
         'captureId': c.captureId,
         'appName': 'Notepad',
+        'pid': 7,
         'pressedAtMs': 1234.5,
+      });
+    });
+
+    group('the captured app\'s icon', () {
+      // Read off the summon path (SHGetFileInfo can block), cached by
+      // executable, and sent to the open grid once it is read.
+      final png = Uint8List.fromList([1, 2, 3]);
+      late List<MethodCall> sentCalls;
+      late List<String> asked;
+      late Completer<Uint8List?> reading;
+
+      setUp(() {
+        sentCalls = [];
+        asked = [];
+        reading = Completer();
+        answer = (call) {
+          sentCalls.add(call);
+          return call.method == kShowOverlay ? true : null;
+        };
+      });
+
+      WindowsWindowController notepad(
+          {FakeDesktop? desktop, Map<String, Completer<Uint8List?>>? reads}) {
+        final d = desktop ??
+            (FakeDesktop(ownPid: 1)
+              ..windows.add(windowFacts(0x10, pid: 7))
+              ..foreground = 0x10
+              ..names[7] = 'Notepad'
+              ..paths[7] = r'C:\Windows\notepad.exe');
+        return WindowsWindowController.forTest(
+          readVersion: () => null,
+          desktop: d,
+          placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)),
+          clock: FakeClock(),
+          readIcon: (exe) {
+            asked.add(exe);
+            return (reads?[exe] ?? reading).future;
+          },
+        );
+      }
+
+      Map<Object?, Object?> argsOf(String method, [int nth = 0]) =>
+          sentCalls.where((c) => c.method == method).elementAt(nth).arguments
+              as Map<Object?, Object?>;
+
+      test('is read once, sent to the open grid, then carried by the summon',
+          () async {
+        final c = notepad();
+        await c.showOverlay();
+        final first = c.captureId;
+        expect(argsOf(kShowOverlay).containsKey('appIcon'), isFalse,
+            reason: 'nothing cached yet: the summon does not wait for it');
+        expect(asked, [r'C:\Windows\notepad.exe']);
+        reading.complete(png);
+        await pumpEventQueue();
+        expect(argsOf(kSetAppIcon), {'sessionId': first, 'png': png});
+
+        await c.showOverlay();
+        expect(argsOf(kShowOverlay, 1)['appIcon'], png);
+        expect(asked, hasLength(1), reason: 'cached by executable');
+        expect(sentCalls.where((c) => c.method == kSetAppIcon), hasLength(1));
+      });
+
+      test('goes to the open grid of its app, whichever summon asked',
+          () async {
+        final c = notepad();
+        await c.showOverlay();
+        await c.showOverlay();
+        final second = c.captureId;
+        expect(asked, hasLength(1), reason: 'one read in flight per app');
+        reading.complete(png);
+        await pumpEventQueue();
+        expect(argsOf(kSetAppIcon), {'sessionId': second, 'png': png});
+      });
+
+      test('for an app no longer in front is kept, not sent to another\'s '
+          'grid', () async {
+        final desktop = FakeDesktop(ownPid: 1)
+          ..windows.add(windowFacts(0x10, pid: 7))
+          ..foreground = 0x10
+          ..paths[7] = r'C:\Windows\notepad.exe'
+          ..paths[8] = r'C:\Windows\regedit.exe';
+        // Registry Editor's own read never finishes here.
+        final c = notepad(
+            desktop: desktop,
+            reads: {r'C:\Windows\regedit.exe': Completer<Uint8List?>()});
+        await c.showOverlay();
+        desktop.windows
+          ..clear()
+          ..add(windowFacts(0x20, pid: 8, className: 'RegEdit_RegEdit'));
+        desktop.foreground = 0x20;
+        await c.showOverlay();
+        reading.complete(png);
+        await pumpEventQueue();
+        expect(sentCalls.where((c) => c.method == kSetAppIcon), isEmpty,
+            reason: 'Notepad\'s icon on Registry Editor\'s grid');
+      });
+
+      test('that arrives after its grid closed is kept, not sent', () async {
+        final c = notepad();
+        await c.showOverlay();
+        await c.hideOverlay();
+        reading.complete(png);
+        await pumpEventQueue();
+        expect(sentCalls.where((c) => c.method == kSetAppIcon), isEmpty);
+        await c.showOverlay();
+        expect(argsOf(kShowOverlay, 1)['appIcon'], png);
+      });
+
+      test('an app with none is not asked about again', () async {
+        final c = notepad();
+        await c.showOverlay();
+        reading.complete(null);
+        await pumpEventQueue();
+        await c.showOverlay();
+        expect(sentCalls.where((c) => c.method == kSetAppIcon), isEmpty);
+        expect(argsOf(kShowOverlay, 1).containsKey('appIcon'), isFalse);
+        expect(asked, hasLength(1));
+      });
+
+      test('a read that throws costs only the chip, and is tried again',
+          () async {
+        final c = notepad();
+        await c.showOverlay();
+        reading.completeError(StateError('isolate went away'));
+        await pumpEventQueue();
+        expect(sentCalls.where((c) => c.method == kSetAppIcon), isEmpty);
+        reading = Completer();
+        await c.showOverlay();
+        expect(asked, hasLength(2));
+      });
+
+      test('a send that fails keeps the icon for the next summon', () async {
+        answer = (call) {
+          sentCalls.add(call);
+          if (call.method == kSetAppIcon) {
+            throw PlatformException(code: 'gone');
+          }
+          return call.method == kShowOverlay ? true : null;
+        };
+        final c = notepad();
+        await c.showOverlay();
+        reading.complete(png);
+        await pumpEventQueue();
+        await c.showOverlay();
+        expect(argsOf(kShowOverlay, 1)['appIcon'], png);
+        expect(asked, hasLength(1), reason: 'read once, kept, carried');
+      });
+
+      test('a read that lands while the next summon is in flight reaches '
+          'that summon\'s grid', () async {
+        // The first summon's read is still going when its grid closes; the
+        // second summon goes out with no icon, none being cached yet, and the
+        // read lands before its reply, when no grid of this app is open.
+        final held = Completer<bool>();
+        var shows = 0;
+        answer = (call) {
+          sentCalls.add(call);
+          if (call.method != kShowOverlay) return null;
+          return ++shows == 2 ? held.future : true;
+        };
+        final c = notepad();
+        await c.showOverlay();
+        await c.hideOverlay();
+        final second = c.showOverlay();
+        await pumpEventQueue();
+        reading.complete(png);
+        await pumpEventQueue();
+        expect(argsOf(kShowOverlay, 1).containsKey('appIcon'), isFalse);
+        expect(sentCalls.where((c) => c.method == kSetAppIcon), isEmpty);
+        held.complete(true);
+        await second;
+        await pumpEventQueue();
+        expect(argsOf(kSetAppIcon), {'sessionId': c.captureId, 'png': png});
+        expect(asked, hasLength(1));
+      });
+
+      test('a window whose executable cannot be named asks for nothing',
+          () async {
+        final c = notepad(
+            desktop: FakeDesktop(ownPid: 1)
+              ..windows.add(windowFacts(0x10, pid: 7))
+              ..foreground = 0x10);
+        await c.showOverlay();
+        expect(asked, isEmpty);
+        expect(argsOf(kShowOverlay).containsKey('appIcon'), isFalse);
+      });
+
+      test('a summon the runner refuses asks for nothing', () async {
+        answer = (call) {
+          sentCalls.add(call);
+          return call.method == kShowOverlay ? false : null;
+        };
+        await notepad().showOverlay();
+        expect(asked, isEmpty, reason: 'no grid will show it');
       });
     });
 
@@ -668,9 +867,89 @@ void main() {
       });
     });
 
+    test('startOverlay asks the runner, and a failure there stays there',
+        () async {
+      await wc().startOverlay();
+      expect(calls, [kStartOverlay]);
+      // The runner's deadline starts the engines anyway; launch, which awaits
+      // this last, must not fail for it.
+      answer = (_) => throw PlatformException(code: 'gone');
+      await expectLater(wc().startOverlay(), completes);
+    });
+
+    test('setCommandsRunning tells the runner, and a failure there stays '
+        'there', () async {
+      final sent = <Object?>[];
+      answer = (call) {
+        sent.add(call.arguments);
+        return null;
+      };
+      await wc().setCommandsRunning(true);
+      await wc().setCommandsRunning(false);
+      expect(calls, [kSetCommandsRunning, kSetCommandsRunning]);
+      expect(sent, [
+        {'running': true},
+        {'running': false},
+      ]);
+      // A command must never fail for its bracket: the runner has a ceiling.
+      answer = (_) => throw PlatformException(code: 'gone');
+      await expectLater(wc().setCommandsRunning(true), completes);
+    });
+
     test('hideOverlay asks the runner', () async {
       await wc().hideOverlay();
       expect(calls, [kHideOverlay]);
+    });
+
+    group('a hide names the grid it ends', () {
+      // So a hide meant for one grid can never end a newer one: the runner
+      // dismisses only the live session it names.
+      late List<Object?> hides;
+      setUp(() {
+        hides = [];
+        answer = (call) {
+          if (call.method == kHideOverlay) hides.add(call.arguments);
+          return call.method == kShowOverlay ? true : null;
+        };
+      });
+
+      WindowsWindowController withNotepad(FakeDesktop desktop) => wc(
+          desktop: desktop
+            ..windows.add(windowFacts(0x10, pid: 7))
+            ..foreground = 0x10,
+          placer: FakeWindow(frame: const PxRect(0, 0, 800, 600)));
+
+      test('a capture over an open grid names that grid', () async {
+        final c = withNotepad(FakeDesktop(ownPid: 1));
+        await c.showOverlay();
+        final grid = c.captureId;
+        await c.captureFrontmost();
+        expect(hides, [
+          {'sessionId': grid},
+        ]);
+      });
+
+      test('a refused summon names the grid that was open before it',
+          () async {
+        final c = withNotepad(FakeDesktop(ownPid: 1));
+        await c.showOverlay();
+        final grid = c.captureId;
+        answer = (call) {
+          if (call.method == kHideOverlay) hides.add(call.arguments);
+          return call.method == kShowOverlay ? false : null;
+        };
+        await c.showOverlay();
+        expect(hides, [
+          {'sessionId': grid},
+        ], reason: 'the refused summon\'s own capture never had a grid');
+      });
+
+      test('with no grid ever shown, it names none', () async {
+        await wc().hideOverlay();
+        expect(hides, [
+          {'sessionId': -1},
+        ]);
+      });
     });
   });
 }

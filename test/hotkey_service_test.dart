@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/channel.dart';
 import 'package:orthant/core/geometry.dart';
 import 'package:orthant/core/key_chord.dart';
+import 'package:orthant/core/windows_keys.dart';
 import 'package:orthant/shortcuts/bindings.dart';
 import 'package:orthant/shortcuts/command_ref.dart';
 import 'package:orthant/shortcuts/hotkey_service.dart';
@@ -573,6 +574,41 @@ void main() {
       expect(sent, isEmpty);
     });
 
+    test('a chord the grid grabs is refused, never registered', () async {
+      // The runner registers the shortcuts at launch and the grid's keys only
+      // while a grid is up, and Windows gives a chord to whoever registered it
+      // first: a shortcut on Ctrl+S or Shift+Left would leave that key dead on
+      // the grid, swallowed with the session's other hotkeys.
+      final sent = capturePayload();
+      Binding on(ShortcutCommand c, PhysicalKeyboardKey p, LogicalKeyboardKey l,
+              Modifiers m) =>
+          Binding(BuiltIn(c),
+              KeyChord(physical: p.usbHidUsage, logical: l.keyId, modifiers: m));
+      final refused = await HotkeyService(onCommand: (_) {}).apply([
+        on(ShortcutCommand.center, PhysicalKeyboardKey.keyS,
+            LogicalKeyboardKey.keyS, Modifiers.ctrl),
+        on(ShortcutCommand.leftHalf, PhysicalKeyboardKey.arrowLeft,
+            LogicalKeyboardKey.arrowLeft, Modifiers.shift),
+        on(ShortcutCommand.bottomHalf, PhysicalKeyboardKey.arrowDown,
+            LogicalKeyboardKey.arrowDown, Modifiers.shift),
+        // Not the grid's: the modifiers must match exactly.
+        on(ShortcutCommand.maximize, PhysicalKeyboardKey.keyS,
+            LogicalKeyboardKey.keyS, Modifiers.ctrl | Modifiers.shift),
+      ]);
+      expect(refused, {
+        const BuiltIn(ShortcutCommand.center),
+        const BuiltIn(ShortcutCommand.leftHalf),
+        const BuiltIn(ShortcutCommand.bottomHalf),
+      });
+      expect(sent, [
+        {
+          'id': 3, // its place in the applied set
+          'vk': 0x53,
+          'modifiers': kModControl | kModShift,
+        },
+      ]);
+    });
+
     test('a hotkey carries its press to the summon, and only the summon',
         () async {
       final presses = <double?>[];
@@ -622,6 +658,31 @@ void main() {
       expect(logged, hasLength(1));
       expect(logged.single, contains('onHotkey'));
     });
+  });
+
+  test('macOS still sends a chord its grid grabs: only Windows refuses it',
+      () async {
+    // The same collision exists on macOS (Carbon refuses the second
+    // registration of a chord), and is left as it shipped.
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    final sent = <Object?>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'replaceHotkeys') {
+        sent.addAll((call.arguments as Map)['bindings'] as List<Object?>);
+      }
+      return <int>[];
+    });
+    final refused = await HotkeyService(onCommand: (_) {}).apply([
+      Binding(
+          const BuiltIn(ShortcutCommand.center),
+          KeyChord(
+              physical: PhysicalKeyboardKey.keyS.usbHidUsage,
+              logical: LogicalKeyboardKey.keyS.keyId,
+              modifiers: Modifiers.meta)),
+    ]);
+    expect(refused, isEmpty);
+    expect(sent, hasLength(1));
   });
 
   test('a hotkey summon carries no press time: macOS stamps its own',

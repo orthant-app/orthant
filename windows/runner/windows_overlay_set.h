@@ -53,6 +53,12 @@ class WindowsOverlaySet {
 
   enum class ShowResult { kShown, kNotReady, kStale, kKeysRefused };
 
+  // Hotkey ids from here up are the overlay's grabs, on the same window as
+  // the shortcuts, whose ids are below it (Dart's HotkeyService._maxId is one
+  // less, which a test holds the two to). RegisterHotKey wants 0x0000 to
+  // 0xBFFF.
+  static constexpr int kFirstGrabId = 900;
+
   WindowsOverlaySet(HWND host, Forward forward);
   ~WindowsOverlaySet();
 
@@ -71,8 +77,32 @@ class WindowsOverlaySet {
   // session ends now; the panels are reconciled on a later turn of the loop.
   void OnDisplayChange(const char* reason);
 
-  // A message posted to the host window. True if it was this set's.
-  bool HandleHostMessage(UINT message);
+  // A message posted to the host window, or one of this set's timers on it.
+  // True if it was this set's.
+  bool HandleHostMessage(UINT message, WPARAM wparam);
+
+  // Launch has registered the hotkeys and built the tray (Dart's startOverlay,
+  // or the deadline when that never comes), so the engines may attach. Until
+  // then the panels exist, engine-less, and answer the display list.
+  void StartEngines(const char* why);
+  // Whether the next attach must wait: a hotkey's hold, or Dart's commands
+  // within their ceiling.
+  bool AttachHeld();
+
+  // The user is doing something: a hotkey's command, or the tray's. The next
+  // attach waits a second, so that work does not run behind one (each costs
+  // over a second of this thread, measured).
+  void HoldAttaches();
+  // A menu (the tray's) is being tracked on this thread, whose modal loop
+  // would run an attach and freeze the menu for its length: none starts while
+  // it is open.
+  void MenuLoop(bool open);
+
+  // Dart's window commands are queued or running (true), or the last of them
+  // has finished (false). No attach starts in between, up to a ceiling: a
+  // placement leaves this thread idle between its reads, and an attach there
+  // would hold the rest of the command for over a second.
+  void CommandsRunning(bool running);
 
   // A WM_HOTKEY. True if the overlay consumed it: one of its grabs, or any
   // other hotkey while a session is live (macOS suppressesRegionHotkeys), so
@@ -90,9 +120,22 @@ class WindowsOverlaySet {
   // `pressed_ms` is the key press that asked for this summon, carried with it
   // (PressTick), or 0 for a summon with no press (the tray). A summon that
   // reaches Show more than a second after its press is refused as stale.
+  // `app_icon` is the captured app's icon as PNG bytes, empty when Dart had
+  // none cached; it then follows as SetAppIcon. `owner_pid` is the captured
+  // window's process: the session ends when the foreground moves to a window
+  // of any other process, or to one of the shell's surfaces (the desktop, the
+  // taskbar, Start, Alt+Tab, Task View) whatever its process (click-away), and
+  // 0 turns click-away off.
   ShowResult Show(int64_t session_id, const std::string& app_name,
-                  double pressed_ms);
+                  const std::vector<uint8_t>& app_icon, double pressed_ms,
+                  DWORD owner_pid);
+  // An icon Dart read after the summon, for the panels of the live session
+  // it names; dropped for any other.
+  void SetAppIcon(int64_t session_id, const std::vector<uint8_t>& png);
   void Dismiss(const char* why);
+  // Dart's hideOverlay: ends the live session only if it is `session_id`'s,
+  // so a hide meant for one grid cannot end a newer one.
+  void Hide(int64_t session_id);
   bool live() const { return session_.has_value(); }
 
   struct Panel;
@@ -101,9 +144,21 @@ class WindowsOverlaySet {
   struct Session {
     int64_t id;
     double trigger_ms;
+    DWORD owner_pid = 0;
     Panel* active = nullptr;
     Panel* press_locked = nullptr;
   };
+
+  // Click-away: macOS dismisses on a click outside every panel through event
+  // monitors. A panel covers its monitor's work area, so the click that lands
+  // outside every panel is on the taskbar, which takes the foreground; so does
+  // Alt+Tab, the Start menu, or a notification. Hooked only while a session
+  // is live, so a hidden overlay costs nothing.
+  static void CALLBACK ForegroundChanged(HWINEVENTHOOK hook, DWORD event,
+                                         HWND hwnd, LONG object, LONG child,
+                                         DWORD thread, DWORD time);
+  void OnForeground(HWINEVENTHOOK hook, HWND hwnd);
+  void Unhook();
 
   static LRESULT CALLBACK PanelProc(HWND hwnd, UINT message, WPARAM wparam,
                                     LPARAM lparam);
@@ -117,6 +172,8 @@ class WindowsOverlaySet {
   void ScheduleAttach();
   void AttachNext();
   void AttachEngine(Panel& panel);
+  void AttachFailed(Panel& panel, const char* why);
+  void RetryAttaches();
   void OnPanelDpiChanged(Panel& panel, UINT dpi);
   std::vector<Panel*> Live() const;
   Panel* PanelFor(HMONITOR monitor) const;
@@ -128,8 +185,9 @@ class WindowsOverlaySet {
       Panel& panel, const flutter::MethodCall<flutter::EncodableValue>& call);
   flutter::EncodableMap SummonPayload(const Panel& panel, int64_t session_id,
                                       double trigger_ms,
-                                      const std::string& app_name, bool active,
-                                      bool warm) const;
+                                      const std::string& app_name,
+                                      const std::vector<uint8_t>& app_icon,
+                                      bool active, bool warm) const;
   bool GrabKeys();
   void ReleaseKeys();
   void Relay(const char* method, flutter::EncodableValue arguments);
@@ -149,7 +207,6 @@ class WindowsOverlaySet {
   HWND host_;
   Forward forward_;
   UINT reconcile_message_;
-  UINT attach_message_;
 
   // Owned for the life of the set: parked, never freed, so a Panel* held by a
   // callback or a session stays valid until the destructor.
@@ -160,12 +217,24 @@ class WindowsOverlaySet {
   const char* reconcile_reason_ = "launch";
   bool reconciling_ = false;
   bool reconcile_again_ = false;
-  bool attach_posted_ = false;
+  ULONGLONG hold_until_ = 0;  // no attach starts before this tick
+  bool menu_open_ = false;
+  bool commands_running_ = false;
+  ULONGLONG commands_since_ = 0;  // the tick they started running
+  bool commands_ceiling_logged_ = false;
+  bool engines_started_ = false;
+  bool attach_retry_set_ = false;
+#ifdef ORTHANT_DEV_BUILD
+  // How many attaches still to fail on purpose (ORTHANT_DEBUG_FAIL_ATTACHES),
+  // so the acceptance can watch a failed attach be retried.
+  int attaches_to_fail_ = 0;
+#endif
   LARGE_INTEGER started_{};
   bool announced_ready_ = false;
 
   std::optional<Session> session_;
   bool showing_ = false;  // inside Show, which a resize can re-enter
+  HWINEVENTHOOK foreground_hook_ = nullptr;
   std::vector<int> grabbed_;
 
   int cols_ = 6;

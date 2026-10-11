@@ -31,3 +31,16 @@ const String kKeyboardLayoutChanged = 'onKeyboardLayoutChanged';
 // captured window there.
 const String kOverlayCommit = 'onOverlayCommit';
 const String kOverlaySaveRegion = 'onOverlaySaveRegion';
+
+// Windows only: the captured app's icon, read off the summon path and sent to
+// the grid it belongs to once it is read.
+const String kSetAppIcon = 'setAppIcon';
+
+// Windows only: launch has registered the hotkeys and built the tray, so the
+// runner may start the overlay's engines.
+const String kStartOverlay = 'startOverlay';
+
+// Windows only: `{running}`, the command queue's burst of commands starting
+// (true) and ending (false). The runner starts no overlay engine attach in
+// between, up to a ceiling of its own.
+const String kSetCommandsRunning = 'setCommandsRunning';

@@ -7,6 +7,7 @@ import 'package:flutter/semantics.dart';
 import '../core/geometry.dart';
 import '../core/grid_config.dart';
 import 'grid_selection.dart';
+import 'overlay_copy.dart';
 
 /// The overlay's whole surface: a compact grid centred on an otherwise clear,
 /// full-screen panel, plus a true-scale preview of where the window will land.
@@ -83,8 +84,9 @@ class GridOverlay extends StatefulWidget {
   final VoidCallback onEndDrag;
   final void Function(WinRect) onCommit;
 
-  /// Asked for the current block to become a shortcut — `⌘S`, grabbed natively
-  /// like `Return` and the arrows, because the panel is non-key.
+  /// Asked for the current block to become a shortcut by the save chord
+  /// (`OverlayCopy.save`: `⌘S`, `Ctrl+S` on Windows), grabbed natively like the
+  /// place key and the arrows, because the panel is non-key.
   final void Function(CellBlock block, WinRect rect)? onSave;
 
   /// Whether to offer the hint at all. False once the user has a region of
@@ -195,29 +197,31 @@ class GridOverlayState extends State<GridOverlay> {
             cols: widget.cols, rows: widget.rows, gap: widget.gap, scale: widget.scale);
   }
 
-  /// Commit whatever is currently selected. Called for `Return`, which is
-  /// grabbed natively and relayed — the panel is non-key, so the key event
-  /// never reaches Flutter directly. No selection means no-op, not a guess.
+  /// Commit whatever is currently selected. Called for the place key
+  /// (`OverlayCopy.place`: `Return`, `Enter` on Windows), which is grabbed
+  /// natively and relayed: the panel is non-key, so the key event never
+  /// reaches Flutter directly. No selection means no-op, not a guess.
   void commitCurrent() {
     final t = _effectiveTarget;
     if (t != null) widget.onCommit(t);
   }
 
   /// Hand the current block up to be turned into a shortcut. Like
-  /// [commitCurrent], no selection is a no-op rather than a guess — pressing
-  /// ⌘S at an empty grid should do nothing, not save a corner.
-  /// ⌘S is Return *plus* an offer, so it carries the rect as well as the
-  /// block: the window lands where it was going to land, and the shape becomes
-  /// a shortcut. Saving without placing would mean summoning again to use the
-  /// region you had just finished defining.
+  /// [commitCurrent], no selection is a no-op rather than a guess: pressing
+  /// the save chord at an empty grid should do nothing, not save a corner.
+  /// The save chord is the place key *plus* an offer (see `OverlayCopy`), so it
+  /// carries the rect as well as the block: the window lands where it was
+  /// going to land, and the shape becomes a shortcut. Saving without placing
+  /// would mean summoning again to use the region you had just finished
+  /// defining.
   void saveCurrent() {
     final b = _effectiveBlock;
     final t = _effectiveTarget;
     if (b != null && t != null) widget.onSave?.call(b, t);
   }
 
-  /// Move or extend the selection by one cell. Called for an arrow key, which —
-  /// like `Return` — is grabbed natively and relayed, because the panel is
+  /// Move or extend the selection by one cell. Called for an arrow key, which,
+  /// like the place key, is grabbed natively and relayed, because the panel is
   /// non-activating and no key event reaches Flutter directly.
   ///
   /// This is what makes the grid usable without a mouse: the summon was already
@@ -341,10 +345,10 @@ class GridOverlayState extends State<GridOverlay> {
         ? 'Row ${b.r0 + 1}' : 'Rows ${b.r0 + 1} to ${b.r1 + 1}';
     final col = b.c0 == b.c1
         ? 'column ${b.c0 + 1}' : 'columns ${b.c0 + 1} to ${b.c1 + 1}';
-    String points(double n) => n == n.roundToDouble()
-        ? n.toInt().toString() : n.toStringAsFixed(1);
-    return '$row, $col. Target: x ${points(t.x)}, y ${points(t.y)}, '
-        'width ${points(t.width)}, height ${points(t.height)} points.';
+    String n(double v) =>
+        v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
+    return '$row, $col. Target: x ${n(t.x)}, y ${n(t.y)}, '
+        'width ${n(t.width)}, height ${n(t.height)} ${OverlayCopy.current.unit}.';
   }
 
   /// Flutter's macOS bridge dispatches the standard press action, but does
@@ -370,8 +374,7 @@ class GridOverlayState extends State<GridOverlay> {
           '${widget.cols} columns, ${widget.rows} rows',
       value: _selectionDescription,
       selected: selected,
-      hint: 'Arrow keys move. Shift and arrow keys extend. '
-          'Return places the window. Escape cancels.',
+      hint: OverlayCopy.current.gridHint,
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -475,7 +478,7 @@ class GridOverlayState extends State<GridOverlay> {
                 rect: Rect.fromLTWH(
                     _panelRect.left, _panelRect.bottom + 7, _panelRect.width, 14),
                 child: Text(
-                  '⌘S  save this shape as a shortcut',
+                  OverlayCopy.current.saveHint,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 10.5,

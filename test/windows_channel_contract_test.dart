@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:orthant/core/windows_keys.dart';
 
 // The Dart-side patterns take either quote style: `prefer_single_quotes` is
 // off, so a double-quoted name must not escape the sweep without failing it.
@@ -42,7 +43,11 @@ void main() {
     return calls;
   }
 
-  final cpp = File('windows/runner/window_channel.cpp').readAsStringSync();
+  // Read with LF endings whatever the checkout did (core.autocrlf true gives
+  // CRLF): the spans below end on a closing brace on a line of its own.
+  final cpp = File('windows/runner/window_channel.cpp')
+      .readAsStringSync()
+      .replaceAll('\r\n', '\n');
   final answered = {
     for (final m in RegExp(r'method == "([^"]+)"').allMatches(cpp)) m.group(1)!,
   };
@@ -99,8 +104,9 @@ void main() {
     for (final m in RegExp(r'''case ['"]([^'"]+)['"]:''').allMatches(overlayDart))
       m.group(1)!,
   };
-  final overlayCpp =
-      File('windows/runner/windows_overlay_set.cpp').readAsStringSync();
+  final overlayCpp = File('windows/runner/windows_overlay_set.cpp')
+      .readAsStringSync()
+      .replaceAll('\r\n', '\n');
   final overlayAnswered = {
     for (final m in RegExp(r'method == "([^"]+)"').allMatches(overlayCpp))
       m.group(1)!,
@@ -142,5 +148,227 @@ void main() {
 
   test('every call the runner makes to a panel is handled by overlayMain', () {
     expect(overlaySent.difference(overlayHandled), isEmpty);
+  });
+
+  // The shell's surfaces are named twice: Dart's capture never takes one as a
+  // target (windows_capture.dart), and the runner's click-away ends a grid when
+  // the foreground moves to one, whatever its process: a File Explorer window
+  // can share a process with the desktop, the taskbar and Alt+Tab, so for a
+  // grid opened over one the process alone cannot tell them apart. Menus
+  // are left out on purpose: the captured app's own menu is not going
+  // elsewhere.
+  test('the runner ends a grid on every shell surface the capture skips', () {
+    final dart = File('lib/core/windows_capture.dart').readAsStringSync();
+    final sets = RegExp(
+        r'const Set<String> k(?:Desktop|Tray|ShellSurface)Classes = \{(.*?)\};',
+        dotAll: true);
+    final classes = {
+      for (final set in sets.allMatches(dart))
+        for (final c in RegExp(r"'([^']+)'").allMatches(set.group(1)!))
+          c.group(1)!,
+    }..remove('#32768');
+    final list = RegExp(r'kShellSurfaces\[\] = \{(.*?)\};', dotAll: true)
+        .firstMatch(overlayCpp);
+    final runner = {
+      for (final c in RegExp(r'L"([^"]+)"').allMatches(list?.group(1) ?? ''))
+        c.group(1)!,
+    };
+    expect(classes, hasLength(8), reason: 'the sweep must see all three sets');
+    expect(runner.containsAll(classes), isTrue,
+        reason: 'missing from the runner: ${classes.difference(runner)}');
+  });
+
+  // The payloads themselves: a key spelled one way on one side and another way
+  // on the other is not an error anywhere, it is a field that reads as absent
+  // and quietly takes its default (a scale of 1, no press, no session). Every
+  // key the runner reads must be one Dart writes, and every key it writes one
+  // Dart reads, on both channels.
+  final runnerSources = [cpp, overlayCpp];
+  // The save-region's block crosses as a list of names in a loop, not as
+  // literals at a call: read from the overlay, written to Dart.
+  final blockKeys = {
+    for (final src in runnerSources)
+      for (final list in RegExp(r'for \(const char\* key : \{([^}]*)\}\)')
+          .allMatches(src))
+        for (final k in RegExp(r'"(\w+)"').allMatches(list.group(1)!))
+          k.group(1)!,
+  };
+  final runnerReads = {
+    for (final src in runnerSources)
+      for (final m in RegExp(r'Field\([^;]*?,\s*"(\w+)"\)').allMatches(src))
+        m.group(1)!,
+    ...blockKeys,
+  };
+  final runnerWrites = {
+    for (final src in runnerSources)
+      for (final m in RegExp(r'EncodableValue\("(\w+)"\)').allMatches(src))
+        m.group(1)!,
+    ...blockKeys,
+  };
+  // The Dart that talks to the runner: the Windows controller, the hotkey
+  // service (both of app.orthant/window), the overlay (app.orthant/overlay),
+  // and the coordinator, which reads the save-region's block.
+  final dartSources = [
+    'lib/core/window_controller_windows.dart',
+    'lib/shortcuts/hotkey_service.dart',
+    'lib/overlay/overlay_main.dart',
+    'lib/app/coordinator.dart',
+  ].map((f) => File(f).readAsStringSync()).toList();
+  // A map literal's keys, in either quote style (`prefer_single_quotes` is
+  // off); `case 'summon':` is a method name, not a key.
+  final writeKey = RegExp(r'''(?<!case )['"](\w+)['"]:''');
+  final readKey = RegExp(r'''(?:\[|read\(|intOf\()\s*['"](\w+)['"]''');
+  // Whole-line comments are prose, which quotes words too ("placed": ...).
+  String code(String src) => src
+      .split('\n')
+      .where((l) => !l.trimLeft().startsWith('//'))
+      .join('\n');
+  Set<String> keys(RegExp re, Iterable<String> sources) => {
+        for (final src in sources)
+          for (final m in re.allMatches(code(src))) m.group(1)!,
+      };
+  final dartWrites = keys(writeKey, dartSources);
+  final dartReads = keys(readKey, dartSources);
+
+  test('the key sweeps see what they must (a regex gone blind fails here)', () {
+    // The keys no test checked across the seam before (W3's list), and the
+    // block's.
+    const crossing = [
+      'sessionId', 'x', 'y', 'w', 'h', 'block', 'scale', 'warm', 'triggerMs',
+      'pressedAtMs',
+    ];
+    expect(runnerReads.union(runnerWrites), containsAll(crossing));
+    expect(blockKeys, {'cols', 'rows', 'c0', 'c1', 'r0', 'r1'});
+    expect(runnerReads, containsAll(['captureId', 'appIcon', 'pid', 'png']));
+    expect(dartReads, containsAll(['triggerMs', 'pressedAtMs', 'c0', 'scale']));
+  });
+
+  test('every key the runner reads is one Dart writes', () {
+    expect(runnerReads.difference(dartWrites), isEmpty,
+        reason: 'the runner reads these and Dart never sends them');
+  });
+
+  test('every key the runner writes is one Dart reads', () {
+    expect(runnerWrites.difference(dartReads), isEmpty,
+        reason: 'the runner sends these and Dart never reads them');
+  });
+
+  // The two Dart files that speak only to the runner (on Windows), checked in
+  // the other direction too: nothing they send is ignored, and nothing they
+  // read is never sent.
+  final windowsSources = [
+    'lib/core/window_controller_windows.dart',
+    'lib/overlay/overlay_main.dart',
+  ].map((f) => File(f).readAsStringSync()).toList();
+
+  test("every key the Windows controller and the overlay write, the runner "
+      'reads', () {
+    expect(keys(writeKey, windowsSources).difference(runnerReads), isEmpty,
+        reason: 'Dart sends these and the runner ignores them');
+  });
+
+  test("every key the Windows controller and the overlay read, the runner "
+      'writes', () {
+    expect(keys(readKey, windowsSources).difference(runnerWrites), isEmpty,
+        reason: 'Dart reads these and the runner never sends them');
+  });
+
+  test('the key sweeps see a double-quoted key', () {
+    expect(writeKey.firstMatch('{"x": 1}')?.group(1), 'x');
+    expect(readKey.firstMatch('a["x"]')?.group(1), 'x');
+    expect(writeKey.firstMatch("case 'summon':"), isNull);
+  });
+
+  // The two summons, field by field. The sets above pool every message, so a
+  // key swapped for one that crosses elsewhere passes them (the panel
+  // summon's `appIcon` written as `png`, setAppIcon's key); and these are the
+  // payloads whose fields are optional, so a lost one reads as absent.
+  String span(String src, String start, String end) {
+    final i = src.indexOf(start);
+    expect(i, isNonNegative, reason: 'no "$start"');
+    final j = src.indexOf(end, i + start.length);
+    expect(j, greaterThan(i), reason: 'no end after "$start"');
+    return src.substring(i, j);
+  }
+
+  test('the panel summon: overlayMain reads every field the runner writes, '
+      'and no other', () {
+    final writes = {
+      for (final m in RegExp(r'EncodableValue\("(\w+)"\)').allMatches(span(
+          overlayCpp,
+          'flutter::EncodableMap WindowsOverlaySet::SummonPayload(',
+          '\n}\n')))
+        m.group(1)!,
+    };
+    final reads = keys(readKey, [
+      span(File('lib/overlay/overlay_main.dart').readAsStringSync(),
+          "case 'summon':", "case '"),
+    ]);
+    expect(writes, hasLength(greaterThan(10)));
+    expect(reads, writes);
+  });
+
+  test('showOverlay: the runner reads every field Dart sends, and no other',
+      () {
+    final sends = keys(writeKey, [
+      span(File('lib/core/window_controller_windows.dart').readAsStringSync(),
+          'kShowOverlay, {', '});'),
+    ]);
+    final reads = {
+      for (final m in RegExp(r'Field\([^;]*?,\s*"(\w+)"\)').allMatches(
+          span(cpp, 'method == "showOverlay"', '} else if (method ==')))
+        m.group(1)!,
+    };
+    expect(sends, hasLength(5));
+    expect(reads, sends);
+  });
+
+  test('Dart\'s shortcut ids end just below the runner\'s first grab id', () {
+    // One number on each side of the seam: a shortcut at the grab id would
+    // fire the grid's Esc, or be swallowed as one.
+    final dartMax = int.parse(RegExp(r'static const int _maxId = (\d+);')
+        .firstMatch(File('lib/shortcuts/hotkey_service.dart').readAsStringSync())!
+        .group(1)!);
+    final header = File('windows/runner/windows_overlay_set.h').readAsStringSync();
+    final firstGrab = int.parse(RegExp(r'static constexpr int kFirstGrabId = (\d+);')
+        .firstMatch(header)!
+        .group(1)!);
+    expect(dartMax + 1, firstGrab);
+    final grabIds = RegExp(r'\{(\d+), \w+, ')
+        .allMatches(overlayCpp)
+        .map((m) => int.parse(m.group(1)!));
+    expect(grabIds.every((id) => id >= firstGrab && id <= 0xBFFF), isTrue);
+  });
+
+  // The grid's key grabs are one table in C++ (kGrabs) and one in Dart
+  // (windowsOverlayGrabs), which refuses a shortcut on any of them: a chord
+  // added to one and not the other is either a dead grid key or a refusal of
+  // a chord the grid never takes.
+  test('the grid grabs exactly the chords Dart refuses as shortcuts', () {
+    const vks = {
+      'VK_ESCAPE': 0x1B,
+      'VK_RETURN': 0x0D,
+      'VK_LEFT': 0x25,
+      'VK_UP': 0x26,
+      'VK_RIGHT': 0x27,
+      'VK_DOWN': 0x28,
+    };
+    const mods = {'0': 0, 'MOD_CONTROL': 2, 'MOD_SHIFT': 4};
+    final table = RegExp(r'constexpr Grab kGrabs\[\] = \{(.*?)\n\};',
+            dotAll: true)
+        .firstMatch(overlayCpp)!
+        .group(1)!;
+    final grabs = {
+      for (final m in RegExp(r'''\{\d+, (\w+), ('\w'|\w+), (?:true|false), "''')
+          .allMatches(table))
+        (
+          mods[m.group(1)]!,
+          m.group(2)!.startsWith("'")
+              ? m.group(2)!.codeUnitAt(1)
+              : vks[m.group(2)]!,
+        ),
+    };
+    expect(grabs, hasLength(11), reason: 'the sweep must see the whole table');
+    expect(grabs, {for (final g in windowsOverlayGrabs) (g.modifiers, g.vk)});
   });
 }

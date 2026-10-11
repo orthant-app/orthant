@@ -174,6 +174,22 @@ abstract class WindowController {
   Future<void> showOverlay({double? pressedAtMs});
   Future<void> hideOverlay();
 
+  /// Launch has done what must answer first (the hotkeys are registered and
+  /// the tray is built), so the overlay may start its engines. Windows only:
+  /// each overlay engine there costs over a second of the thread every engine
+  /// shares, so the runner waits for this (or, failing it, a deadline) rather
+  /// than make the shortcuts and the tray wait for the overlay. macOS starts
+  /// its overlay engine with the app, and this does nothing there.
+  Future<void> startOverlay();
+
+  /// Whether window commands are queued or running: true as the first of a
+  /// burst is queued, false once the last has finished, however it ended. On
+  /// Windows no overlay engine attaches in between, since an attach holds the
+  /// thread the commands share for over a second and a placement leaves that
+  /// thread idle between its reads; a time-based hold cannot know when a
+  /// placement, or a queue of them, is done. macOS has nothing to defer.
+  Future<void> setCommandsRunning(bool running);
+
   /// What the running bundle reports itself to be. Read natively from
   /// `Bundle.main`, never from pubspec or a Dart constant — those drift
   /// from what actually shipped, which is the whole failure this exists to

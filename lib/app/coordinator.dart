@@ -83,7 +83,11 @@ class OrthantCoordinator extends ChangeNotifier {
     this.debugPlacementItems = false,
   }) : _bindingsStore = bindingsStore ?? BindingsStore(),
        _settingsStore = settingsStore ?? SettingsStore(),
-       _commands = commands ?? CommandQueue();
+       _commands = commands ?? CommandQueue() {
+    // The platform hears when a burst of window commands starts and when the
+    // last of it is done: Windows attaches no overlay engine in between.
+    _commands.onBusy = (busy) => unawaited(wc.setCommandsRunning(busy));
+  }
 
   final WindowController wc;
   final PermissionController permissions;
@@ -239,6 +243,14 @@ class OrthantCoordinator extends ChangeNotifier {
     permissions.addListener(_onPermissionNotified);
     notifyListeners();
   }
+
+  /// Starts the overlay's engines, once the app is up: main.dart calls this
+  /// after [start] has registered the hotkeys and the tray is listening. On
+  /// Windows each engine holds the thread the app shares for over a second,
+  /// and started any earlier they held the hotkeys and the tray back for all
+  /// of them. macOS starts its overlay engine with the app; this does nothing
+  /// there.
+  Future<void> startOverlay() => wc.startOverlay();
 
   /// Read what the user configured. Needs no permission of any kind.
   Future<void> loadPreferences() async {

@@ -699,6 +699,47 @@ void main() {
     });
   });
 
+  group('the platform\'s words', () {
+    // The suite runs as Android unless told otherwise, which the overlay reads
+    // as macOS; each case names the platform it is about.
+    Future<SemanticsData> selectOne(WidgetTester tester) async {
+      final key = GlobalKey<GridOverlayState>();
+      await tester.pumpWidget(
+          host(gridKey: key, saveHint: true, onSave: (_, _) {}));
+      key.currentState!.moveSelection(GridDirection.right);
+      await tester.pump();
+      return tester
+          .getSemantics(find.bySemanticsLabel(
+              'Window grid for Google Chrome, 6 columns, 6 rows'))
+          .getSemanticsData();
+    }
+
+    testWidgets('on Windows the hint, the help and the target name Ctrl+S, '
+        'Enter and pixels', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final data = await selectOne(tester);
+      expect(find.text('Ctrl+S  save this shape as a shortcut'), findsOneWidget);
+      expect(data.hint,
+          'Arrow keys move. Shift and arrow keys extend. '
+          'Enter places the window. Escape cancels.');
+      expect(data.value,
+          'Row 1, column 1. Target: x 0, y 0, width 200, height 100 pixels.');
+      semantics.dispose();
+    }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
+
+    testWidgets('on macOS they are exactly what 1.0.x says', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final data = await selectOne(tester);
+      expect(find.text('⌘S  save this shape as a shortcut'), findsOneWidget);
+      expect(data.hint,
+          'Arrow keys move. Shift and arrow keys extend. '
+          'Return places the window. Escape cancels.');
+      expect(data.value,
+          'Row 1, column 1. Target: x 0, y 0, width 200, height 100 points.');
+      semantics.dispose();
+    }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+  });
+
   group('at a display scale of 1.5', () {
     // A 3840x2088 work area at 150 %: the panel is 2560x1392 logical pixels.
     const frame = WinRect(561, -2160, 3840, 2088);

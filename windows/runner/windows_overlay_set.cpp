@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -25,6 +26,41 @@ constexpr UINT kHidePanel = WM_APP + 1;
 constexpr UINT kFramePresented = WM_APP + 2;
 constexpr UINT_PTR kRevealTimer = 1;
 constexpr UINT_PTR kWarmTimer = 2;
+// On the host window, whose timer ids are shared with whatever else sets one
+// there: hence values no small counter would reach.
+constexpr UINT_PTR kStartEnginesTimer = 0x4F57;
+// The next engine attaches on a timer, not a posted message: Windows delivers
+// a timer only when no posted message is waiting, so a hotkey's notice and the
+// work Dart does for it (posted, as all of an engine's tasks are) go first,
+// and an attach takes the thread only when it is otherwise idle. Posted, the
+// attaches queued ahead of that work, and a press made as the engines started
+// waited for all of them (measured: 10.5 s in Debug on two displays).
+constexpr UINT_PTR kAttachTimer = 0x4F58;
+// How long a hotkey's notice, or the tray menu's, holds the next attach: long
+// enough for Dart to say its command is running, which then holds it until
+// the command is done.
+constexpr ULONGLONG kAttachHoldMs = 1000;
+// The longest Dart's commands may hold the attaches. A placement takes 2.8 s
+// at most (windows_placement.dart), so this is three of the slowest queued,
+// and a Dart that never says they are done cannot keep the overlay from ever
+// being ready.
+constexpr ULONGLONG kCommandsCeilingMs = 10000;
+
+// The engines start when Dart says launch is done, or after this. Each takes
+// over a second of the thread every engine shares (measured), and started
+// first they made the hotkeys and the tray wait for all of them. The deadline
+// is for a launch that never says so, so it must be longer than any launch
+// that does, in every build, or it brings the old ordering back: Dart's
+// launch said so 0.06 s after the panels existed in Profile and 0.6 s in
+// Debug (measured, in the VM).
+constexpr UINT kStartEnginesDeadlineMs = 10000;
+// A failed engine attach is tried again after this, and at most this many
+// times a panel, and again whenever the displays change: a panel with no
+// engine refuses every summon, but each attempt costs over a second of the
+// thread every engine shares.
+constexpr UINT_PTR kAttachRetryTimer = 0x4F59;
+constexpr UINT kAttachRetryMs = 10000;
+constexpr int kAttachAttempts = 3;
 
 // WM_DPICHANGED_BEFOREPARENT, spelled out: WinUser.h defines it only for
 // WINVER >= 0x0605.
@@ -71,7 +107,6 @@ constexpr Grab kGrabs[] = {
     {916, MOD_SHIFT, VK_UP, false, "Shift+Up"},
     {917, MOD_SHIFT, VK_DOWN, false, "Shift+Down"},
 };
-constexpr int kGrabFirst = 900;
 constexpr int kGrabEsc = 901;
 constexpr int kGrabEnter = 902;
 constexpr int kGrabSave = 904;
@@ -141,13 +176,52 @@ bool MonitorExists(HMONITOR monitor) {
   return WorkArea(monitor, &work);
 }
 
-// The monitor's effective DPI as Windows applies it now. Used only to notice
-// that a panel's own DPI is stale (Fit): the display list answers from
-// GetDpiForWindow, the documented source for a per-monitor-aware thread.
+// The monitor's effective DPI as Windows applies it now. Used to notice that a
+// panel's own DPI is stale: Fit nudges the panel when the two disagree, and
+// until it has, DisplayFor reports no display for it. The display list answers
+// from GetDpiForWindow, the documented source for a per-monitor-aware thread.
 UINT MonitorDpi(HMONITOR monitor) {
   UINT x = 0, y = 0;
   return SUCCEEDED(GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &x, &y)) ? x
                                                                           : 0;
+}
+
+// The set whose session the foreground hook watches. One overlay set exists
+// per process, and a WinEvent callback carries no context of its own.
+WindowsOverlaySet* g_foreground_watcher = nullptr;
+
+// The shell's own surfaces: the desktop (Win+D), the taskbars, the tray's
+// overflow, Start and Search, Alt+Tab (whose first foreground window is a
+// ForegroundStaging, measured) and Task View. Explorer owns most of them, and
+// a File Explorer window can share its process (on the VM it had one of its
+// own), so for a grid opened over a File Explorer window the process alone
+// cannot tell the user going elsewhere from the target: these end a grid
+// whatever their process. Every class the capture skips as a target is here
+// (windows_capture.dart's three sets; menus aside, since the captured app's
+// own menu is not the user going elsewhere), and a test holds this list to
+// that. ForegroundStaging and MultitaskingViewFrame are here too and in none
+// of those sets.
+constexpr const wchar_t* kShellSurfaces[] = {
+    L"Progman",
+    L"WorkerW",
+    L"Shell_TrayWnd",
+    L"Shell_SecondaryTrayWnd",
+    L"NotifyIconOverflowWindow",
+    L"TopLevelWindowForOverflowXamlIsland",
+    L"Windows.UI.Core.CoreWindow",
+    L"XamlExplorerHostIslandWindow",
+    L"ForegroundStaging",
+    L"MultitaskingViewFrame",
+};
+
+bool IsShellSurface(HWND hwnd) {
+  wchar_t name[64] = {};
+  const int length = GetClassNameW(hwnd, name, 64);
+  if (length <= 0) return false;
+  for (const wchar_t* cls : kShellSurfaces) {
+    if (wcscmp(name, cls) == 0) return true;
+  }
+  return false;
 }
 
 const flutter::EncodableValue* Field(const flutter::EncodableMap& map,
@@ -195,7 +269,8 @@ struct WindowsOverlaySet::Panel {
   // The last summon sent, replayed if it arrived before overlayMain's handler
   // was live (macOS OverlayPanel.lastSummon).
   std::optional<flutter::EncodableValue> last_summon;
-  bool attach_failed = false;
+  bool attach_failed = false;  // until the next retry or display change
+  int attach_attempts = 0;
   bool ready = false;      // overlayMain's handler is live
   bool warming = false;    // the launch warm-up has started
   bool warm = false;       // and finished
@@ -219,9 +294,14 @@ WindowsOverlaySet::WindowsOverlaySet(HWND host, Forward forward)
     : instance_(GetModuleHandle(nullptr)),
       host_(host),
       forward_(std::move(forward)),
-      reconcile_message_(RegisterWindowMessageW(L"OrthantOverlayReconcile")),
-      attach_message_(RegisterWindowMessageW(L"OrthantOverlayAttach")) {
+      reconcile_message_(RegisterWindowMessageW(L"OrthantOverlayReconcile")) {
   QueryPerformanceCounter(&started_);
+#ifdef ORTHANT_DEV_BUILD
+  char fail[8] = {};
+  if (GetEnvironmentVariableA("ORTHANT_DEBUG_FAIL_ATTACHES", fail, 8) > 0) {
+    attaches_to_fail_ = atoi(fail);
+  }
+#endif
   WNDCLASSEXW window_class{};
   window_class.cbSize = sizeof(window_class);
   window_class.lpfnWndProc = PanelProc;
@@ -236,11 +316,17 @@ WindowsOverlaySet::WindowsOverlaySet(HWND host, Forward forward)
   }
   // Windows now, engines later: the windows are a few CreateWindowEx calls and
   // answer the display list at once, while each engine costs over a second of
-  // this thread (measured), so they attach one per turn of the message loop.
+  // this thread (measured). They attach one per turn of the message loop, and
+  // only once launch has done what must answer first (StartEngines).
   Reconcile("launch");
+  SetTimer(host_, kStartEnginesTimer, kStartEnginesDeadlineMs, nullptr);
 }
 
 WindowsOverlaySet::~WindowsOverlaySet() {
+  KillTimer(host_, kStartEnginesTimer);
+  KillTimer(host_, kAttachTimer);
+  KillTimer(host_, kAttachRetryTimer);
+  Unhook();
   ReleaseKeys();
   for (auto& panel : panels_) {
     if (panel->channel) panel->channel->SetMethodCallHandler(nullptr);
@@ -382,6 +468,11 @@ void WindowsOverlaySet::Reconcile(const char* reason) {
       if (PanelFor(monitor)) continue;
       if (Panel* spare = Parked()) {
         spare->monitor = monitor;
+        // Its warm-up, if it had one, rendered another monitor's size and
+        // scale, or was ended by the park before its frame: warmed again
+        // below, so the first summon on this monitor is not a cold one.
+        spare->warming = false;
+        spare->warm = false;
         reused++;
       } else if (CreatePanel(monitor)) {
         created++;
@@ -390,6 +481,22 @@ void WindowsOverlaySet::Reconcile(const char* reason) {
     for (Panel* panel : Live()) Fit(*panel);
   } while (reconcile_again_);
   reconciling_ = false;
+  // A monitor that came or went is a new chance for an engine that failed to
+  // attach: whatever made it fail may have been that display's, and a parked
+  // panel that failed would otherwise go to the next monitor without one. A
+  // work-area or scale change is not, or a failing engine would cost the
+  // thread another three attempts each time the taskbar moved.
+  if (parked || reused || created) {
+    for (auto& panel : panels_) {
+      panel->attach_failed = false;
+      panel->attach_attempts = 0;
+    }
+  }
+  // Reused panels whose engine is listening: warmed now, at their new size.
+  // One whose overlayMain is not yet listening warms when it says so.
+  for (Panel* panel : Live()) {
+    if (panel->ready) Warm(*panel);
+  }
 
   std::ostringstream line;
   const std::vector<Display> displays = Displays();
@@ -457,19 +564,69 @@ void WindowsOverlaySet::OnPanelDpiChanged(Panel& panel, UINT dpi) {
 }
 
 void WindowsOverlaySet::ScheduleAttach() {
-  if (attach_posted_) return;
+  // A menu that is open, or a session that is live, schedules again when it
+  // ends (MenuLoop, Dismiss): an attach would freeze either for its length.
+  if (!engines_started_ || menu_open_ || session_) return;
   for (const auto& panel : panels_) {
     if (!panel->controller && !panel->attach_failed) {
-      attach_posted_ = PostMessageW(host_, attach_message_, 0, 0) != FALSE;
+      // Setting the timer again replaces it, so the latest wait wins: a
+      // hotkey's hold, or Dart's commands up to their ceiling.
+      const ULONGLONG now = GetTickCount64();
+      ULONGLONG until = hold_until_;
+      if (commands_running_) {
+        until = (std::max)(until, commands_since_ + kCommandsCeilingMs);
+      }
+      const UINT wait = until > now ? static_cast<UINT>(until - now)
+                                    : USER_TIMER_MINIMUM;
+      SetTimer(host_, kAttachTimer, wait, nullptr);
       return;
     }
   }
 }
 
+void WindowsOverlaySet::HoldAttaches() {
+  hold_until_ = GetTickCount64() + kAttachHoldMs;
+  ScheduleAttach();
+}
+
+bool WindowsOverlaySet::AttachHeld() {
+  const ULONGLONG now = GetTickCount64();
+  if (now < hold_until_) return true;
+  if (!commands_running_) return false;
+  if (now < commands_since_ + kCommandsCeilingMs) return true;
+  if (!commands_ceiling_logged_) {
+    commands_ceiling_logged_ = true;
+    DevLog("overlay attaches go on: commands still running after " +
+           std::to_string(kCommandsCeilingMs) + " ms");
+  }
+  return false;
+}
+
+void WindowsOverlaySet::CommandsRunning(bool running) {
+  if (running == commands_running_) return;
+  commands_running_ = running;
+  if (running) {
+    commands_since_ = GetTickCount64();
+    commands_ceiling_logged_ = false;
+  }
+  DevLog(running ? "overlay commands running" : "overlay commands done");
+  ScheduleAttach();  // the timer again, with the new wait
+}
+
+void WindowsOverlaySet::MenuLoop(bool open) {
+  menu_open_ = open;
+  if (open) {
+    KillTimer(host_, kAttachTimer);
+  } else {
+    HoldAttaches();  // the menu's command, if one was chosen, runs next
+  }
+}
+
 void WindowsOverlaySet::AttachNext() {
-  // One engine per turn of the loop: each costs over a second of this thread
-  // in the VM (measured), and the main isolate and the tray must not wait for
-  // all of them. A panel on a monitor goes before a parked one.
+  // One engine per timer (kAttachTimer), never during a hold, an open menu or
+  // a session: each costs over a second of this thread in the VM (measured),
+  // and the main isolate, the hotkeys, the tray and the grid must not wait for
+  // it. A panel on a monitor goes before a parked one.
   Panel* next = nullptr;
   for (const auto& panel : panels_) {
     if (panel->controller || panel->attach_failed) continue;
@@ -484,6 +641,14 @@ void WindowsOverlaySet::AttachEngine(Panel& panel) {
   GetClientRect(panel.hwnd, &client);
   LARGE_INTEGER start;
   QueryPerformanceCounter(&start);
+  ++panel.attach_attempts;
+#ifdef ORTHANT_DEV_BUILD
+  if (attaches_to_fail_ > 0) {
+    --attaches_to_fail_;
+    AttachFailed(panel, "failed on purpose");
+    return;
+  }
+#endif
   flutter::DartProject project(L"data");
   project.set_dart_entrypoint("overlayMain");
   // No plugins on this engine: overlayMain uses none, and a second copy of
@@ -491,9 +656,7 @@ void WindowsOverlaySet::AttachEngine(Panel& panel) {
   auto controller = std::make_unique<flutter::FlutterViewController>(
       client.right, client.bottom, project);
   if (!controller->engine() || !controller->view()) {
-    panel.attach_failed = true;
-    DevLog("overlay engine not created for panel " +
-           std::to_string(panel.index));
+    AttachFailed(panel, "not created");
     return;
   }
   panel.controller = std::move(controller);
@@ -524,6 +687,30 @@ void WindowsOverlaySet::AttachEngine(Panel& panel) {
       });
   DevLog("overlay engine attached: panel " + std::to_string(panel.index) +
          " in " + Ms(MsSince(start)) + " ms");
+}
+
+void WindowsOverlaySet::AttachFailed(Panel& panel, const char* why) {
+  panel.attach_failed = true;
+  const bool again = panel.attach_attempts < kAttachAttempts;
+  DevLog("overlay engine " + std::string(why) + " for panel " +
+         std::to_string(panel.index) + " (attempt " +
+         std::to_string(panel.attach_attempts) + ")" +
+         (again ? "; retrying" : "; giving up until the displays change"));
+  if (again && !attach_retry_set_) {
+    attach_retry_set_ =
+        SetTimer(host_, kAttachRetryTimer, kAttachRetryMs, nullptr) != 0;
+  }
+}
+
+void WindowsOverlaySet::RetryAttaches() {
+  KillTimer(host_, kAttachRetryTimer);
+  attach_retry_set_ = false;
+  for (auto& panel : panels_) {
+    if (panel->attach_failed && panel->attach_attempts < kAttachAttempts) {
+      panel->attach_failed = false;
+    }
+  }
+  ScheduleAttach();
 }
 
 std::vector<WindowsOverlaySet::Panel*> WindowsOverlaySet::Live() const {
@@ -561,6 +748,13 @@ std::optional<WindowsOverlaySet::Display> WindowsOverlaySet::DisplayFor(
   if (!panel.monitor || !WorkArea(panel.monitor, &work)) return std::nullopt;
   const UINT dpi = GetDpiForWindow(panel.hwnd);
   if (dpi == 0) return std::nullopt;
+  // A panel learns a scale change only when Fit, on a later turn of the loop,
+  // nudges it (measured: Windows re-reads a static window's DPI only when its
+  // rect changes). Until then its DPI is the old one, which would scale a
+  // gap wrongly: no display rather than a stale one, so the list is empty for
+  // that moment, as it is while a monitor that has just come has no panel.
+  const UINT monitor_dpi = MonitorDpi(panel.monitor);
+  if (monitor_dpi != 0 && monitor_dpi != dpi) return std::nullopt;
   return Display{work, dpi};
 }
 
@@ -608,16 +802,39 @@ void WindowsOverlaySet::OnDisplayChange(const char* reason) {
       PostMessageW(host_, reconcile_message_, 0, 0) != FALSE;
 }
 
-bool WindowsOverlaySet::HandleHostMessage(UINT message) {
+void WindowsOverlaySet::StartEngines(const char* why) {
+  if (engines_started_) return;
+  engines_started_ = true;
+  KillTimer(host_, kStartEnginesTimer);
+  DevLog(std::string("overlay engines starting (") + why + "), " +
+         Ms(MsSince(started_)) + " ms after launch");
+  ScheduleAttach();
+}
+
+bool WindowsOverlaySet::HandleHostMessage(UINT message, WPARAM wparam) {
+  if (message == WM_TIMER && wparam == kStartEnginesTimer) {
+    StartEngines("deadline");
+    return true;
+  }
+  if (message == WM_TIMER && wparam == kAttachTimer) {
+    KillTimer(host_, kAttachTimer);
+    // A hold a later hotkey extended, commands that started, or a menu or a
+    // session opened since it was set.
+    if (menu_open_ || session_ || AttachHeld()) {
+      ScheduleAttach();
+    } else {
+      AttachNext();
+    }
+    return true;
+  }
+  if (message == WM_TIMER && wparam == kAttachRetryTimer) {
+    RetryAttaches();
+    return true;
+  }
   if (message == 0) return false;  // a registration that failed
   if (message == reconcile_message_) {
     reconcile_posted_ = false;
     Reconcile(reconcile_reason_);
-    return true;
-  }
-  if (message == attach_message_) {
-    attach_posted_ = false;
-    AttachNext();
     return true;
   }
   return false;
@@ -626,7 +843,7 @@ bool WindowsOverlaySet::HandleHostMessage(UINT message) {
 // ---------------------------------------------------------------- session
 
 bool WindowsOverlaySet::HandleHotkey(int id) {
-  if (id < kGrabFirst || id > kGrabArrowLast) {
+  if (id < kFirstGrabId || id > kGrabArrowLast) {
     // Swallowed while a session is live (macOS suppressesRegionHotkeys): a
     // shortcut would capture anew underneath an open grid.
     return session_.has_value();
@@ -674,7 +891,8 @@ void WindowsOverlaySet::SetGrid(int cols, int rows, double gap,
 
 flutter::EncodableMap WindowsOverlaySet::SummonPayload(
     const Panel& panel, int64_t session_id, double trigger_ms,
-    const std::string& app_name, bool active, bool warm) const {
+    const std::string& app_name, const std::vector<uint8_t>& app_icon,
+    bool active, bool warm) const {
   RECT work{};
   WorkArea(panel.monitor, &work);
   const UINT dpi = GetDpiForWindow(panel.hwnd);
@@ -701,6 +919,10 @@ flutter::EncodableMap WindowsOverlaySet::SummonPayload(
       {flutter::EncodableValue("gap"), flutter::EncodableValue(gap_)},
       {flutter::EncodableValue("saveHint"), flutter::EncodableValue(save_hint_)},
   };
+  if (!app_icon.empty()) {
+    payload[flutter::EncodableValue("appIcon")] =
+        flutter::EncodableValue(app_icon);
+  }
   if (warm) {
     payload[flutter::EncodableValue("warm")] = flutter::EncodableValue(true);
   }
@@ -708,7 +930,9 @@ flutter::EncodableMap WindowsOverlaySet::SummonPayload(
 }
 
 WindowsOverlaySet::ShowResult WindowsOverlaySet::Show(
-    int64_t session_id, const std::string& app_name, double pressed_ms) {
+    int64_t session_id, const std::string& app_name,
+    const std::vector<uint8_t>& app_icon, double pressed_ms,
+    DWORD owner_pid) {
   // Timed from the summon's key press when there is one, as macOS times from
   // its Carbon press; a tray summon has none (0) and is timed from here. The
   // age is read on the tick clock the press was stamped on; the trigger the
@@ -716,7 +940,9 @@ WindowsOverlaySet::ShowResult WindowsOverlaySet::Show(
   const double now = EpochMs();
   const double age =
       pressed_ms > 0 ? static_cast<double>(GetTickCount64()) - pressed_ms : 0;
-  if (pressed_ms > 0 && age > kStaleSummonMs) {
+  // A press from the future is no press of ours (the tick is this machine's
+  // and monotonic): stale, not fresh.
+  if (pressed_ms > 0 && (age > kStaleSummonMs || age < 0)) {
     DevLog("overlay summon refused: stale, " + Ms(age) +
            " ms after its hotkey");
     MessageBeep(MB_OK);
@@ -776,7 +1002,7 @@ WindowsOverlaySet::ShowResult WindowsOverlaySet::Show(
     return ShowResult::kNotReady;
   }
 
-  session_ = Session{session_id, trigger};
+  session_ = Session{session_id, trigger, owner_pid};
   POINT cursor{};
   GetCursorPos(&cursor);
   const HMONITOR under = MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST);
@@ -794,21 +1020,100 @@ WindowsOverlaySet::ShowResult WindowsOverlaySet::Show(
     SetWindowPos(panel->hwnd, HWND_TOPMOST, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
     const flutter::EncodableValue payload(SummonPayload(
-        *panel, session_id, trigger, app_name, active, false));
+        *panel, session_id, trigger, app_name, app_icon, active, false));
     panel->last_summon = payload;
     panel->channel->InvokeMethod(
         "summon", std::make_unique<flutter::EncodableValue>(payload));
     ArmFrame(*panel);
     SetTimer(panel->hwnd, kRevealTimer, kRevealDeadlineMs, nullptr);
   }
+  // Last, once nothing above can end the session: a change of foreground from
+  // here on ends it. Out of context, so the callback runs from this thread's
+  // message loop, never inside another process.
+  if (owner_pid != 0) {
+    g_foreground_watcher = this;
+    foreground_hook_ = SetWinEventHook(
+        EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr,
+        ForegroundChanged, 0, 0, WINEVENT_OUTOFCONTEXT);
+    if (!foreground_hook_) DevLog("overlay click-away not hooked");
+    // A move made before the hook existed, between Dart's capture and here,
+    // is read once now by the same rule; any later one arrives as an event.
+    if (foreground_hook_) OnForeground(foreground_hook_, GetForegroundWindow());
+  }
   NoteReady();
   return ShowResult::kShown;
+}
+
+void WindowsOverlaySet::SetAppIcon(int64_t session_id,
+                                   const std::vector<uint8_t>& png) {
+  if (!session_ || session_->id != session_id || png.empty()) {
+    DevLog("overlay icon dropped: session " + std::to_string(session_id));
+    return;
+  }
+  const flutter::EncodableValue icon(png);
+  for (Panel* panel : Live()) {
+    // A panel whose overlayMain was not yet listening replays its last
+    // summon when it is: that replay carries the icon too.
+    if (panel->last_summon) {
+      if (auto* summon =
+              std::get_if<flutter::EncodableMap>(&*panel->last_summon)) {
+        (*summon)[flutter::EncodableValue("appIcon")] = icon;
+      }
+    }
+    if (!panel->channel) continue;
+    panel->channel->InvokeMethod(
+        "setAppIcon",
+        std::make_unique<flutter::EncodableValue>(flutter::EncodableMap{
+            {flutter::EncodableValue("sessionId"),
+             flutter::EncodableValue(session_id)},
+            {flutter::EncodableValue("png"), icon},
+        }));
+  }
+  DevLog("overlay icon: session " + std::to_string(session_id) + ", " +
+         std::to_string(png.size()) + " bytes");
+}
+
+void CALLBACK WindowsOverlaySet::ForegroundChanged(HWINEVENTHOOK hook, DWORD,
+                                                   HWND hwnd, LONG object,
+                                                   LONG, DWORD, DWORD) {
+  if (object != OBJID_WINDOW || !hwnd || !g_foreground_watcher) return;
+  g_foreground_watcher->OnForeground(hook, hwnd);
+}
+
+void WindowsOverlaySet::OnForeground(HWINEVENTHOOK hook, HWND hwnd) {
+  // An event queued before an earlier session's hook was removed is not this
+  // session's; no window at all is a switch still in progress.
+  if (!session_ || hook != foreground_hook_ || !hwnd) return;
+  DWORD pid = 0;
+  GetWindowThreadProcessId(hwnd, &pid);
+  // Orthant's own windows: a tray summon's foreground is the hidden window
+  // until its capture reactivates the target.
+  if (pid == GetCurrentProcessId()) return;
+  // The captured window's own process: a tray summon's capture activates
+  // that window after the panels show, and a dialog of the app's own may come
+  // forward. Neither is the user going elsewhere.
+  const bool shell = IsShellSurface(hwnd);
+  if (pid == session_->owner_pid && !shell) return;
+  DevLog(std::string("overlay foreground moved: ") +
+         (shell ? "shell" : "process " + std::to_string(pid)));
+  Dismiss("click-away");
+}
+
+void WindowsOverlaySet::Unhook() {
+  if (foreground_hook_) UnhookWinEvent(foreground_hook_);
+  foreground_hook_ = nullptr;
+  if (g_foreground_watcher == this) g_foreground_watcher = nullptr;
+}
+
+void WindowsOverlaySet::Hide(int64_t session_id) {
+  if (session_ && session_->id == session_id) Dismiss("hideOverlay");
 }
 
 void WindowsOverlaySet::Dismiss(const char* why) {
   if (!session_) return;
   const int64_t id = session_->id;
   session_.reset();
+  Unhook();
   ReleaseKeys();
   for (const auto& owned : panels_) {
     Panel& panel = *owned;
@@ -826,6 +1131,8 @@ void WindowsOverlaySet::Dismiss(const char* why) {
     }
   }
   DevLog(std::string("overlay dismissed (") + why + ")");
+  // Its outcome (a placement, the picker) runs before the next attach.
+  HoldAttaches();
 }
 
 bool WindowsOverlaySet::GrabKeys() {
@@ -1002,8 +1309,8 @@ void WindowsOverlaySet::Warm(Panel& panel) {
   // Rendered as the active panel, so the first real summon takes the warmed
   // path; the warm flag keeps it from speaking or reporting a first frame.
   panel.channel->InvokeMethod(
-      "summon", std::make_unique<flutter::EncodableValue>(
-                    SummonPayload(panel, 0, EpochMs(), "", true, true)));
+      "summon", std::make_unique<flutter::EncodableValue>(SummonPayload(
+                    panel, 0, EpochMs(), "", {}, true, true)));
   ArmFrame(panel);
   SetTimer(panel.hwnd, kWarmTimer, kWarmDeadlineMs, nullptr);
 }
@@ -1058,12 +1365,14 @@ void WindowsOverlaySet::EndWarm(Panel& panel, uint64_t shows,
 
 void WindowsOverlaySet::NoteReady() {
   if (announced_ready_) return;
-  const std::vector<Panel*> live = Live();
-  for (const Panel* panel : live) {
-    if (!panel->warm) return;
+  // Every monitor's, not every live panel's: a monitor that came and went at
+  // launch would otherwise be announced ready with one panel short.
+  for (HMONITOR monitor : Monitors()) {
+    const Panel* panel = PanelFor(monitor);
+    if (!panel || !panel->warm) return;
   }
+  const std::vector<Panel*> live = Live();
   announced_ready_ = true;
   DevLog("overlay ready: " + std::to_string(live.size()) + " panels, " +
          Ms(MsSince(started_)) + " ms after launch");
 }
-

@@ -50,9 +50,10 @@ std::optional<int64_t> IntOf(const flutter::EncodableValue* value) {
   return std::nullopt;
 }
 
-// Dart's ids for the shortcuts: 0 to 899. The overlay's grabs are 900 to 917
+// Dart's ids for the shortcuts: every id below WindowsOverlaySet::kFirstGrabId
+// (0 to 899 today). The overlay's grabs are that id and up (900 to 917 today)
 // on the same window, and RegisterHotKey wants 0x0000 to 0xBFFF.
-constexpr int64_t kMaxShortcutId = 899;
+constexpr int64_t kMaxShortcutId = WindowsOverlaySet::kFirstGrabId - 1;
 
 // One replaceHotkeys entry: {id, vk, modifiers}, from Dart's _windowsEntry.
 struct HotkeyRequest {
@@ -155,16 +156,31 @@ std::optional<flutter::EncodableList> WindowChannel::ReplaceHotkeys(
   // will read as "everything refused" must not leave the old chords live.
   UnregisterHotkeys();
   const auto requests = ParseHotkeys(arguments);
-  if (!requests) return std::nullopt;
+  if (!requests) {
+#ifdef ORTHANT_DEV_BUILD
+    std::cout << "[orthant] hotkeys: payload unreadable, nothing registered"
+              << std::endl;
+#endif
+    return std::nullopt;
+  }
   flutter::EncodableList refused;
   for (const HotkeyRequest& r : *requests) {
-    // Only an entry parsing kept (vk not 0) has an id from 0 to 899 to narrow;
-    // a refused one goes back as it came, so an id past int's range cannot
-    // read as another's.
+    // Only an entry parsing kept (vk not 0) has an id from 0 to kMaxShortcutId
+    // to narrow; a refused one goes back as it came, so an id past int's range
+    // cannot read as another's.
     if (r.vk != 0 && RegisterHotKey(config_window_, static_cast<int>(r.id),
                                     r.modifiers | MOD_NOREPEAT, r.vk)) {
       registered_.push_back(static_cast<int>(r.id));
     } else {
+      // Read before anything else runs: writing to cout can reset it.
+      const DWORD error = r.vk != 0 ? GetLastError() : 0;
+#ifdef ORTHANT_DEV_BUILD
+      std::cout << "[orthant] hotkey refused: id " << r.id << " vk " << r.vk
+                << " modifiers " << r.modifiers << " error " << error
+                << std::endl;
+#else
+      (void)error;
+#endif
       refused.push_back(flutter::EncodableValue(r.id));
     }
   }
@@ -187,9 +203,11 @@ void WindowChannel::HandleMethodCall(
   const std::string& method = call.method_name();
   if (method == "showConfigWindow") {
     // A minimized window shown with SW_SHOW stays minimized; restore it.
-    // SetForegroundWindow succeeds because the tray click that asked for
-    // this window granted the process foreground rights; there is no other
-    // path that shows it (spec §5.5).
+    // Dart asks for this window from the tray, from the grid's Ctrl+S (its
+    // picker opens here once overlaySaveRegion has placed the captured
+    // window), and at launch and on a lost permission for the onboarding. In
+    // the first two SetForegroundWindow succeeds because the click or the
+    // WM_HOTKEY that started them granted the process foreground rights.
     ShowWindow(config_window_,
                IsIconic(config_window_) ? SW_RESTORE : SW_SHOW);
     SetForegroundWindow(config_window_);
@@ -245,10 +263,12 @@ void WindowChannel::HandleMethodCall(
     }
     result->Success();
   } else if (method == "showOverlay") {
-    // {captureId, appName, pressedAtMs?}: Dart has captured the window
-    // already, and the session is named by that capture's id. pressedAtMs is
-    // the key press that asked for this summon, carried with it; absent for a
-    // summon with no press (the tray). The reply is whether it showed.
+    // {captureId, appName, pressedAtMs?, appIcon?, pid?}: Dart has captured
+    // the window already, and the session is named by that capture's id.
+    // pressedAtMs is the key press that asked for this summon, carried with
+    // it; absent for a summon with no press (the tray). pid is the captured
+    // window's process, for click-away; absent, click-away is off for the
+    // session. The reply is whether it showed.
     // Show refuses, and the reply is false, for four reasons: a monitor with
     // no panel, or whose panel has no engine attached yet; Esc or Enter held
     // by another app; a hotkey press more than 1 s old (stale); or the
@@ -273,15 +293,56 @@ void WindowChannel::HandleMethodCall(
       pressed_ms = static_cast<double>(*i);
     }
     if (!std::isfinite(pressed_ms)) pressed_ms = 0;
+    // The captured app's icon as PNG bytes, when Dart had one cached; absent
+    // otherwise, and it follows as setAppIcon.
+    const auto* icon = Field(call.arguments(), "appIcon");
+    const auto* icon_bytes =
+        icon ? std::get_if<std::vector<uint8_t>>(icon) : nullptr;
+    // The captured window's process, for click-away. One that cannot be read
+    // is 0, which turns click-away off for this session rather than ending
+    // it on the activation a tray summon's capture causes.
+    const auto pid = IntOf(Field(call.arguments(), "pid"));
+    const DWORD owner_pid =
+        pid && *pid > 0 && *pid <= 0xFFFFFFFF ? static_cast<DWORD>(*pid) : 0;
     const bool shown =
         overlays_->Show(*capture_id,
                         app_name_value ? *app_name_value : std::string(),
-                        pressed_ms) == WindowsOverlaySet::ShowResult::kShown;
+                        icon_bytes ? *icon_bytes : std::vector<uint8_t>(),
+                        pressed_ms,
+                        owner_pid) == WindowsOverlaySet::ShowResult::kShown;
     result->Success(flutter::EncodableValue(shown));
+  } else if (method == "setAppIcon") {
+    // {sessionId, png}: an icon Dart read after the summon, off the summon
+    // path. The panels take it only while that session is live.
+    const auto session = IntOf(Field(call.arguments(), "sessionId"));
+    const auto* png = Field(call.arguments(), "png");
+    const auto* bytes = png ? std::get_if<std::vector<uint8_t>>(png) : nullptr;
+    if (session && bytes) overlays_->SetAppIcon(*session, *bytes);
+    result->Success();
+  } else if (method == "setCommandsRunning") {
+    // {running}: Dart's window commands are queued or running, or the last
+    // of them has finished. No overlay engine attaches in between.
+    const auto* running = Field(call.arguments(), "running");
+    const auto* value = running ? std::get_if<bool>(running) : nullptr;
+    if (value) overlays_->CommandsRunning(*value);
+    result->Success();
+  } else if (method == "startOverlay") {
+    // Launch has registered the hotkeys and built the tray: the overlay's
+    // engines may take the thread now.
+    overlays_->StartEngines("dart");
+    result->Success();
   } else if (method == "hideOverlay") {
-    // Also how Dart ends a summon that will not reach showOverlay (nothing to
-    // capture): a grid still open names the capture that summon just cleared.
-    overlays_->Dismiss("hideOverlay");
+    // {sessionId}: the grid Dart last saw shown, which this ends only if it is
+    // the live session. Also how Dart ends a summon that will not reach
+    // showOverlay (nothing to capture): a grid still open names the capture
+    // that summon just cleared. A payload that names no session ends whatever
+    // is live: ending a grid is the safe side, a dead one holds Esc and Enter.
+    const auto session = IntOf(Field(call.arguments(), "sessionId"));
+    if (session) {
+      overlays_->Hide(*session);
+    } else {
+      overlays_->Dismiss("hideOverlay");
+    }
     result->Success();
   } else {
     result->NotImplemented();

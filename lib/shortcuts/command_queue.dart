@@ -19,16 +19,28 @@
 /// which keeps a burst predictable rather than merely fast.
 class CommandQueue {
   Future<void> _tail = Future<void>.value();
+  int _pending = 0;
+
+  /// Told `true` when the queue takes a task while idle, and `false` once the
+  /// last task queued has finished, a failure included: once per burst, not
+  /// once per task. The platform defers its own work that would hold the
+  /// thread the commands share until then (see
+  /// `WindowController.setCommandsRunning`).
+  void Function(bool busy)? onBusy;
 
   /// Queue [task] and return a future for *its* completion, errors included.
   Future<void> add(Future<void> Function() task) {
+    if (_pending++ == 0) onBusy?.call(true);
     final result = _tail.then((_) => task());
     // The chain itself must survive a failure. If the tail were left rejected,
     // every later command would inherit that error and never run — one thrown
     // exception would kill the shortcuts for the rest of the session, which is
     // a far worse outcome than the race this exists to prevent. The caller's
-    // future still carries the error.
-    _tail = result.then((_) {}, onError: (_) {});
+    // future still carries the error. The count drops here too, before the
+    // next task starts, so a burst ends only with its last task.
+    _tail = result.then((_) {}, onError: (_) {}).whenComplete(() {
+      if (--_pending == 0) onBusy?.call(false);
+    });
     return result;
   }
 }

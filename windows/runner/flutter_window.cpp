@@ -2,6 +2,7 @@
 
 #include <commctrl.h>
 
+#include <iostream>
 #include <optional>
 #include <utility>
 
@@ -11,6 +12,36 @@ namespace {
 
 // The view's subclass, unique to this file.
 constexpr UINT_PTR kViewSubclass = 1;
+
+// The focus never activates a window of Orthant's that nobody can see: the
+// settings window while it is hidden, or an overlay panel, which never takes
+// it at all. Flutter asks for its view's focus as an app starts (the first
+// route takes the focus, and the view follows), and the embedder's SetFocus
+// activates the window holding the view. At launch, while the process may
+// still take the foreground, the hidden settings window and then each panel
+// took it from the window the user was in, and the hidden one could keep it
+// (measured). The hidden window may still be activated, which the tray does
+// so that its menu closes on a click elsewhere, and once active it may focus
+// its view: that focus is what the settings window has when the tray then
+// shows it, already active, with no second activation to set it (measured:
+// refused, the shortcut recorder heard nothing). A thread hook sees only this
+// thread's windows, and every window Orthant has is on this thread.
+HHOOK g_focus_guard = nullptr;
+
+LRESULT CALLBACK FocusGuard(int code, WPARAM wparam, LPARAM lparam) {
+  if (code == HCBT_SETFOCUS || code == HCBT_ACTIVATE) {
+    HWND root = GetAncestor(reinterpret_cast<HWND>(wparam), GA_ROOT);
+    if (root) {
+      const bool never =
+          (GetWindowLongPtrW(root, GWL_EXSTYLE) & WS_EX_NOACTIVATE) != 0;
+      const bool activates_unseen = code == HCBT_SETFOCUS &&
+                                    !IsWindowVisible(root) &&
+                                    GetActiveWindow() != root;
+      if (never || activates_unseen) return 1;
+    }
+  }
+  return CallNextHookEx(g_focus_guard, code, wparam, lparam);
+}
 
 }  // namespace
 
@@ -22,6 +53,16 @@ FlutterWindow::~FlutterWindow() {}
 bool FlutterWindow::OnCreate() {
   if (!Win32Window::OnCreate()) {
     return false;
+  }
+  // Before any engine, so that none of their first requests gets through.
+  g_focus_guard = SetWindowsHookExW(WH_CBT, FocusGuard, nullptr,
+                                    GetCurrentThreadId());
+  if (!g_focus_guard) {
+#ifdef ORTHANT_DEV_BUILD
+    const DWORD error = GetLastError();
+    std::cout << "[orthant] focus guard not installed, error " << error
+              << std::endl;
+#endif
   }
 
   RECT frame = GetClientArea();
@@ -56,8 +97,17 @@ bool FlutterWindow::OnCreate() {
   window_channel_ = std::make_unique<WindowChannel>(
       flutter_controller_->engine()->messenger(), GetHandle(),
       overlay_set_.get());
-  SetWindowSubclass(flutter_controller_->view()->GetNativeWindow(), ViewProc,
-                    kViewSubclass, reinterpret_cast<DWORD_PTR>(this));
+  if (!SetWindowSubclass(flutter_controller_->view()->GetNativeWindow(),
+                         ViewProc, kViewSubclass,
+                         reinterpret_cast<DWORD_PTR>(this))) {
+#ifdef ORTHANT_DEV_BUILD
+    // The labels then follow a layout switch only when this window is next
+    // activated.
+    std::cout << "[orthant] view not subclassed: layout notices only on "
+                 "activation"
+              << std::endl;
+#endif
+  }
 
   // The template shows the window on the engine's first frame. Orthant is a
   // tray app: the window stays hidden until Dart asks for it over the channel
@@ -76,6 +126,10 @@ void FlutterWindow::OnDestroy() {
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
+  if (g_focus_guard) {
+    UnhookWindowsHookEx(g_focus_guard);
+    g_focus_guard = nullptr;
+  }
 
   Win32Window::OnDestroy();
 }
@@ -84,8 +138,9 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
-  // The overlay's posted work: reconciles and engine attaches.
-  if (overlay_set_ && overlay_set_->HandleHostMessage(message)) {
+  // The overlay's posted work and its timer: reconciles, engine attaches, and
+  // the deadline for starting the engines.
+  if (overlay_set_ && overlay_set_->HandleHostMessage(message, wparam)) {
     return 0;
   }
 
@@ -95,9 +150,15 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       // The overlay's grabs, and anything at all while a session is live.
       if (overlay_set_ && overlay_set_->HandleHotkey(id)) return 0;
       // A shortcut, to Dart with its press: the summon's stale check and its
-      // first-frame timing read the press, not this dispatch. Ids from 900 up
-      // are the overlay's and were handled above.
-      if (id >= 0 && id < 900 && window_channel_) {
+      // first-frame timing read the press, not this dispatch. Ids from
+      // kFirstGrabId up are the overlay's and were handled above.
+      if (id >= 0 && id < WindowsOverlaySet::kFirstGrabId && window_channel_) {
+        // A fixed hold (one second) keeps an engine from attaching between
+        // this press and Dart's own notice that its command is running
+        // (setCommandsRunning), which then holds the attaches until the
+        // commands are done, up to a ceiling. The hold runs out whether or
+        // not Dart says so.
+        if (overlay_set_) overlay_set_->HoldAttaches();
         window_channel_->NotifyHotkey(
             id, WindowsOverlaySet::PressTick(GetMessageTime()));
         return 0;
@@ -122,7 +183,12 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
         window_channel_->NotifyConfigWindowClosed();
       }
       return 0;
+    case WM_ENTERMENULOOP:
+      // The tray's menu, tracked on this thread: no engine attaches under it.
+      if (overlay_set_) overlay_set_->MenuLoop(true);
+      break;
     case WM_EXITMENULOOP:
+      if (overlay_set_) overlay_set_->MenuLoop(false);
       // tray_manager tracks its menu with this window as owner but never
       // posts the WM_NULL Microsoft prescribes after TrackPopupMenu for a
       // notification icon's menu. Without it the second opening of the menu
@@ -169,7 +235,12 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
 LRESULT CALLBACK FlutterWindow::ViewProc(HWND hwnd, UINT message,
                                          WPARAM wparam, LPARAM lparam,
                                          UINT_PTR id, DWORD_PTR data) {
-  (void)id;
+  if (message == WM_NCDESTROY) {
+    // The view is going without OnDestroy having run (the ~Win32Window path):
+    // the subclass must not outlive it.
+    RemoveWindowSubclass(hwnd, ViewProc, id);
+    return DefSubclassProc(hwnd, message, wparam, lparam);
+  }
   if (message == WM_INPUTLANGCHANGE) {
     // This thread's input language changed, so a punctuation key may print
     // differently: Dart re-reads the labels.

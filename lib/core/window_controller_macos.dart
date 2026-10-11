@@ -125,6 +125,14 @@ class MacosWindowController implements WindowController {
   @override
   Future<void> hideOverlay() => _channel.invokeMethod<void>(kHideOverlay);
 
+  // macOS starts its overlay engine with the app, natively.
+  @override
+  Future<void> startOverlay() async {}
+
+  // Nothing on macOS waits for the commands to finish.
+  @override
+  Future<void> setCommandsRunning(bool running) async {}
+
   @override
   Future<AppVersion> appVersion() async {
     // Defensive on every field: a reply that is missing, the wrong shape, or

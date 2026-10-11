@@ -36,6 +36,7 @@ class FakeDesktop implements Win32Desktop {
   int foreground = 0;
   final List<WindowFacts> windows = [];
   final Map<int, String> names = {};
+  final Map<int, String> paths = {};
   final List<int> reactivated = [];
   bool foregroundRefused = false;
 
@@ -64,6 +65,9 @@ class FakeDesktop implements Win32Desktop {
   String? processName(int pid) => names[pid];
 
   @override
+  String? imagePath(int pid) => paths[pid];
+
+  @override
   bool setForeground(int hwnd) {
     reactivated.add(hwnd);
     return !foregroundRefused;
@@ -85,6 +89,8 @@ class NoWindows implements Win32Desktop, Win32Placer {
       windowFacts(hwnd, pid: 0, visible: false, frame: null);
   @override
   String? processName(int pid) => null;
+  @override
+  String? imagePath(int pid) => null;
   @override
   bool setForeground(int hwnd) => false;
   @override

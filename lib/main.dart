@@ -101,6 +101,8 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
   void initState() {
     super.initState();
     trayManager.addListener(this);
+    // Last of launch, now the tray can hear a click: the overlay's engines.
+    unawaited(app.startOverlay());
   }
 
   @override

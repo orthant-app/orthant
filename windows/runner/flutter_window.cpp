@@ -13,6 +13,36 @@ namespace {
 // The view's subclass, unique to this file.
 constexpr UINT_PTR kViewSubclass = 1;
 
+// The focus never activates a window of Orthant's that nobody can see: the
+// settings window while it is hidden, or an overlay panel, which never takes
+// it at all. Flutter asks for its view's focus as an app starts (the first
+// route takes the focus, and the view follows), and the embedder's SetFocus
+// activates the window holding the view. At launch, while the process may
+// still take the foreground, the hidden settings window and then each panel
+// took it from the window the user was in, and the hidden one could keep it
+// (measured). The hidden window may still be activated, which the tray does
+// so that its menu closes on a click elsewhere, and once active it may focus
+// its view: that focus is what the settings window has when the tray then
+// shows it, already active, with no second activation to set it (measured:
+// refused, the shortcut recorder heard nothing). A thread hook sees only this
+// thread's windows, and every window Orthant has is on this thread.
+HHOOK g_focus_guard = nullptr;
+
+LRESULT CALLBACK FocusGuard(int code, WPARAM wparam, LPARAM lparam) {
+  if (code == HCBT_SETFOCUS || code == HCBT_ACTIVATE) {
+    HWND root = GetAncestor(reinterpret_cast<HWND>(wparam), GA_ROOT);
+    if (root) {
+      const bool never =
+          (GetWindowLongPtrW(root, GWL_EXSTYLE) & WS_EX_NOACTIVATE) != 0;
+      const bool activates_unseen = code == HCBT_SETFOCUS &&
+                                    !IsWindowVisible(root) &&
+                                    GetActiveWindow() != root;
+      if (never || activates_unseen) return 1;
+    }
+  }
+  return CallNextHookEx(g_focus_guard, code, wparam, lparam);
+}
+
 }  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
@@ -23,6 +53,13 @@ FlutterWindow::~FlutterWindow() {}
 bool FlutterWindow::OnCreate() {
   if (!Win32Window::OnCreate()) {
     return false;
+  }
+  // Before any engine, so that none of their first requests gets through.
+  g_focus_guard = SetWindowsHookExW(WH_CBT, FocusGuard, nullptr,
+                                    GetCurrentThreadId());
+  if (!g_focus_guard) {
+    std::cout << "[orthant] focus guard not installed, error "
+              << GetLastError() << std::endl;
   }
 
   RECT frame = GetClientArea();
@@ -85,6 +122,10 @@ void FlutterWindow::OnDestroy() {
   overlay_set_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
+  }
+  if (g_focus_guard) {
+    UnhookWindowsHookEx(g_focus_guard);
+    g_focus_guard = nullptr;
   }
 
   Win32Window::OnDestroy();

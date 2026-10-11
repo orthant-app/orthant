@@ -35,3 +35,8 @@ const String kOverlaySaveRegion = 'onOverlaySaveRegion';
 // Windows only: the captured app's icon, read off the summon path and sent to
 // the grid it belongs to once it is read.
 const String kSetAppIcon = 'setAppIcon';
+
+// Windows only: launch has registered the hotkeys and built the tray, so the
+// runner may start the overlay's engines.
+const String kStartOverlay = 'startOverlay';
+const String kSetCommandsRunning = 'setCommandsRunning';

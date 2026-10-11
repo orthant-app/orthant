@@ -300,6 +300,18 @@ void WindowChannel::HandleMethodCall(
     const auto* bytes = png ? std::get_if<std::vector<uint8_t>>(png) : nullptr;
     if (session && bytes) overlays_->SetAppIcon(*session, *bytes);
     result->Success();
+  } else if (method == "setCommandsRunning") {
+    // {running}: Dart's window commands are queued or running, or the last
+    // of them has finished. No overlay engine attaches in between.
+    const auto* running = Field(call.arguments(), "running");
+    const auto* value = running ? std::get_if<bool>(running) : nullptr;
+    if (value) overlays_->CommandsRunning(*value);
+    result->Success();
+  } else if (method == "startOverlay") {
+    // Launch has registered the hotkeys and built the tray: the overlay's
+    // engines may take the thread now.
+    overlays_->StartEngines("dart");
+    result->Success();
   } else if (method == "hideOverlay") {
     // {sessionId}: the grid Dart last saw shown, which this ends only if it is
     // the live session. Also how Dart ends a summon that will not reach

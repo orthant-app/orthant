@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/shortcuts/command_queue.dart';
 
@@ -26,6 +28,31 @@ void main() {
 
     expect(overlapped, isFalse);
     expect(log, ['a+', 'a-', 'b+', 'b-', 'c+', 'c-']);
+  });
+
+  test('tells its listener once when a burst starts and once when its last '
+      'task has finished, a failing one included', () async {
+    final q = CommandQueue();
+    final log = <String>[];
+    q.onBusy = (busy) => log.add('busy $busy');
+    final gate = Completer<void>();
+    final a = q.add(() async {
+      log.add('a');
+      await gate.future;
+    });
+    final b = q.add(() async {
+      log.add('b');
+      throw StateError('b');
+    });
+    expect(log, ['busy true'], reason: 'once, as the first task is queued');
+    gate.complete();
+    await a;
+    await expectLater(b, throwsStateError);
+    await pumpEventQueue();
+    expect(log, ['busy true', 'a', 'b', 'busy false']);
+    await q.add(() async => log.add('c'));
+    await pumpEventQueue();
+    expect(log.skip(4), ['busy true', 'c', 'busy false']);
   });
 
   test('a failing task does not wedge the queue', () async {

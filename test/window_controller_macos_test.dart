@@ -45,6 +45,29 @@ void main() {
     expect(await const MacosWindowController().keyboardLabels(), isEmpty);
   });
 
+  test('startOverlay asks the native side nothing: macOS starts its overlay '
+      'engine with the app, and Swift answers no such method', () async {
+    final calls = <MethodCall>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      return null;
+    });
+    await const MacosWindowController().startOverlay();
+    expect(calls, isEmpty);
+  });
+
+  test('setCommandsRunning asks the native side nothing: macOS has no engine '
+      'attaches to defer, and Swift answers no such method', () async {
+    final calls = <MethodCall>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      return null;
+    });
+    await const MacosWindowController().setCommandsRunning(true);
+    await const MacosWindowController().setCommandsRunning(false);
+    expect(calls, isEmpty);
+  });
+
   test('applyFrame sends the rect and returns the native bool', () async {
     final calls = <MethodCall>[];
     messenger.setMockMethodCallHandler(channel, (call) async {

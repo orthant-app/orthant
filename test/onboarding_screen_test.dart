@@ -32,6 +32,10 @@ class _FakeWc implements WindowController {
   @override
   Future<void> hideOverlay() async {}
   @override
+  Future<void> startOverlay() async {}
+  @override
+  Future<void> setCommandsRunning(bool running) async {}
+  @override
   Future<void> setOverlayGrid({
     required int cols,
     required int rows,

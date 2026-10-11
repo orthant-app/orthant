@@ -84,8 +84,9 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
-  // The overlay's posted work: reconciles and engine attaches.
-  if (overlay_set_ && overlay_set_->HandleHostMessage(message)) {
+  // The overlay's posted work and its timer: reconciles, engine attaches, and
+  // the deadline for starting the engines.
+  if (overlay_set_ && overlay_set_->HandleHostMessage(message, wparam)) {
     return 0;
   }
 
@@ -98,6 +99,9 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       // first-frame timing read the press, not this dispatch. Ids from 900 up
       // are the overlay's and were handled above.
       if (id >= 0 && id < 900 && window_channel_) {
+        // No engine attaches until Dart says its command is running, which
+        // then holds the attaches until the command is done.
+        if (overlay_set_) overlay_set_->HoldAttaches();
         window_channel_->NotifyHotkey(
             id, WindowsOverlaySet::PressTick(GetMessageTime()));
         return 0;
@@ -122,7 +126,12 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
         window_channel_->NotifyConfigWindowClosed();
       }
       return 0;
+    case WM_ENTERMENULOOP:
+      // The tray's menu, tracked on this thread: no engine attaches under it.
+      if (overlay_set_) overlay_set_->MenuLoop(true);
+      break;
     case WM_EXITMENULOOP:
+      if (overlay_set_) overlay_set_->MenuLoop(false);
       // tray_manager tracks its menu with this window as owner but never
       // posts the WM_NULL Microsoft prescribes after TrackPopupMenu for a
       // notification icon's menu. Without it the second opening of the menu

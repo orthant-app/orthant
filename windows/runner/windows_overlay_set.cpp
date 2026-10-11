@@ -25,6 +25,34 @@ constexpr UINT kHidePanel = WM_APP + 1;
 constexpr UINT kFramePresented = WM_APP + 2;
 constexpr UINT_PTR kRevealTimer = 1;
 constexpr UINT_PTR kWarmTimer = 2;
+// On the host window, whose timer ids are shared with whatever else sets one
+// there: hence values no small counter would reach.
+constexpr UINT_PTR kStartEnginesTimer = 0x4F57;
+// The next engine attaches on a timer, not a posted message: Windows delivers
+// a timer only when no posted message is waiting, so a hotkey's notice and the
+// work Dart does for it (posted, as all of an engine's tasks are) go first,
+// and an attach takes the thread only when it is otherwise idle. Posted, the
+// attaches queued ahead of that work, and a press made as the engines started
+// waited for all of them (measured: 10.5 s in Debug on two displays).
+constexpr UINT_PTR kAttachTimer = 0x4F58;
+// How long a hotkey's notice, or the tray menu's, holds the next attach: long
+// enough for Dart to say its command is running, which then holds it until
+// the command is done.
+constexpr ULONGLONG kAttachHoldMs = 1000;
+// The longest Dart's commands may hold the attaches. A placement takes 2.8 s
+// at most (windows_placement.dart), so this is three of the slowest queued,
+// and a Dart that never says they are done cannot keep the overlay from ever
+// being ready.
+constexpr ULONGLONG kCommandsCeilingMs = 10000;
+
+// The engines start when Dart says launch is done, or after this. Each takes
+// over a second of the thread every engine shares (measured), and started
+// first they made the hotkeys and the tray wait for all of them. The deadline
+// is for a launch that never says so, so it must be longer than any launch
+// that does, in every build, or it brings the old ordering back: Dart's
+// launch said so 0.06 s after the panels existed in Profile and 0.6 s in
+// Debug (measured, in the VM).
+constexpr UINT kStartEnginesDeadlineMs = 10000;
 
 // WM_DPICHANGED_BEFOREPARENT, spelled out: WinUser.h defines it only for
 // WINVER >= 0x0605.
@@ -256,8 +284,7 @@ WindowsOverlaySet::WindowsOverlaySet(HWND host, Forward forward)
     : instance_(GetModuleHandle(nullptr)),
       host_(host),
       forward_(std::move(forward)),
-      reconcile_message_(RegisterWindowMessageW(L"OrthantOverlayReconcile")),
-      attach_message_(RegisterWindowMessageW(L"OrthantOverlayAttach")) {
+      reconcile_message_(RegisterWindowMessageW(L"OrthantOverlayReconcile")) {
   QueryPerformanceCounter(&started_);
   WNDCLASSEXW window_class{};
   window_class.cbSize = sizeof(window_class);
@@ -273,11 +300,15 @@ WindowsOverlaySet::WindowsOverlaySet(HWND host, Forward forward)
   }
   // Windows now, engines later: the windows are a few CreateWindowEx calls and
   // answer the display list at once, while each engine costs over a second of
-  // this thread (measured), so they attach one per turn of the message loop.
+  // this thread (measured). They attach one per turn of the message loop, and
+  // only once launch has done what must answer first (StartEngines).
   Reconcile("launch");
+  SetTimer(host_, kStartEnginesTimer, kStartEnginesDeadlineMs, nullptr);
 }
 
 WindowsOverlaySet::~WindowsOverlaySet() {
+  KillTimer(host_, kStartEnginesTimer);
+  KillTimer(host_, kAttachTimer);
   Unhook();
   ReleaseKeys();
   for (auto& panel : panels_) {
@@ -495,19 +526,68 @@ void WindowsOverlaySet::OnPanelDpiChanged(Panel& panel, UINT dpi) {
 }
 
 void WindowsOverlaySet::ScheduleAttach() {
-  if (attach_posted_) return;
+  // A menu that is open schedules again when it closes (MenuLoop).
+  if (!engines_started_ || menu_open_) return;
   for (const auto& panel : panels_) {
     if (!panel->controller && !panel->attach_failed) {
-      attach_posted_ = PostMessageW(host_, attach_message_, 0, 0) != FALSE;
+      // Setting the timer again replaces it, so the latest wait wins: a
+      // hotkey's hold, or Dart's commands up to their ceiling.
+      const ULONGLONG now = GetTickCount64();
+      ULONGLONG until = hold_until_;
+      if (commands_running_) {
+        until = (std::max)(until, commands_since_ + kCommandsCeilingMs);
+      }
+      const UINT wait = until > now ? static_cast<UINT>(until - now)
+                                    : USER_TIMER_MINIMUM;
+      SetTimer(host_, kAttachTimer, wait, nullptr);
       return;
     }
   }
 }
 
+void WindowsOverlaySet::HoldAttaches() {
+  hold_until_ = GetTickCount64() + kAttachHoldMs;
+  ScheduleAttach();
+}
+
+bool WindowsOverlaySet::AttachHeld() {
+  const ULONGLONG now = GetTickCount64();
+  if (now < hold_until_) return true;
+  if (!commands_running_) return false;
+  if (now < commands_since_ + kCommandsCeilingMs) return true;
+  if (!commands_ceiling_logged_) {
+    commands_ceiling_logged_ = true;
+    DevLog("overlay attaches go on: commands still running after " +
+           std::to_string(kCommandsCeilingMs) + " ms");
+  }
+  return false;
+}
+
+void WindowsOverlaySet::CommandsRunning(bool running) {
+  if (running == commands_running_) return;
+  commands_running_ = running;
+  if (running) {
+    commands_since_ = GetTickCount64();
+    commands_ceiling_logged_ = false;
+  }
+  DevLog(running ? "overlay commands running" : "overlay commands done");
+  ScheduleAttach();  // the timer again, with the new wait
+}
+
+void WindowsOverlaySet::MenuLoop(bool open) {
+  menu_open_ = open;
+  if (open) {
+    KillTimer(host_, kAttachTimer);
+  } else {
+    HoldAttaches();  // the menu's command, if one was chosen, runs next
+  }
+}
+
 void WindowsOverlaySet::AttachNext() {
-  // One engine per turn of the loop: each costs over a second of this thread
-  // in the VM (measured), and the main isolate and the tray must not wait for
-  // all of them. A panel on a monitor goes before a parked one.
+  // One engine per timer (kAttachTimer), never during a hold or an open menu:
+  // each costs over a second of this thread in the VM (measured), and the
+  // main isolate, the hotkeys and the tray must not wait for all of them. A
+  // panel on a monitor goes before a parked one.
   Panel* next = nullptr;
   for (const auto& panel : panels_) {
     if (panel->controller || panel->attach_failed) continue;
@@ -646,16 +726,35 @@ void WindowsOverlaySet::OnDisplayChange(const char* reason) {
       PostMessageW(host_, reconcile_message_, 0, 0) != FALSE;
 }
 
-bool WindowsOverlaySet::HandleHostMessage(UINT message) {
+void WindowsOverlaySet::StartEngines(const char* why) {
+  if (engines_started_) return;
+  engines_started_ = true;
+  KillTimer(host_, kStartEnginesTimer);
+  DevLog(std::string("overlay engines starting (") + why + "), " +
+         Ms(MsSince(started_)) + " ms after launch");
+  ScheduleAttach();
+}
+
+bool WindowsOverlaySet::HandleHostMessage(UINT message, WPARAM wparam) {
+  if (message == WM_TIMER && wparam == kStartEnginesTimer) {
+    StartEngines("deadline");
+    return true;
+  }
+  if (message == WM_TIMER && wparam == kAttachTimer) {
+    KillTimer(host_, kAttachTimer);
+    // A hold a later hotkey extended, commands that started, or a menu
+    // opened since it was set.
+    if (menu_open_ || AttachHeld()) {
+      ScheduleAttach();
+    } else {
+      AttachNext();
+    }
+    return true;
+  }
   if (message == 0) return false;  // a registration that failed
   if (message == reconcile_message_) {
     reconcile_posted_ = false;
     Reconcile(reconcile_reason_);
-    return true;
-  }
-  if (message == attach_message_) {
-    attach_posted_ = false;
-    AttachNext();
     return true;
   }
   return false;

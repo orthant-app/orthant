@@ -71,8 +71,32 @@ class WindowsOverlaySet {
   // session ends now; the panels are reconciled on a later turn of the loop.
   void OnDisplayChange(const char* reason);
 
-  // A message posted to the host window. True if it was this set's.
-  bool HandleHostMessage(UINT message);
+  // A message posted to the host window, or one of this set's timers on it.
+  // True if it was this set's.
+  bool HandleHostMessage(UINT message, WPARAM wparam);
+
+  // Launch has registered the hotkeys and built the tray (Dart's startOverlay,
+  // or the deadline when that never comes), so the engines may attach. Until
+  // then the panels exist, engine-less, and answer the display list.
+  void StartEngines(const char* why);
+  // Whether the next attach must wait: a hotkey's hold, or Dart's commands
+  // within their ceiling.
+  bool AttachHeld();
+
+  // The user is doing something: a hotkey's command, or the tray's. The next
+  // attach waits a second, so that work does not run behind one (each costs
+  // over a second of this thread, measured).
+  void HoldAttaches();
+  // A menu (the tray's) is being tracked on this thread, whose modal loop
+  // would run an attach and freeze the menu for its length: none starts while
+  // it is open.
+  void MenuLoop(bool open);
+
+  // Dart's window commands are queued or running (true), or the last of them
+  // has finished (false). No attach starts in between, up to a ceiling: a
+  // placement leaves this thread idle between its reads, and an attach there
+  // would hold the rest of the command for over a second.
+  void CommandsRunning(bool running);
 
   // A WM_HOTKEY. True if the overlay consumed it: one of its grabs, or any
   // other hotkey while a session is live (macOS suppressesRegionHotkeys), so
@@ -174,7 +198,6 @@ class WindowsOverlaySet {
   HWND host_;
   Forward forward_;
   UINT reconcile_message_;
-  UINT attach_message_;
 
   // Owned for the life of the set: parked, never freed, so a Panel* held by a
   // callback or a session stays valid until the destructor.
@@ -185,7 +208,12 @@ class WindowsOverlaySet {
   const char* reconcile_reason_ = "launch";
   bool reconciling_ = false;
   bool reconcile_again_ = false;
-  bool attach_posted_ = false;
+  ULONGLONG hold_until_ = 0;  // no attach starts before this tick
+  bool menu_open_ = false;
+  bool commands_running_ = false;
+  ULONGLONG commands_since_ = 0;  // the tick they started running
+  bool commands_ceiling_logged_ = false;
+  bool engines_started_ = false;
   LARGE_INTEGER started_{};
   bool announced_ready_ = false;
 

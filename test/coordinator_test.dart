@@ -98,6 +98,11 @@ class _FakeWc implements WindowController {
   @override
   Future<void> hideOverlay() async => calls.add('hideOverlay');
   @override
+  Future<void> startOverlay() async => calls.add('startOverlay');
+  @override
+  Future<void> setCommandsRunning(bool running) async =>
+      calls.add('commandsRunning $running');
+  @override
   Future<void> setOverlayGrid({
     required int cols,
     required int rows,
@@ -432,6 +437,41 @@ void main() {
       expect(t.app.screen, AppScreen.none);
       expect(t.wc.calls, isNot(contains('show')));
       expect(await SettingsStore().hasOnboarded(), isTrue);
+    });
+
+    test('the platform hears when a burst of commands starts and when its '
+        'last command is done, once each', () async {
+      // Windows attaches no overlay engine in between: an attach holds the
+      // thread the commands share for over a second, and a time-based hold
+      // cannot know when a queue of placements is done.
+      final t = build(granted: true);
+      await t.app.start();
+      t.wc.calls.clear();
+      await Future.wait([t.app.summon(), t.app.summon()]);
+      await pumpEventQueue();
+      expect(t.wc.calls, [
+        'commandsRunning true',
+        'showOverlay',
+        'showOverlay',
+        'commandsRunning false',
+      ]);
+    });
+
+    test('launch leaves the overlay to the app, which starts it once the '
+        'tray listens', () async {
+      // On Windows each overlay engine costs over a second of the thread the
+      // whole app shares; started inside launch, they kept the hotkeys and the
+      // tray from answering for the length of all of them. main.dart starts
+      // them after start() and after the tray's listener is added.
+      for (final granted in [true, false]) {
+        final t = build(granted: granted);
+        await t.app.start();
+        expect(t.wc.calls, isNot(contains('startOverlay')),
+            reason: 'granted: $granted');
+        await t.app.startOverlay();
+        expect(t.wc.calls.where((c) => c == 'startOverlay'), hasLength(1),
+            reason: 'granted: $granted');
+      }
     });
 
     test('granted: the grid reaches native before any summon can', () async {

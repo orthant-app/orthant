@@ -450,6 +450,31 @@ class WindowsWindowController implements WindowController {
     _gridOpen = false;
   }
 
+  /// The runner holds the overlay's engines back until this, or a deadline of
+  /// its own: each costs over a second of the thread the hotkeys and the tray
+  /// answer on. Never throws: if it cannot be delivered, the deadline starts
+  /// them anyway.
+  @override
+  Future<void> startOverlay() async {
+    try {
+      await _channel.invokeMethod<void>(kStartOverlay);
+    } catch (e) {
+      _log('start overlay: threw ($e)');
+    }
+  }
+
+  @override
+  Future<void> setCommandsRunning(bool running) async {
+    // Never throws: the queue calls this around every burst of commands, and
+    // a runner that misses one has a ceiling of its own.
+    try {
+      await _channel
+          .invokeMethod<void>(kSetCommandsRunning, {'running': running});
+    } catch (e) {
+      _log('commands running: threw ($e)');
+    }
+  }
+
   /// Labels for the keys whose symbol depends on the layout, keyed by their
   /// Windows id (`KeyChord.labelKey` on Windows). Letters, digits and named
   /// keys are labelled from the chord's logical key itself, so they are not

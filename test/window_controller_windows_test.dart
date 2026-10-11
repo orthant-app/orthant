@@ -867,6 +867,35 @@ void main() {
       });
     });
 
+    test('startOverlay asks the runner, and a failure there stays there',
+        () async {
+      await wc().startOverlay();
+      expect(calls, [kStartOverlay]);
+      // The runner's deadline starts the engines anyway; launch, which awaits
+      // this last, must not fail for it.
+      answer = (_) => throw PlatformException(code: 'gone');
+      await expectLater(wc().startOverlay(), completes);
+    });
+
+    test('setCommandsRunning tells the runner, and a failure there stays '
+        'there', () async {
+      final sent = <Object?>[];
+      answer = (call) {
+        sent.add(call.arguments);
+        return null;
+      };
+      await wc().setCommandsRunning(true);
+      await wc().setCommandsRunning(false);
+      expect(calls, [kSetCommandsRunning, kSetCommandsRunning]);
+      expect(sent, [
+        {'running': true},
+        {'running': false},
+      ]);
+      // A command must never fail for its bracket: the runner has a ceiling.
+      answer = (_) => throw PlatformException(code: 'gone');
+      await expectLater(wc().setCommandsRunning(true), completes);
+    });
+
     test('hideOverlay asks the runner', () async {
       await wc().hideOverlay();
       expect(calls, [kHideOverlay]);

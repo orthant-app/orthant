@@ -52,6 +52,10 @@ class _RecordingWc implements WindowController {
   @override
   Future<void> hideOverlay() async {}
   @override
+  Future<void> startOverlay() async {}
+  @override
+  Future<void> setCommandsRunning(bool running) async {}
+  @override
   Future<Map<int, String>> keyboardLabels() async => const {};
 
   @override

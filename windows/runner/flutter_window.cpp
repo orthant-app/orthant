@@ -58,8 +58,11 @@ bool FlutterWindow::OnCreate() {
   g_focus_guard = SetWindowsHookExW(WH_CBT, FocusGuard, nullptr,
                                     GetCurrentThreadId());
   if (!g_focus_guard) {
-    std::cout << "[orthant] focus guard not installed, error "
-              << GetLastError() << std::endl;
+#ifdef ORTHANT_DEV_BUILD
+    const DWORD error = GetLastError();
+    std::cout << "[orthant] focus guard not installed, error " << error
+              << std::endl;
+#endif
   }
 
   RECT frame = GetClientArea();

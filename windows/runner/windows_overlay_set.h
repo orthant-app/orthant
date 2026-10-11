@@ -90,8 +90,13 @@ class WindowsOverlaySet {
   // `pressed_ms` is the key press that asked for this summon, carried with it
   // (PressTick), or 0 for a summon with no press (the tray). A summon that
   // reaches Show more than a second after its press is refused as stale.
+  // `app_icon` is the captured app's icon as PNG bytes, empty when Dart had
+  // none cached; it then follows as SetAppIcon.
   ShowResult Show(int64_t session_id, const std::string& app_name,
-                  double pressed_ms);
+                  const std::vector<uint8_t>& app_icon, double pressed_ms);
+  // An icon Dart read after the summon, for the panels of the live session
+  // it names; dropped for any other.
+  void SetAppIcon(int64_t session_id, const std::vector<uint8_t>& png);
   void Dismiss(const char* why);
   bool live() const { return session_.has_value(); }
 
@@ -128,8 +133,9 @@ class WindowsOverlaySet {
       Panel& panel, const flutter::MethodCall<flutter::EncodableValue>& call);
   flutter::EncodableMap SummonPayload(const Panel& panel, int64_t session_id,
                                       double trigger_ms,
-                                      const std::string& app_name, bool active,
-                                      bool warm) const;
+                                      const std::string& app_name,
+                                      const std::vector<uint8_t>& app_icon,
+                                      bool active, bool warm) const;
   bool GrabKeys();
   void ReleaseKeys();
   void Relay(const char* method, flutter::EncodableValue arguments);

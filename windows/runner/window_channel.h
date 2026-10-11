@@ -23,7 +23,8 @@
 // and a press comes back as onHotkey; the displays, answered from
 // WindowsOverlaySet's per-monitor windows (W1); and setOverlayGrid,
 // showOverlay and hideOverlay, with the overlay's commit and save-region
-// notifications to Dart (W3). Anything else answers NotImplemented, which
+// notifications to Dart (W3), and setAppIcon, the captured app's icon after
+// the summon (W4). Anything else answers NotImplemented, which
 // Dart surfaces as MissingPluginException;
 // test/windows_channel_contract_test.dart fails if Dart calls a method this
 // file does not answer, or this file sends one Dart does not handle.

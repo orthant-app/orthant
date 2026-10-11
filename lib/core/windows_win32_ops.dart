@@ -90,6 +90,9 @@ class FfiWin32WindowOps implements Win32Desktop, Win32Placer {
   }
 
   @override
+  String? imagePath(int pid) => _imagePath(pid);
+
+  @override
   bool setForeground(int hwnd) => SetForegroundWindow(_h(hwnd));
 
   /// What [vk] types, unshifted and uppercased, under the layout of the

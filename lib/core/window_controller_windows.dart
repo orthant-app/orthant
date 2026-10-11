@@ -1,9 +1,13 @@
+import 'dart:async' show unawaited;
+import 'dart:isolate' show Isolate;
+
 import 'package:flutter/foundation.dart'
     show debugPrint, kReleaseMode, visibleForTesting;
 import 'package:flutter/services.dart';
 import 'channel.dart';
 import 'geometry.dart';
 import 'window_controller.dart';
+import 'windows_app_icon.dart';
 import 'windows_capture.dart';
 import 'windows_keys.dart';
 import 'windows_placement.dart';
@@ -28,7 +32,7 @@ import 'windows_window_ops.dart';
 /// the methods that do call it).
 class WindowsWindowController implements WindowController {
   WindowsWindowController._(this._readVersion, this._desktop, this._placer,
-      this._clock, this._keyLabel);
+      this._clock, this._keyLabel, this._readIcon);
 
   /// The one way to obtain the controller in production.
   ///
@@ -39,8 +43,12 @@ class WindowsWindowController implements WindowController {
   static WindowsWindowController start() {
     final win32 = FfiWin32WindowOps();
     return WindowsWindowController._(readFixedFileVersion, win32, win32,
-        RealPlacementClock(), win32.keyLabel);
+        RealPlacementClock(), win32.keyLabel, _readIconInBackground);
   }
+
+  /// [readAppIconPng] blocks, so it runs on an isolate of its own.
+  static Future<Uint8List?> _readIconInBackground(String exe) =>
+      Isolate.run(() => readAppIconPng(exe));
 
   /// The same controller with its OS supplied, for a suite that runs on a Mac
   /// where neither `version.dll` nor `user32.dll` exists.
@@ -51,9 +59,11 @@ class WindowsWindowController implements WindowController {
     required Win32Placer placer,
     PlacementClock? clock,
     String? Function(int vk)? keyLabel,
+    Future<Uint8List?> Function(String exe)? readIcon,
   }) =>
       WindowsWindowController._(readVersion, desktop, placer,
-          clock ?? RealPlacementClock(), keyLabel ?? (_) => null);
+          clock ?? RealPlacementClock(), keyLabel ?? (_) => null,
+          readIcon ?? (_) async => null);
 
   final VersionReader _readVersion;
   final Win32Desktop _desktop;
@@ -64,6 +74,24 @@ class WindowsWindowController implements WindowController {
   /// (`FfiWin32WindowOps.keyLabel`), for [keyboardLabels].
   final String? Function(int vk) _keyLabel;
 
+  /// An executable's icon as a PNG ([readAppIconPng], off this isolate).
+  final Future<Uint8List?> Function(String exe) _readIcon;
+
+  /// Icons by executable path, null for an app that has none to read. Read
+  /// once per app per run: an executable's icon does not change while it
+  /// runs, and the summon carries a cached one at no cost.
+  final Map<String, Uint8List?> _icons = {};
+
+  /// Executables whose icon is being read, so a second summon of the same app
+  /// does not start a second read.
+  final Set<String> _iconReads = {};
+
+  /// The grid the runner last showed: its session (the capture id) and the
+  /// app's executable. An icon that finishes reading goes to it only if it is
+  /// still open and is still that app's.
+  int? _shownId;
+  String? _shownExe;
+
   /// The capture slot: the window the next placement moves. A handle, so it
   /// stays here, private to this backend; the seam sees only the
   /// [CapturedWindow] built from it. The owning process
@@ -72,7 +100,7 @@ class WindowsWindowController implements WindowController {
   /// a stranger's window (rare, as the handle's high word counts reuses),
   /// which must fail rather than move. [id] names the capture to the overlay:
   /// a summon's session is this id.
-  ({int hwnd, int pid, String className, int id})? _captured;
+  ({int hwnd, int pid, String className, int id, String? exe})? _captured;
 
   /// The last id handed out. Every capture takes the next one, the direct
   /// shortcuts' included, so a commit from an older summon can never match a
@@ -170,6 +198,7 @@ class WindowsWindowController implements WindowController {
         reactivated = _desktop.setForeground(window.hwnd) ? 'yes' : 'refused';
       }
       final name = _desktop.processName(window.pid) ?? '';
+      final exe = _desktop.imagePath(window.pid);
       final id = _captureSeq + 1;
       _log('capture: branch=${decision.branch.name} '
           'hwnd=0x${window.hwnd.toRadixString(16)} class=${window.className} '
@@ -187,6 +216,7 @@ class WindowsWindowController implements WindowController {
         pid: window.pid,
         className: window.className,
         id: id,
+        exe: exe,
       );
       _consumed = false;
       return captured;
@@ -321,15 +351,33 @@ class WindowsWindowController implements WindowController {
       await hideOverlay();
       return;
     }
+    final exe = _captured?.exe;
+    // The cached icon if there is one, and nothing otherwise: the summon never
+    // waits for one (SHGetFileInfo can block).
+    final icon = exe == null ? null : _icons[exe];
     final shown = await _channel.invokeMethod<Object?>(kShowOverlay, {
       'captureId': id,
       'appName': captured.appName,
+      'appIcon': ?icon,
       'pressedAtMs': ?pressedAtMs,
     });
     _log('summon: outcome=${shown == true ? 'shown' : 'refused'} id=$id '
-        'capture=${captureMs}ms');
+        'capture=${captureMs}ms icon=${icon != null ? 'cached' : 'none'}');
     if (shown == true) {
       _gridOpen = true;
+      _shownId = id;
+      _shownExe = exe;
+      if (exe != null && !_icons.containsKey(exe)) {
+        unawaited(_readIconFor(exe));
+      } else if (exe != null && icon == null && _icons[exe] != null) {
+        // An earlier summon's read landed while this one was in flight: it
+        // found no grid of this app open, and this summon went without.
+        final started = _clock.elapsedMs;
+        final late = _icons[exe]!;
+        final outcome = await _sendIcon(id, late);
+        _log('icon: id=$id outcome=$outcome bytes=${late.length} '
+            'ms=${_clock.elapsedMs - started} (read during the summon)');
+      }
     } else {
       // The capture slot was just replaced, so a grid still open names a
       // capture that no longer exists: every commit from it would be dropped
@@ -339,6 +387,49 @@ class WindowsWindowController implements WindowController {
       // Through hideOverlay: a hide that fails leaves a grid still open
       // marked open, so the next capture ends it.
       await hideOverlay();
+    }
+  }
+
+  /// Read [exe]'s icon, cache it, and send it to the grid on screen if that
+  /// grid is still this app's. Never throws: an icon is a nicety, and this
+  /// runs outside the command queue, where nothing would catch it.
+  Future<void> _readIconFor(String exe) async {
+    if (!_iconReads.add(exe)) return;
+    final started = _clock.elapsedMs;
+    Uint8List? png;
+    try {
+      png = await _readIcon(exe);
+    } catch (e) {
+      // Not cached, so the next summon of this app tries again.
+      _log('icon: outcome=threw ($e) ms=${_clock.elapsedMs - started}');
+      return;
+    } finally {
+      _iconReads.remove(exe);
+    }
+    _icons[exe] = png;
+    final id = _shownId;
+    final String outcome;
+    if (png == null) {
+      outcome = 'none';
+    } else if (id != null && _gridOpen && _shownExe == exe) {
+      outcome = await _sendIcon(id, png);
+    } else {
+      outcome = 'kept';
+    }
+    _log('icon: id=${id ?? 'none'} outcome=$outcome '
+        'bytes=${png?.length ?? 0} ms=${_clock.elapsedMs - started}');
+  }
+
+  /// Sends an icon to the grid of session [id]; its outcome for the log. A
+  /// failure costs only this grid's chip: the icon is cached already, so the
+  /// next summon of the app carries it.
+  Future<String> _sendIcon(int id, Uint8List png) async {
+    try {
+      await _channel
+          .invokeMethod<void>(kSetAppIcon, {'sessionId': id, 'png': png});
+      return 'sent';
+    } catch (e) {
+      return 'unsent ($e)';
     }
   }
 

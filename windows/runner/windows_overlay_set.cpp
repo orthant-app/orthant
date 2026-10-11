@@ -674,7 +674,8 @@ void WindowsOverlaySet::SetGrid(int cols, int rows, double gap,
 
 flutter::EncodableMap WindowsOverlaySet::SummonPayload(
     const Panel& panel, int64_t session_id, double trigger_ms,
-    const std::string& app_name, bool active, bool warm) const {
+    const std::string& app_name, const std::vector<uint8_t>& app_icon,
+    bool active, bool warm) const {
   RECT work{};
   WorkArea(panel.monitor, &work);
   const UINT dpi = GetDpiForWindow(panel.hwnd);
@@ -701,6 +702,10 @@ flutter::EncodableMap WindowsOverlaySet::SummonPayload(
       {flutter::EncodableValue("gap"), flutter::EncodableValue(gap_)},
       {flutter::EncodableValue("saveHint"), flutter::EncodableValue(save_hint_)},
   };
+  if (!app_icon.empty()) {
+    payload[flutter::EncodableValue("appIcon")] =
+        flutter::EncodableValue(app_icon);
+  }
   if (warm) {
     payload[flutter::EncodableValue("warm")] = flutter::EncodableValue(true);
   }
@@ -708,7 +713,8 @@ flutter::EncodableMap WindowsOverlaySet::SummonPayload(
 }
 
 WindowsOverlaySet::ShowResult WindowsOverlaySet::Show(
-    int64_t session_id, const std::string& app_name, double pressed_ms) {
+    int64_t session_id, const std::string& app_name,
+    const std::vector<uint8_t>& app_icon, double pressed_ms) {
   // Timed from the summon's key press when there is one, as macOS times from
   // its Carbon press; a tray summon has none (0) and is timed from here. The
   // age is read on the tick clock the press was stamped on; the trigger the
@@ -794,7 +800,7 @@ WindowsOverlaySet::ShowResult WindowsOverlaySet::Show(
     SetWindowPos(panel->hwnd, HWND_TOPMOST, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
     const flutter::EncodableValue payload(SummonPayload(
-        *panel, session_id, trigger, app_name, active, false));
+        *panel, session_id, trigger, app_name, app_icon, active, false));
     panel->last_summon = payload;
     panel->channel->InvokeMethod(
         "summon", std::make_unique<flutter::EncodableValue>(payload));
@@ -803,6 +809,35 @@ WindowsOverlaySet::ShowResult WindowsOverlaySet::Show(
   }
   NoteReady();
   return ShowResult::kShown;
+}
+
+void WindowsOverlaySet::SetAppIcon(int64_t session_id,
+                                   const std::vector<uint8_t>& png) {
+  if (!session_ || session_->id != session_id || png.empty()) {
+    DevLog("overlay icon dropped: session " + std::to_string(session_id));
+    return;
+  }
+  const flutter::EncodableValue icon(png);
+  for (Panel* panel : Live()) {
+    // A panel whose overlayMain was not yet listening replays its last
+    // summon when it is: that replay carries the icon too.
+    if (panel->last_summon) {
+      if (auto* summon =
+              std::get_if<flutter::EncodableMap>(&*panel->last_summon)) {
+        (*summon)[flutter::EncodableValue("appIcon")] = icon;
+      }
+    }
+    if (!panel->channel) continue;
+    panel->channel->InvokeMethod(
+        "setAppIcon",
+        std::make_unique<flutter::EncodableValue>(flutter::EncodableMap{
+            {flutter::EncodableValue("sessionId"),
+             flutter::EncodableValue(session_id)},
+            {flutter::EncodableValue("png"), icon},
+        }));
+  }
+  DevLog("overlay icon: session " + std::to_string(session_id) + ", " +
+         std::to_string(png.size()) + " bytes");
 }
 
 void WindowsOverlaySet::Dismiss(const char* why) {
@@ -1002,8 +1037,8 @@ void WindowsOverlaySet::Warm(Panel& panel) {
   // Rendered as the active panel, so the first real summon takes the warmed
   // path; the warm flag keeps it from speaking or reporting a first frame.
   panel.channel->InvokeMethod(
-      "summon", std::make_unique<flutter::EncodableValue>(
-                    SummonPayload(panel, 0, EpochMs(), "", true, true)));
+      "summon", std::make_unique<flutter::EncodableValue>(SummonPayload(
+                    panel, 0, EpochMs(), "", {}, true, true)));
   ArmFrame(panel);
   SetTimer(panel.hwnd, kWarmTimer, kWarmDeadlineMs, nullptr);
 }

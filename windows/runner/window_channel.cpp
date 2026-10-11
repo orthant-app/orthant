@@ -245,10 +245,11 @@ void WindowChannel::HandleMethodCall(
     }
     result->Success();
   } else if (method == "showOverlay") {
-    // {captureId, appName, pressedAtMs?}: Dart has captured the window
-    // already, and the session is named by that capture's id. pressedAtMs is
-    // the key press that asked for this summon, carried with it; absent for a
-    // summon with no press (the tray). The reply is whether it showed.
+    // {captureId, appName, appIcon?, pressedAtMs?}: Dart has captured the
+    // window already, and the session is named by that capture's id.
+    // pressedAtMs is the key press that asked for this summon, carried with
+    // it; absent for a summon with no press (the tray). The reply is whether
+    // it showed.
     // Show refuses, and the reply is false, for four reasons: a monitor with
     // no panel, or whose panel has no engine attached yet; Esc or Enter held
     // by another app; a hotkey press more than 1 s old (stale); or the
@@ -273,11 +274,25 @@ void WindowChannel::HandleMethodCall(
       pressed_ms = static_cast<double>(*i);
     }
     if (!std::isfinite(pressed_ms)) pressed_ms = 0;
+    // The captured app's icon as PNG bytes, when Dart had one cached; absent
+    // otherwise, and it follows as setAppIcon.
+    const auto* icon = Field(call.arguments(), "appIcon");
+    const auto* icon_bytes =
+        icon ? std::get_if<std::vector<uint8_t>>(icon) : nullptr;
     const bool shown =
         overlays_->Show(*capture_id,
                         app_name_value ? *app_name_value : std::string(),
+                        icon_bytes ? *icon_bytes : std::vector<uint8_t>(),
                         pressed_ms) == WindowsOverlaySet::ShowResult::kShown;
     result->Success(flutter::EncodableValue(shown));
+  } else if (method == "setAppIcon") {
+    // {sessionId, png}: an icon Dart read after the summon, off the summon
+    // path. The panels take it only while that session is live.
+    const auto session = IntOf(Field(call.arguments(), "sessionId"));
+    const auto* png = Field(call.arguments(), "png");
+    const auto* bytes = png ? std::get_if<std::vector<uint8_t>>(png) : nullptr;
+    if (session && bytes) overlays_->SetAppIcon(*session, *bytes);
+    result->Success();
   } else if (method == "hideOverlay") {
     // Also how Dart ends a summon that will not reach showOverlay (nothing to
     // capture): a grid still open names the capture that summon just cleared.

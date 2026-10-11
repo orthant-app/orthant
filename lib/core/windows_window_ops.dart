@@ -103,6 +103,10 @@ abstract interface class Win32Desktop {
   /// else null.
   String? processName(int pid);
 
+  /// The full path of the process's executable, or null. The key its icon is
+  /// cached under.
+  String? imagePath(int pid);
+
   bool setForeground(int hwnd);
 }
 

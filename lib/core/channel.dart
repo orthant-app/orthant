@@ -31,3 +31,7 @@ const String kKeyboardLayoutChanged = 'onKeyboardLayoutChanged';
 // captured window there.
 const String kOverlayCommit = 'onOverlayCommit';
 const String kOverlaySaveRegion = 'onOverlaySaveRegion';
+
+// Windows only: the captured app's icon, read off the summon path and sent to
+// the grid it belongs to once it is read.
+const String kSetAppIcon = 'setAppIcon';

@@ -52,7 +52,7 @@ std::optional<int64_t> IntOf(const flutter::EncodableValue* value) {
 
 // Dart's ids for the shortcuts: 0 to 899. The overlay's grabs are 900 to 917
 // on the same window, and RegisterHotKey wants 0x0000 to 0xBFFF.
-constexpr int64_t kMaxShortcutId = 899;
+constexpr int64_t kMaxShortcutId = WindowsOverlaySet::kFirstGrabId - 1;
 
 // One replaceHotkeys entry: {id, vk, modifiers}, from Dart's _windowsEntry.
 struct HotkeyRequest {
@@ -155,7 +155,13 @@ std::optional<flutter::EncodableList> WindowChannel::ReplaceHotkeys(
   // will read as "everything refused" must not leave the old chords live.
   UnregisterHotkeys();
   const auto requests = ParseHotkeys(arguments);
-  if (!requests) return std::nullopt;
+  if (!requests) {
+#ifdef ORTHANT_DEV_BUILD
+    std::cout << "[orthant] hotkeys: payload unreadable, nothing registered"
+              << std::endl;
+#endif
+    return std::nullopt;
+  }
   flutter::EncodableList refused;
   for (const HotkeyRequest& r : *requests) {
     // Only an entry parsing kept (vk not 0) has an id from 0 to 899 to narrow;
@@ -165,6 +171,15 @@ std::optional<flutter::EncodableList> WindowChannel::ReplaceHotkeys(
                                     r.modifiers | MOD_NOREPEAT, r.vk)) {
       registered_.push_back(static_cast<int>(r.id));
     } else {
+      // Read before anything else runs: writing to cout can reset it.
+      const DWORD error = r.vk != 0 ? GetLastError() : 0;
+#ifdef ORTHANT_DEV_BUILD
+      std::cout << "[orthant] hotkey refused: id " << r.id << " vk " << r.vk
+                << " modifiers " << r.modifiers << " error " << error
+                << std::endl;
+#else
+      (void)error;
+#endif
       refused.push_back(flutter::EncodableValue(r.id));
     }
   }

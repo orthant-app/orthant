@@ -2,6 +2,7 @@
 
 #include <commctrl.h>
 
+#include <iostream>
 #include <optional>
 #include <utility>
 
@@ -56,8 +57,17 @@ bool FlutterWindow::OnCreate() {
   window_channel_ = std::make_unique<WindowChannel>(
       flutter_controller_->engine()->messenger(), GetHandle(),
       overlay_set_.get());
-  SetWindowSubclass(flutter_controller_->view()->GetNativeWindow(), ViewProc,
-                    kViewSubclass, reinterpret_cast<DWORD_PTR>(this));
+  if (!SetWindowSubclass(flutter_controller_->view()->GetNativeWindow(),
+                         ViewProc, kViewSubclass,
+                         reinterpret_cast<DWORD_PTR>(this))) {
+#ifdef ORTHANT_DEV_BUILD
+    // The labels then follow a layout switch only when this window is next
+    // activated.
+    std::cout << "[orthant] view not subclassed: layout notices only on "
+                 "activation"
+              << std::endl;
+#endif
+  }
 
   // The template shows the window on the engine's first frame. Orthant is a
   // tray app: the window stays hidden until Dart asks for it over the channel
@@ -96,9 +106,9 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       // The overlay's grabs, and anything at all while a session is live.
       if (overlay_set_ && overlay_set_->HandleHotkey(id)) return 0;
       // A shortcut, to Dart with its press: the summon's stale check and its
-      // first-frame timing read the press, not this dispatch. Ids from 900 up
-      // are the overlay's and were handled above.
-      if (id >= 0 && id < 900 && window_channel_) {
+      // first-frame timing read the press, not this dispatch. Ids from
+      // kFirstGrabId up are the overlay's and were handled above.
+      if (id >= 0 && id < WindowsOverlaySet::kFirstGrabId && window_channel_) {
         // No engine attaches until Dart says its command is running, which
         // then holds the attaches until the command is done.
         if (overlay_set_) overlay_set_->HoldAttaches();
@@ -178,7 +188,12 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
 LRESULT CALLBACK FlutterWindow::ViewProc(HWND hwnd, UINT message,
                                          WPARAM wparam, LPARAM lparam,
                                          UINT_PTR id, DWORD_PTR data) {
-  (void)id;
+  if (message == WM_NCDESTROY) {
+    // The view is going without OnDestroy having run (the ~Win32Window path):
+    // the subclass must not outlive it.
+    RemoveWindowSubclass(hwnd, ViewProc, id);
+    return DefSubclassProc(hwnd, message, wparam, lparam);
+  }
   if (message == WM_INPUTLANGCHANGE) {
     // This thread's input language changed, so a punctuation key may print
     // differently: Dart re-reads the labels.

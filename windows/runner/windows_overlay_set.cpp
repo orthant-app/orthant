@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -53,6 +54,13 @@ constexpr ULONGLONG kCommandsCeilingMs = 10000;
 // launch said so 0.06 s after the panels existed in Profile and 0.6 s in
 // Debug (measured, in the VM).
 constexpr UINT kStartEnginesDeadlineMs = 10000;
+// A failed engine attach is tried again after this, and at most this many
+// times a panel, and again whenever the displays change: a panel with no
+// engine refuses every summon, but each attempt costs over a second of the
+// thread every engine shares.
+constexpr UINT_PTR kAttachRetryTimer = 0x4F59;
+constexpr UINT kAttachRetryMs = 10000;
+constexpr int kAttachAttempts = 3;
 
 // WM_DPICHANGED_BEFOREPARENT, spelled out: WinUser.h defines it only for
 // WINVER >= 0x0605.
@@ -99,7 +107,6 @@ constexpr Grab kGrabs[] = {
     {916, MOD_SHIFT, VK_UP, false, "Shift+Up"},
     {917, MOD_SHIFT, VK_DOWN, false, "Shift+Down"},
 };
-constexpr int kGrabFirst = 900;
 constexpr int kGrabEsc = 901;
 constexpr int kGrabEnter = 902;
 constexpr int kGrabSave = 904;
@@ -260,7 +267,8 @@ struct WindowsOverlaySet::Panel {
   // The last summon sent, replayed if it arrived before overlayMain's handler
   // was live (macOS OverlayPanel.lastSummon).
   std::optional<flutter::EncodableValue> last_summon;
-  bool attach_failed = false;
+  bool attach_failed = false;  // until the next retry or display change
+  int attach_attempts = 0;
   bool ready = false;      // overlayMain's handler is live
   bool warming = false;    // the launch warm-up has started
   bool warm = false;       // and finished
@@ -286,6 +294,12 @@ WindowsOverlaySet::WindowsOverlaySet(HWND host, Forward forward)
       forward_(std::move(forward)),
       reconcile_message_(RegisterWindowMessageW(L"OrthantOverlayReconcile")) {
   QueryPerformanceCounter(&started_);
+#ifdef ORTHANT_DEV_BUILD
+  char fail[8] = {};
+  if (GetEnvironmentVariableA("ORTHANT_DEBUG_FAIL_ATTACHES", fail, 8) > 0) {
+    attaches_to_fail_ = atoi(fail);
+  }
+#endif
   WNDCLASSEXW window_class{};
   window_class.cbSize = sizeof(window_class);
   window_class.lpfnWndProc = PanelProc;
@@ -309,6 +323,7 @@ WindowsOverlaySet::WindowsOverlaySet(HWND host, Forward forward)
 WindowsOverlaySet::~WindowsOverlaySet() {
   KillTimer(host_, kStartEnginesTimer);
   KillTimer(host_, kAttachTimer);
+  KillTimer(host_, kAttachRetryTimer);
   Unhook();
   ReleaseKeys();
   for (auto& panel : panels_) {
@@ -451,6 +466,11 @@ void WindowsOverlaySet::Reconcile(const char* reason) {
       if (PanelFor(monitor)) continue;
       if (Panel* spare = Parked()) {
         spare->monitor = monitor;
+        // Its warm-up, if it had one, rendered another monitor's size and
+        // scale, or was ended by the park before its frame: warmed again
+        // below, so the first summon on this monitor is not a cold one.
+        spare->warming = false;
+        spare->warm = false;
         reused++;
       } else if (CreatePanel(monitor)) {
         created++;
@@ -459,6 +479,22 @@ void WindowsOverlaySet::Reconcile(const char* reason) {
     for (Panel* panel : Live()) Fit(*panel);
   } while (reconcile_again_);
   reconciling_ = false;
+  // A monitor that came or went is a new chance for an engine that failed to
+  // attach: whatever made it fail may have been that display's, and a parked
+  // panel that failed would otherwise go to the next monitor without one. A
+  // work-area or scale change is not, or a failing engine would cost the
+  // thread another three attempts each time the taskbar moved.
+  if (parked || reused || created) {
+    for (auto& panel : panels_) {
+      panel->attach_failed = false;
+      panel->attach_attempts = 0;
+    }
+  }
+  // Reused panels whose engine is listening: warmed now, at their new size.
+  // One whose overlayMain is not yet listening warms when it says so.
+  for (Panel* panel : Live()) {
+    if (panel->ready) Warm(*panel);
+  }
 
   std::ostringstream line;
   const std::vector<Display> displays = Displays();
@@ -526,8 +562,9 @@ void WindowsOverlaySet::OnPanelDpiChanged(Panel& panel, UINT dpi) {
 }
 
 void WindowsOverlaySet::ScheduleAttach() {
-  // A menu that is open schedules again when it closes (MenuLoop).
-  if (!engines_started_ || menu_open_) return;
+  // A menu that is open, or a session that is live, schedules again when it
+  // ends (MenuLoop, Dismiss): an attach would freeze either for its length.
+  if (!engines_started_ || menu_open_ || session_) return;
   for (const auto& panel : panels_) {
     if (!panel->controller && !panel->attach_failed) {
       // Setting the timer again replaces it, so the latest wait wins: a
@@ -584,10 +621,10 @@ void WindowsOverlaySet::MenuLoop(bool open) {
 }
 
 void WindowsOverlaySet::AttachNext() {
-  // One engine per timer (kAttachTimer), never during a hold or an open menu:
-  // each costs over a second of this thread in the VM (measured), and the
-  // main isolate, the hotkeys and the tray must not wait for all of them. A
-  // panel on a monitor goes before a parked one.
+  // One engine per timer (kAttachTimer), never during a hold, an open menu or
+  // a session: each costs over a second of this thread in the VM (measured),
+  // and the main isolate, the hotkeys, the tray and the grid must not wait for
+  // it. A panel on a monitor goes before a parked one.
   Panel* next = nullptr;
   for (const auto& panel : panels_) {
     if (panel->controller || panel->attach_failed) continue;
@@ -602,6 +639,14 @@ void WindowsOverlaySet::AttachEngine(Panel& panel) {
   GetClientRect(panel.hwnd, &client);
   LARGE_INTEGER start;
   QueryPerformanceCounter(&start);
+  ++panel.attach_attempts;
+#ifdef ORTHANT_DEV_BUILD
+  if (attaches_to_fail_ > 0) {
+    --attaches_to_fail_;
+    AttachFailed(panel, "failed on purpose");
+    return;
+  }
+#endif
   flutter::DartProject project(L"data");
   project.set_dart_entrypoint("overlayMain");
   // No plugins on this engine: overlayMain uses none, and a second copy of
@@ -609,9 +654,7 @@ void WindowsOverlaySet::AttachEngine(Panel& panel) {
   auto controller = std::make_unique<flutter::FlutterViewController>(
       client.right, client.bottom, project);
   if (!controller->engine() || !controller->view()) {
-    panel.attach_failed = true;
-    DevLog("overlay engine not created for panel " +
-           std::to_string(panel.index));
+    AttachFailed(panel, "not created");
     return;
   }
   panel.controller = std::move(controller);
@@ -642,6 +685,30 @@ void WindowsOverlaySet::AttachEngine(Panel& panel) {
       });
   DevLog("overlay engine attached: panel " + std::to_string(panel.index) +
          " in " + Ms(MsSince(start)) + " ms");
+}
+
+void WindowsOverlaySet::AttachFailed(Panel& panel, const char* why) {
+  panel.attach_failed = true;
+  const bool again = panel.attach_attempts < kAttachAttempts;
+  DevLog("overlay engine " + std::string(why) + " for panel " +
+         std::to_string(panel.index) + " (attempt " +
+         std::to_string(panel.attach_attempts) + ")" +
+         (again ? "; retrying" : "; giving up until the displays change"));
+  if (again && !attach_retry_set_) {
+    attach_retry_set_ =
+        SetTimer(host_, kAttachRetryTimer, kAttachRetryMs, nullptr) != 0;
+  }
+}
+
+void WindowsOverlaySet::RetryAttaches() {
+  KillTimer(host_, kAttachRetryTimer);
+  attach_retry_set_ = false;
+  for (auto& panel : panels_) {
+    if (panel->attach_failed && panel->attach_attempts < kAttachAttempts) {
+      panel->attach_failed = false;
+    }
+  }
+  ScheduleAttach();
 }
 
 std::vector<WindowsOverlaySet::Panel*> WindowsOverlaySet::Live() const {
@@ -679,6 +746,13 @@ std::optional<WindowsOverlaySet::Display> WindowsOverlaySet::DisplayFor(
   if (!panel.monitor || !WorkArea(panel.monitor, &work)) return std::nullopt;
   const UINT dpi = GetDpiForWindow(panel.hwnd);
   if (dpi == 0) return std::nullopt;
+  // A panel learns a scale change only when Fit, on a later turn of the loop,
+  // nudges it (measured: Windows re-reads a static window's DPI only when its
+  // rect changes). Until then its DPI is the old one, which would scale a
+  // gap wrongly: no display rather than a stale one, so the list is empty for
+  // that moment, as it is while a monitor that has just come has no panel.
+  const UINT monitor_dpi = MonitorDpi(panel.monitor);
+  if (monitor_dpi != 0 && monitor_dpi != dpi) return std::nullopt;
   return Display{work, dpi};
 }
 
@@ -742,13 +816,17 @@ bool WindowsOverlaySet::HandleHostMessage(UINT message, WPARAM wparam) {
   }
   if (message == WM_TIMER && wparam == kAttachTimer) {
     KillTimer(host_, kAttachTimer);
-    // A hold a later hotkey extended, commands that started, or a menu
-    // opened since it was set.
-    if (menu_open_ || AttachHeld()) {
+    // A hold a later hotkey extended, commands that started, or a menu or a
+    // session opened since it was set.
+    if (menu_open_ || session_ || AttachHeld()) {
       ScheduleAttach();
     } else {
       AttachNext();
     }
+    return true;
+  }
+  if (message == WM_TIMER && wparam == kAttachRetryTimer) {
+    RetryAttaches();
     return true;
   }
   if (message == 0) return false;  // a registration that failed
@@ -763,7 +841,7 @@ bool WindowsOverlaySet::HandleHostMessage(UINT message, WPARAM wparam) {
 // ---------------------------------------------------------------- session
 
 bool WindowsOverlaySet::HandleHotkey(int id) {
-  if (id < kGrabFirst || id > kGrabArrowLast) {
+  if (id < kFirstGrabId || id > kGrabArrowLast) {
     // Swallowed while a session is live (macOS suppressesRegionHotkeys): a
     // shortcut would capture anew underneath an open grid.
     return session_.has_value();
@@ -860,7 +938,9 @@ WindowsOverlaySet::ShowResult WindowsOverlaySet::Show(
   const double now = EpochMs();
   const double age =
       pressed_ms > 0 ? static_cast<double>(GetTickCount64()) - pressed_ms : 0;
-  if (pressed_ms > 0 && age > kStaleSummonMs) {
+  // A press from the future is no press of ours (the tick is this machine's
+  // and monotonic): stale, not fresh.
+  if (pressed_ms > 0 && (age > kStaleSummonMs || age < 0)) {
     DevLog("overlay summon refused: stale, " + Ms(age) +
            " ms after its hotkey");
     MessageBeep(MB_OK);
@@ -1049,6 +1129,8 @@ void WindowsOverlaySet::Dismiss(const char* why) {
     }
   }
   DevLog(std::string("overlay dismissed (") + why + ")");
+  // Its outcome (a placement, the picker) runs before the next attach.
+  HoldAttaches();
 }
 
 bool WindowsOverlaySet::GrabKeys() {
@@ -1281,12 +1363,14 @@ void WindowsOverlaySet::EndWarm(Panel& panel, uint64_t shows,
 
 void WindowsOverlaySet::NoteReady() {
   if (announced_ready_) return;
-  const std::vector<Panel*> live = Live();
-  for (const Panel* panel : live) {
-    if (!panel->warm) return;
+  // Every monitor's, not every live panel's: a monitor that came and went at
+  // launch would otherwise be announced ready with one panel short.
+  for (HMONITOR monitor : Monitors()) {
+    const Panel* panel = PanelFor(monitor);
+    if (!panel || !panel->warm) return;
   }
+  const std::vector<Panel*> live = Live();
   announced_ready_ = true;
   DevLog("overlay ready: " + std::to_string(live.size()) + " panels, " +
          Ms(MsSince(started_)) + " ms after launch");
 }
-

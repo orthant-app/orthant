@@ -323,6 +323,23 @@ void main() {
     expect(reads, sends);
   });
 
+  test('Dart\'s shortcut ids end just below the runner\'s first grab id', () {
+    // One number on each side of the seam: a shortcut at the grab id would
+    // fire the grid's Esc, or be swallowed as one.
+    final dartMax = int.parse(RegExp(r'static const int _maxId = (\d+);')
+        .firstMatch(File('lib/shortcuts/hotkey_service.dart').readAsStringSync())!
+        .group(1)!);
+    final header = File('windows/runner/windows_overlay_set.h').readAsStringSync();
+    final firstGrab = int.parse(RegExp(r'static constexpr int kFirstGrabId = (\d+);')
+        .firstMatch(header)!
+        .group(1)!);
+    expect(dartMax + 1, firstGrab);
+    final grabIds = RegExp(r'\{(\d+), \w+, ')
+        .allMatches(overlayCpp)
+        .map((m) => int.parse(m.group(1)!));
+    expect(grabIds.every((id) => id >= firstGrab && id <= 0xBFFF), isTrue);
+  });
+
   // The grid's key grabs are one table in C++ (kGrabs) and one in Dart
   // (windowsOverlayGrabs), which refuses a shortcut on any of them: a chord
   // added to one and not the other is either a dead grid key or a refusal of

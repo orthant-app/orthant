@@ -53,6 +53,12 @@ class WindowsOverlaySet {
 
   enum class ShowResult { kShown, kNotReady, kStale, kKeysRefused };
 
+  // Hotkey ids from here up are the overlay's grabs, on the same window as
+  // the shortcuts, whose ids are below it (Dart's HotkeyService._maxId is one
+  // less, which a test holds the two to). RegisterHotKey wants 0x0000 to
+  // 0xBFFF.
+  static constexpr int kFirstGrabId = 900;
+
   WindowsOverlaySet(HWND host, Forward forward);
   ~WindowsOverlaySet();
 
@@ -165,6 +171,8 @@ class WindowsOverlaySet {
   void ScheduleAttach();
   void AttachNext();
   void AttachEngine(Panel& panel);
+  void AttachFailed(Panel& panel, const char* why);
+  void RetryAttaches();
   void OnPanelDpiChanged(Panel& panel, UINT dpi);
   std::vector<Panel*> Live() const;
   Panel* PanelFor(HMONITOR monitor) const;
@@ -214,6 +222,12 @@ class WindowsOverlaySet {
   ULONGLONG commands_since_ = 0;  // the tick they started running
   bool commands_ceiling_logged_ = false;
   bool engines_started_ = false;
+  bool attach_retry_set_ = false;
+#ifdef ORTHANT_DEV_BUILD
+  // How many attaches still to fail on purpose (ORTHANT_DEBUG_FAIL_ATTACHES),
+  // so the acceptance can watch a failed attach be retried.
+  int attaches_to_fail_ = 0;
+#endif
   LARGE_INTEGER started_{};
   bool announced_ready_ = false;
 

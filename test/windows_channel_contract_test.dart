@@ -43,7 +43,11 @@ void main() {
     return calls;
   }
 
-  final cpp = File('windows/runner/window_channel.cpp').readAsStringSync();
+  // Read with LF endings whatever the checkout did (core.autocrlf true gives
+  // CRLF): the spans below end on a closing brace on a line of its own.
+  final cpp = File('windows/runner/window_channel.cpp')
+      .readAsStringSync()
+      .replaceAll('\r\n', '\n');
   final answered = {
     for (final m in RegExp(r'method == "([^"]+)"').allMatches(cpp)) m.group(1)!,
   };
@@ -100,8 +104,9 @@ void main() {
     for (final m in RegExp(r'''case ['"]([^'"]+)['"]:''').allMatches(overlayDart))
       m.group(1)!,
   };
-  final overlayCpp =
-      File('windows/runner/windows_overlay_set.cpp').readAsStringSync();
+  final overlayCpp = File('windows/runner/windows_overlay_set.cpp')
+      .readAsStringSync()
+      .replaceAll('\r\n', '\n');
   final overlayAnswered = {
     for (final m in RegExp(r'method == "([^"]+)"').allMatches(overlayCpp))
       m.group(1)!,

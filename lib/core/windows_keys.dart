@@ -26,6 +26,25 @@ const int kModControl = 0x0002;
 const int kModShift = 0x0004;
 const int kModWin = 0x0008;
 
+/// The chords the grid takes while it is up, as the runner registers them
+/// (`kGrabs` in `windows_overlay_set.cpp`, which a test holds this list to):
+/// Esc, Enter, Ctrl+S, the arrows and Shift with the arrows. Windows gives a
+/// chord to whoever registered it first, and the shortcuts register at
+/// launch, so a shortcut on one of these would take that key from every grid.
+const List<({int modifiers, int vk})> windowsOverlayGrabs = [
+  (modifiers: 0, vk: 0x1B), // Esc
+  (modifiers: 0, vk: 0x0D), // Enter
+  (modifiers: kModControl, vk: 0x53), // Ctrl+S
+  (modifiers: 0, vk: 0x25), // Left
+  (modifiers: 0, vk: 0x27), // Right
+  (modifiers: 0, vk: 0x26), // Up
+  (modifiers: 0, vk: 0x28), // Down
+  (modifiers: kModShift, vk: 0x25),
+  (modifiers: kModShift, vk: 0x27),
+  (modifiers: kModShift, vk: 0x26),
+  (modifiers: kModShift, vk: 0x28),
+];
+
 /// The `RegisterHotKey` flags for [modifiers]; 0 when none is held.
 int windowsModifiers(Modifiers modifiers) =>
     (modifiers.has(Modifiers.alt) ? kModAlt : 0) |

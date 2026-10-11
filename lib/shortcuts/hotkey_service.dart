@@ -168,11 +168,16 @@ class HotkeyService implements HotkeyRegistrar {
   /// `RegisterHotKey`'s modifier flags. Validated here, as macOS's Carbon code
   /// is: the v3 reader accepts any positive logical key, so a file naming one
   /// Windows cannot register is refused rather than sent, and a chord with no
-  /// modifier is never registered as a bare key.
+  /// modifier is never registered as a bare key. Nor is a chord the grid
+  /// grabs ([windowsOverlayGrabs]): registered at launch, it would leave that
+  /// key dead on every grid, so it reads "unavailable" instead.
   static Map<String, Object?>? _windowsEntry(int id, KeyChord chord) {
     final vk = windowsVirtualKey(chord.windowsKey);
     final mods = windowsModifiers(chord.modifiers);
     if (vk == null || mods == 0) return null;
+    if (windowsOverlayGrabs.any((g) => g.modifiers == mods && g.vk == vk)) {
+      return null;
+    }
     return {'id': id, 'vk': vk, 'modifiers': mods};
   }
 

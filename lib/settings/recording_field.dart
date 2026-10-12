@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../shortcuts/bindings.dart';
 import '../core/key_chord.dart';
+import '../core/key_words.dart';
 import 'key_capture.dart';
 import 'keyboard_labels.dart';
 import 'platform_theme.dart';
@@ -117,7 +118,9 @@ class _RecordingFieldState extends State<RecordingField> {
           borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
-          symbols.isEmpty ? 'Press keys…' : symbols.join(' '),
+          symbols.isEmpty
+              ? 'Press keys…'
+              : KeyWords.current.joinSpaced(symbols),
           style: TextStyle(
             fontFamily: symbols.isEmpty ? null : PlatformTokens.monoFamily,
             fontSize: 11.5,

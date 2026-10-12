@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:flutter/services.dart' show PhysicalKeyboardKey;
+
+import '../core/key_words.dart';
 import '../settings/keycap.dart';
 import '../settings/mac_control.dart';
 import '../settings/platform_theme.dart';
@@ -33,6 +36,9 @@ const _twoThirds = CustomRegion(
   r1: 0,
 );
 
+/// The key that places, as a keycap names it: ↩ on macOS, Enter on Windows.
+final _enter = PhysicalKeyboardKey.enter.usbHidUsage;
+
 class ReadyScreen extends StatelessWidget {
   const ReadyScreen({
     super.key,
@@ -63,20 +69,22 @@ class ReadyScreen extends StatelessWidget {
     orElse: () => Binding.unbound(c),
   );
 
-  /// Keycaps, preceded by a warning when the OS will not deliver them.
-  List<Widget> _keys(PlatformTokens t, Binding b,
+  /// One chord's keycaps, preceded by a warning when the OS will not deliver
+  /// them.
+  Widget _chord(PlatformTokens t, Binding b,
           {String unsetLabel = 'Not set'}) =>
-      [
+      Row(mainAxisSize: MainAxisSize.min, children: [
         if (b.isBound && unavailable.contains(b.command)) ...[
           Tooltip(
-            message: 'macOS or another app already uses this combination, so '
-                'it never reaches Orthant.\nPick a different one below.',
+            message: '${KeyWords.current.system} or another app already uses '
+                'this combination, so it never reaches Orthant.\n'
+                'Pick a different one below.',
             child: Icon(Icons.warning_amber_rounded, size: 14, color: t.warning),
           ),
           const SizedBox(width: 5),
         ],
         KeycapRow(chord: b.chord, unsetLabel: unsetLabel),
-      ];
+      ]);
 
   @override
   Widget build(BuildContext context) {
@@ -122,8 +130,9 @@ class ReadyScreen extends StatelessWidget {
                             height: 34,
                             child: Center(child: RegionGlyph(command: null)),
                           ),
-                          keys:
-                              _keys(t, summon, unsetLabel: 'No shortcut set'),
+                          chords: [
+                            _chord(t, summon, unsetLabel: 'No shortcut set'),
+                          ],
                           // The arrows are named here because this card is the
                           // only place the grid is ever explained, and a
                           // keyboard feature nobody is told about is one nobody
@@ -132,7 +141,8 @@ class ReadyScreen extends StatelessWidget {
                           caption:
                               'Opens the grid. Drag across it to pick any '
                               'block: thirds, two-thirds, anything. Or use '
-                              'the arrow keys, ⇧ to extend, ↩ to place.',
+                              'the arrow keys, ${KeyWords.current.shiftName} '
+                              'to extend, ${keySymbol(_enter)} to place.',
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -158,11 +168,7 @@ class ReadyScreen extends StatelessWidget {
                               ),
                             ),
                           ),
-                          keys: [
-                            ..._keys(t, left),
-                            const SizedBox(width: 8),
-                            ..._keys(t, right),
-                          ],
+                          chords: [_chord(t, left), _chord(t, right)],
                           // The last clause is the only place anything tells
                           // a new user that the eleven defaults are not the
                           // whole vocabulary. A feature nobody is told about is
@@ -224,13 +230,19 @@ class _Card extends StatelessWidget {
   const _Card({
     required this.tokens,
     required this.art,
-    required this.keys,
+    required this.chords,
     required this.caption,
   });
 
   final PlatformTokens tokens;
   final Widget art;
-  final List<Widget> keys;
+
+  /// Each chord whole, side by side while they fit. Windows names its keys
+  /// (Win, Ctrl, Shift), so two of its chords are wider than a card and the
+  /// second goes beneath the first. macOS's default chords fit on one line,
+  /// laid out exactly as a centred row would; two rebound to four modifiers
+  /// each do not, and wrap too, where the row they replace ran past the card.
+  final List<Widget> chords;
   final String caption;
 
   @override
@@ -247,7 +259,13 @@ class _Card extends StatelessWidget {
         children: [
           art,
           const SizedBox(height: 12),
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: keys),
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 6,
+            children: chords,
+          ),
           const SizedBox(height: 10),
           Text(
             caption,

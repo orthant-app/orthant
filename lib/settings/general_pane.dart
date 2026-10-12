@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/key_words.dart';
 import '../core/window_controller.dart';
 import '../shortcuts/bindings.dart';
 import '../shortcuts/command_ref.dart';
@@ -265,8 +266,8 @@ class GeneralPane extends StatelessWidget {
         if (summonUnavailable && summon.isBound) ...[
           Tooltip(
             message:
-                'macOS or another app already uses this combination, so '
-                'it never reaches Orthant.',
+                '${KeyWords.current.system} or another app already uses this '
+                'combination, so it never reaches Orthant.',
             child: Icon(
               Icons.warning_amber_rounded,
               size: 15,

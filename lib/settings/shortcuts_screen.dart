@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../core/key_chord.dart';
+import '../core/key_words.dart';
+import '../overlay/overlay_copy.dart';
 import '../shortcuts/bindings.dart';
 import '../shortcuts/command_ref.dart';
 import '../shortcuts/custom_region.dart';
@@ -647,11 +649,14 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   /// (`saveHint` is `regions.isEmpty`), which left the grid-to-shortcut route
   /// taught nowhere for anyone who already had one. "Add region…" is a
   /// labelled button and documents itself; ⌘S is invisible unless told.
+  ///
+  /// The chord is the grid's own ([OverlayCopy.save]: ⌘S, Ctrl+S on Windows),
+  /// so the hint teaches exactly what the grid's caption shows.
   Widget _regionsHint(PlatformTokens t) => Padding(
     padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
     child: Text(
       "Bind a shape the built-ins don't cover. Draw it here, or select it "
-      'in the grid and press ⌘S.',
+      'in the grid and press ${OverlayCopy.current.save}.',
       style: TextStyle(fontSize: 11, color: t.labelTertiary),
     ),
   );
@@ -888,9 +893,10 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
             child: Text(
               _notice?.message ??
                   (_recording != null
-                      ? 'Listening… press a combination, or esc to cancel.'
-                      : 'Click a shortcut to change it. '
-                            'Combinations need ⌃, ⌥, ⇧ or ⌘.'),
+                      ? 'Listening… press a combination, or '
+                            '${KeyWords.current.escape} to cancel.'
+                      : 'Click a shortcut to change it. Combinations need '
+                            '${KeyWords.current.anyModifier}.'),
               // Two lines at most, so a long message cannot change the pane's
               // height — this window measures its content to size itself, and a
               // line that grows and collapses drives exactly the resize loop that
@@ -1392,8 +1398,9 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
                     padding: const EdgeInsets.only(right: 5),
                     child: Tooltip(
                       message:
-                          'macOS or another app already uses this '
-                          'combination, so it never reaches Orthant.\n'
+                          '${KeyWords.current.system} or another app already '
+                          'uses this combination, so it never reaches '
+                          'Orthant.\n'
                           'Click the shortcut to pick a different one.',
                       // The row's label already ends in ", unavailable"; the
                       // icon is how the same thing is said to a sighted user.

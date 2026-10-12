@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../overlay/grid_selection.dart';
 import '../core/key_chord.dart';
+import '../core/key_words.dart';
 import '../shortcuts/bindings.dart';
 import '../shortcuts/custom_region.dart';
 import 'keycap.dart';
@@ -419,7 +420,8 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
                   _grid(t),
                   const SizedBox(height: 6),
                   Text(
-                    'Drag to draw · arrows to move, ⇧ to extend',
+                    'Drag to draw · arrows to move, '
+                    '${KeyWords.current.shiftName} to extend',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 10.5, color: t.labelTertiary),
                   ),

@@ -129,6 +129,26 @@ class MacosWindowController implements WindowController {
   @override
   Future<void> startOverlay() async {}
 
+  @override
+  Future<AccentColors?> accentColor() async {
+    // Display data only, like the labels above: a failure here is the
+    // platform's default accent, never a launch that stops.
+    final Object? reply;
+    try {
+      reply = await _channel.invokeMethod<Object?>(kAccentColor);
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+    if (reply is! Map) return null;
+    bool argb(Object? v) => v is int && v >= 0 && v <= 0xFFFFFFFF;
+    final light = reply['light'];
+    final dark = reply['dark'];
+    if (!argb(light) || !argb(dark)) return null;
+    return AccentColors(light: light as int, dark: dark as int);
+  }
+
   // Nothing on macOS waits for the commands to finish.
   @override
   Future<void> setCommandsRunning(bool running) async {}

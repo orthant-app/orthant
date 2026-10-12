@@ -45,6 +45,39 @@ void main() {
     expect(await const MacosWindowController().keyboardLabels(), isEmpty);
   });
 
+  test('the accent is both appearances\' colours, as Swift resolves them',
+      () async {
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      expect(call.method, 'accentColor');
+      return <Object, Object>{'light': 0xFF953D96, 'dark': 0xFFA550A7};
+    });
+    expect(await const MacosWindowController().accentColor(),
+        const AccentColors(light: 0xFF953D96, dark: 0xFFA550A7));
+  });
+
+  test('an accent reply that is missing, malformed or failed is no accent',
+      () async {
+    for (final reply in <Object?>[
+      null,
+      'blue',
+      <Object, Object>{'light': 0xFF007AFF},
+      <Object, Object>{'light': 0xFF007AFF, 'dark': '0A84FF'},
+      <Object, Object>{'light': -1, 'dark': 0xFF0A84FF},
+      <Object, Object>{'light': 0x1FF007AFF, 'dark': 0xFF0A84FF},
+    ]) {
+      messenger.setMockMethodCallHandler(channel, (call) async => reply);
+      expect(await const MacosWindowController().accentColor(), isNull,
+          reason: '$reply');
+    }
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      throw PlatformException(code: 'accent');
+    });
+    expect(await const MacosWindowController().accentColor(), isNull);
+    // No handler at all: a Dart side newer than its native side.
+    messenger.setMockMethodCallHandler(channel, null);
+    expect(await const MacosWindowController().accentColor(), isNull);
+  });
+
   test('startOverlay asks the native side nothing: macOS starts its overlay '
       'engine with the app, and Swift answers no such method', () async {
     final calls = <MethodCall>[];

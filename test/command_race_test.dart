@@ -86,6 +86,8 @@ class _SlottedWc implements WindowController {
   // requires an answer. `unavailable` is the honest default for a fake.
   @override
   Future<Map<int, String>> keyboardLabels() async => const {};
+  @override
+  Future<AccentColors?> accentColor() async => null;
 
   @override
   Future<AppVersion> appVersion() async => const AppVersion('1.0.0', '1');

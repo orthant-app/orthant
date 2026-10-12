@@ -145,6 +145,17 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       // user has selected. Bindings keep their key codes; see KeyboardLayout.
       case "keyboardLabels":
         result(KeyboardLayout.labels())
+      // Display data only: the user's accent as macOS draws its own controls
+      // with it, resolved in each appearance, since a named accent differs
+      // between the two. Read every time, so a change in System Settings
+      // shows the next time the window opens. Nil when either has no sRGB
+      // form; Dart then draws the default.
+      case "accentColor":
+        if let light = accentARGB(in: .aqua), let dark = accentARGB(in: .darkAqua) {
+          result(["light": light, "dark": dark])
+        } else {
+          result(nil)
+        }
       case "appVersion":
         let info = Bundle.main.infoDictionary
         result([
@@ -270,4 +281,18 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     channel?.invokeMethod("onConfigWindowClosed", arguments: nil)
     return false
   }
+}
+
+/// `NSColor.controlAccentColor` resolved in the appearance named `name`, as
+/// 0xAARRGGBB in sRGB, or nil when it has no sRGB form.
+private func accentARGB(in name: NSAppearance.Name) -> Int? {
+  guard let appearance = NSAppearance(named: name) else { return nil }
+  var argb: Int?
+  appearance.performAsCurrentDrawingAppearance {
+    guard let c = NSColor.controlAccentColor.usingColorSpace(.sRGB) else { return }
+    func byte(_ v: CGFloat) -> Int { Int((min(max(v, 0), 1) * 255).rounded()) }
+    argb = byte(c.alphaComponent) << 24 | byte(c.redComponent) << 16
+      | byte(c.greenComponent) << 8 | byte(c.blueComponent)
+  }
+  return argb
 }

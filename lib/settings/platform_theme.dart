@@ -7,8 +7,8 @@ import 'package:flutter/material.dart';
 /// values approximate AppKit's semantic colors closely enough that the window
 /// reads as a system preferences pane rather than a Material app.
 @immutable
-class MacTokens extends ThemeExtension<MacTokens> {
-  const MacTokens({
+class PlatformTokens extends ThemeExtension<PlatformTokens> {
+  const PlatformTokens({
     required this.windowBackground,
     required this.contentBackground,
     required this.rowHighlight,
@@ -44,7 +44,7 @@ class MacTokens extends ThemeExtension<MacTokens> {
   /// SF Mono isn't guaranteed installed; Menlo ships with every macOS.
   static const String monoFamily = 'Menlo';
 
-  static const light = MacTokens(
+  static const light = PlatformTokens(
     windowBackground: Color(0xFFECECEE),
     contentBackground: Color(0xFFFFFFFF),
     rowHighlight: Color(0x0A000000),
@@ -60,7 +60,7 @@ class MacTokens extends ThemeExtension<MacTokens> {
     warning: Color(0xFFC93400),
   );
 
-  static const dark = MacTokens(
+  static const dark = PlatformTokens(
     windowBackground: Color(0xFF1E1E1F),
     contentBackground: Color(0xFF2C2C2E),
     rowHighlight: Color(0x14FFFFFF),
@@ -77,7 +77,7 @@ class MacTokens extends ThemeExtension<MacTokens> {
   );
 
   @override
-  MacTokens copyWith({
+  PlatformTokens copyWith({
     Color? windowBackground,
     Color? contentBackground,
     Color? rowHighlight,
@@ -92,7 +92,7 @@ class MacTokens extends ThemeExtension<MacTokens> {
     Color? glyphOutline,
     Color? warning,
   }) {
-    return MacTokens(
+    return PlatformTokens(
       windowBackground: windowBackground ?? this.windowBackground,
       contentBackground: contentBackground ?? this.contentBackground,
       rowHighlight: rowHighlight ?? this.rowHighlight,
@@ -110,10 +110,10 @@ class MacTokens extends ThemeExtension<MacTokens> {
   }
 
   @override
-  MacTokens lerp(MacTokens? other, double t) {
+  PlatformTokens lerp(PlatformTokens? other, double t) {
     if (other == null) return this;
     Color c(Color a, Color b) => Color.lerp(a, b, t)!;
-    return MacTokens(
+    return PlatformTokens(
       windowBackground: c(windowBackground, other.windowBackground),
       contentBackground: c(contentBackground, other.contentBackground),
       rowHighlight: c(rowHighlight, other.rowHighlight),
@@ -131,14 +131,16 @@ class MacTokens extends ThemeExtension<MacTokens> {
   }
 }
 
-/// Convenience: `context.mac` instead of a nested `Theme.of` lookup.
-extension MacThemeContext on BuildContext {
-  MacTokens get mac =>
-      Theme.of(this).extension<MacTokens>() ?? MacTokens.light;
+/// Convenience: `context.tokens` instead of a nested `Theme.of` lookup.
+extension PlatformThemeContext on BuildContext {
+  PlatformTokens get tokens =>
+      Theme.of(this).extension<PlatformTokens>() ?? PlatformTokens.light;
 }
 
-ThemeData macTheme(Brightness brightness) {
-  final t = brightness == Brightness.dark ? MacTokens.dark : MacTokens.light;
+ThemeData orthantTheme(Brightness brightness) {
+  final t = brightness == Brightness.dark
+      ? PlatformTokens.dark
+      : PlatformTokens.light;
   final base = ThemeData(brightness: brightness, useMaterial3: true);
   return base.copyWith(
     scaffoldBackgroundColor: t.windowBackground,

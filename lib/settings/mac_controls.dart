@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'mac_control.dart';
-import 'mac_theme.dart';
+import 'platform_theme.dart';
 
-/// A macOS push button, drawn over [MacTokens].
+/// A macOS push button, drawn over [PlatformTokens].
 ///
 /// Extracted from `general_pane.dart` when the About pane needed the same
 /// control. Two hand-tuned copies of one button is how the two quietly stop
@@ -21,7 +21,7 @@ class MacPushButton extends StatelessWidget {
   });
 
   final String label;
-  final MacTokens tokens;
+  final PlatformTokens tokens;
 
   /// Null disables the button — [MacControl] handles the semantics.
   final VoidCallback? onPressed;
@@ -70,7 +70,7 @@ class MacCheckbox extends StatelessWidget {
   });
 
   final String label;
-  final MacTokens tokens;
+  final PlatformTokens tokens;
   final bool value;
   final void Function(bool)? onChanged;
 

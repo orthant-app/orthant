@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 
-import 'mac_theme.dart';
+import 'platform_theme.dart';
 
 /// A control that can be reached and used without a mouse.
 ///
@@ -108,7 +108,7 @@ class _MacControlState extends State<MacControl> {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.mac;
+    final t = context.tokens;
     final a11yFocus = widget.onAccessibilityFocusChange;
     final node = Semantics(
       container: true,

@@ -10,7 +10,7 @@ import '../shortcuts/shortcut_command.dart';
 import 'keycap.dart';
 import 'keyboard_labels.dart';
 import 'mac_control.dart';
-import 'mac_theme.dart';
+import 'platform_theme.dart';
 import 'recording_field.dart';
 import 'region_glyph.dart';
 import 'region_picker_sheet.dart';
@@ -549,7 +549,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.mac;
+    final t = context.tokens;
     return Scaffold(
       backgroundColor: t.windowBackground,
       body: Column(
@@ -624,7 +624,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   /// A real heading, not just bold small text: without the flag a screen
   /// reader's heading rotor cannot find either group, so the structure this
   /// exists to create is visible only to people who can see it.
-  Widget _sectionHeader(String title, MacTokens t) => Semantics(
+  Widget _sectionHeader(String title, PlatformTokens t) => Semantics(
     header: true,
     child: Padding(
       padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
@@ -647,7 +647,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   /// (`saveHint` is `regions.isEmpty`), which left the grid-to-shortcut route
   /// taught nowhere for anyone who already had one. "Add region…" is a
   /// labelled button and documents itself; ⌘S is invisible unless told.
-  Widget _regionsHint(MacTokens t) => Padding(
+  Widget _regionsHint(PlatformTokens t) => Padding(
     padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
     child: Text(
       "Bind a shape the built-ins don't cover. Draw it here, or select it "
@@ -657,7 +657,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   );
 
   /// One rounded group, its rows hairline-separated.
-  Widget _group(MacTokens t, List<Widget> rows) => DecoratedBox(
+  Widget _group(PlatformTokens t, List<Widget> rows) => DecoratedBox(
     decoration: BoxDecoration(
       color: t.contentBackground,
       borderRadius: BorderRadius.circular(10),
@@ -730,7 +730,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   ///
   /// The key is the **outermost** node either way, so it never moves in the
   /// tree as the animation comes and goes.
-  Widget _flashWrap(String id, MacTokens t, Widget child) {
+  Widget _flashWrap(String id, PlatformTokens t, Widget child) {
     final key = _rowKeys.putIfAbsent(id, GlobalKey.new);
     if (_flash != id) return KeyedSubtree(key: key, child: child);
     return KeyedSubtree(
@@ -756,7 +756,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
     );
   }
 
-  Widget _header(MacTokens t) => Padding(
+  Widget _header(PlatformTokens t) => Padding(
     padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -795,7 +795,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   /// The taller version cost ~120 pt and pushed the last three rows below the
   /// fold — a warning that hides the very list it is warning about. This says
   /// the same thing in a third of the space, and the link is still one click.
-  Widget _notGrantedNotice(MacTokens t) => Padding(
+  Widget _notGrantedNotice(PlatformTokens t) => Padding(
     padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
     child: Container(
       padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
@@ -877,7 +877,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   /// it. Nothing in the row is centred against it, so slack costs nothing.
   static const _footerHeight = 30.0;
 
-  Widget _footer(MacTokens t) => Padding(
+  Widget _footer(PlatformTokens t) => Padding(
     padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
     child: SizedBox(
       height: _footerHeight,
@@ -996,7 +996,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   ///
   /// A row rather than a footer button, so it reads as the natural end of the
   /// list it extends and lands in the same Tab order as everything above it.
-  Widget _addRegionRow(MacTokens t) => MacControl(
+  Widget _addRegionRow(PlatformTokens t) => MacControl(
         key: const ValueKey('add-region'),
         onPressed: () => _openPicker(null),
         semanticLabel: 'Add region',
@@ -1241,7 +1241,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
     await _openPicker(next.initial, isNew: next.isNew);
   }
 
-  Widget _row(CommandRef cmd, MacTokens t) {
+  Widget _row(CommandRef cmd, PlatformTokens t) {
     final binding = _bindingFor(cmd);
     final custom = _customOf(cmd);
     final isRecording = _recording == cmd;
@@ -1486,7 +1486,7 @@ class _ClearButton extends StatelessWidget {
     required this.command,
     required this.onPressed,
   });
-  final MacTokens tokens;
+  final PlatformTokens tokens;
 
   /// Named in the label because these are now resident: a screen reader can
   /// meet eleven of them, and "Remove shortcut" on its own says which one only
@@ -1518,7 +1518,7 @@ class _ClearButton extends StatelessWidget {
 /// be hit by the click that was meant to land on a row.
 class _ResetButton extends StatelessWidget {
   const _ResetButton({required this.tokens, required this.onPressed});
-  final MacTokens tokens;
+  final PlatformTokens tokens;
   final VoidCallback onPressed;
 
   @override

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/geometry.dart';
-import 'package:orthant/settings/mac_theme.dart';
+import 'package:orthant/settings/platform_theme.dart';
 import 'package:orthant/settings/region_glyph.dart';
 import 'package:orthant/shortcuts/custom_region.dart';
 import 'package:orthant/shortcuts/region_commands.dart';
@@ -51,7 +51,7 @@ void main() {
 
   testWidgets('renders each kind without throwing', (tester) async {
     await tester.pumpWidget(MaterialApp(
-      theme: macTheme(Brightness.light),
+      theme: orthantTheme(Brightness.light),
       home: const Scaffold(
         body: Row(
           children: [
@@ -87,7 +87,7 @@ void main() {
     Future<int> accentPixels(Widget glyph) async {
       final key = GlobalKey();
       await tester.pumpWidget(MaterialApp(
-        theme: macTheme(Brightness.light),
+        theme: orthantTheme(Brightness.light),
         home: Scaffold(
           body: Center(child: RepaintBoundary(key: key, child: glyph)),
         ),

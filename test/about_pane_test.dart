@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/window_controller.dart';
 import 'package:orthant/settings/about_pane.dart';
-import 'package:orthant/settings/mac_theme.dart';
+import 'package:orthant/settings/platform_theme.dart';
 
 void main() {
   Widget host(
@@ -12,7 +12,7 @@ void main() {
     void Function(bool)? onAutomaticChecksChanged,
   }) =>
       MaterialApp(
-        theme: macTheme(Brightness.light),
+        theme: orthantTheme(Brightness.light),
         home: Scaffold(
           body: AboutPane(
             version: version,

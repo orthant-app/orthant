@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/geometry.dart';
-import 'mac_theme.dart';
+import 'platform_theme.dart';
 
 /// A miniature of the overlay grid, fed by the grid *and* the gap controls.
 ///
@@ -30,7 +30,7 @@ class GridPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.mac;
+    final t = context.tokens;
     return Container(
       padding: const EdgeInsets.all(9),
       decoration: BoxDecoration(

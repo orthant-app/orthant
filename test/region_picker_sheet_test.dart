@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/geometry.dart';
 import 'package:orthant/settings/keycap.dart';
 import 'package:orthant/settings/mac_control.dart';
-import 'package:orthant/settings/mac_theme.dart';
+import 'package:orthant/settings/platform_theme.dart';
 import 'package:orthant/settings/recording_field.dart';
 import 'package:orthant/settings/region_picker_sheet.dart';
 import 'package:orthant/shortcuts/custom_region.dart';
@@ -27,7 +27,7 @@ const _leftTwoThirds = CustomRegion(
 );
 
 Widget _host(Widget child) => MaterialApp(
-      theme: macTheme(Brightness.light),
+      theme: orthantTheme(Brightness.light),
       home: Scaffold(body: SizedBox(width: 600, height: 700, child: child)),
     );
 
@@ -662,7 +662,7 @@ void main() {
     // one layer down: tertiary is what macOS greys an unavailable control with
     // — 2.4:1 against this pane — so an invitation wearing it still reads as a
     // verdict, however button-shaped the box around it is.
-    final t = MacTokens.light;
+    final t = PlatformTokens.light;
     final label = tester.widget<Text>(find.text('Click to record'));
     expect(label.style!.color, isNot(t.labelTertiary));
     expect(label.style!.color, t.labelSecondary);

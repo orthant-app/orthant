@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../settings/keycap.dart';
 import '../settings/mac_control.dart';
-import '../settings/mac_theme.dart';
+import '../settings/platform_theme.dart';
 import '../settings/region_glyph.dart';
 import '../shortcuts/bindings.dart';
 import '../shortcuts/command_ref.dart';
@@ -64,7 +64,9 @@ class ReadyScreen extends StatelessWidget {
   );
 
   /// Keycaps, preceded by a warning when the OS will not deliver them.
-  List<Widget> _keys(MacTokens t, Binding b, {String unsetLabel = 'Not set'}) => [
+  List<Widget> _keys(PlatformTokens t, Binding b,
+          {String unsetLabel = 'Not set'}) =>
+      [
         if (b.isBound && unavailable.contains(b.command)) ...[
           Tooltip(
             message: 'macOS or another app already uses this combination, so '
@@ -78,7 +80,7 @@ class ReadyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.mac;
+    final t = context.tokens;
     final summon = _bindingFor(const BuiltIn(ShortcutCommand.showGrid));
     final left = _bindingFor(const BuiltIn(ShortcutCommand.leftHalf));
     final right = _bindingFor(const BuiltIn(ShortcutCommand.rightHalf));
@@ -226,7 +228,7 @@ class _Card extends StatelessWidget {
     required this.caption,
   });
 
-  final MacTokens tokens;
+  final PlatformTokens tokens;
   final Widget art;
   final List<Widget> keys;
   final String caption;

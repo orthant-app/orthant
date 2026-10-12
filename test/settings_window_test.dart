@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/window_controller.dart';
-import 'package:orthant/settings/mac_theme.dart';
+import 'package:orthant/settings/platform_theme.dart';
 import 'package:orthant/settings/region_picker_sheet.dart';
 import 'package:orthant/settings/settings.dart';
 import 'package:orthant/settings/settings_window.dart';
@@ -28,7 +28,7 @@ void main() {
     void Function(RegionDraft)? onRegionSaved,
   }) =>
       MaterialApp(
-        theme: macTheme(Brightness.light),
+        theme: orthantTheme(Brightness.light),
         home: SettingsWindow(
           initialTab: initialTab,
           settings: settings,
@@ -155,7 +155,7 @@ void main() {
     // reach, which is what a footer inside the scroll area did.
     Widget short(SettingsTab tab, {bool permissionGranted = false}) =>
         MaterialApp(
-          theme: macTheme(Brightness.light),
+          theme: orthantTheme(Brightness.light),
           home: Align(
             alignment: Alignment.topCenter,
             child: SizedBox(

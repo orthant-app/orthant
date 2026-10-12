@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:orthant/settings/mac_theme.dart';
+import 'package:orthant/settings/platform_theme.dart';
 import 'package:orthant/settings/recording_field.dart';
 import 'package:orthant/settings/region_glyph.dart';
 import 'package:orthant/settings/shortcuts_screen.dart';
@@ -19,7 +19,7 @@ import 'package:orthant/shortcuts/shortcut_command.dart';
 import 'support/carbon_terms.dart';
 
 Widget _host(Widget child) =>
-    MaterialApp(theme: macTheme(Brightness.light), home: child);
+    MaterialApp(theme: orthantTheme(Brightness.light), home: child);
 
 void main() {
   testWidgets('lists every command with a region glyph and its combo keycaps',
@@ -1971,7 +1971,7 @@ void main() {
       required bool reduceMotion,
     }) async {
       await tester.pumpWidget(MaterialApp(
-        theme: macTheme(Brightness.light),
+        theme: orthantTheme(Brightness.light),
         // `copyWith`, never a fresh `MediaQueryData`: a bare one carries
         // `Size.zero`, which lays the pane out at nothing and leaves every row
         // findable but unhittable — the same fold problem this group's `setUp`

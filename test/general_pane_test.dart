@@ -4,7 +4,7 @@ import 'package:orthant/core/window_controller.dart';
 import 'package:orthant/settings/general_pane.dart';
 import 'package:orthant/settings/grid_preview.dart';
 import 'package:orthant/settings/mac_stepper.dart';
-import 'package:orthant/settings/mac_theme.dart';
+import 'package:orthant/settings/platform_theme.dart';
 import 'package:orthant/settings/settings.dart';
 
 import 'support/carbon_terms.dart';
@@ -15,7 +15,7 @@ void main() {
   Widget host(Settings settings) {
     changes = [];
     return MaterialApp(
-      theme: macTheme(Brightness.light),
+      theme: orthantTheme(Brightness.light),
       home: Scaffold(
         body: SizedBox(
           width: 560,

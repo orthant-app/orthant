@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/window_controller.dart';
 import 'mac_controls.dart';
-import 'mac_theme.dart';
+import 'platform_theme.dart';
 
 /// What the running build is, and the one action anyone wants after reading it.
 ///
@@ -63,7 +63,7 @@ class AboutPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.mac;
+    final t = context.tokens;
     // Centre in the *viewport*, and scroll when the viewport is too short for
     // the content. `minHeight` has to come from the incoming constraints, not
     // a constant: a `SingleChildScrollView` sizes its child to the child's own

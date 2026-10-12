@@ -2,7 +2,7 @@ import 'package:flutter/widgets.dart';
 import '../core/geometry.dart';
 import '../shortcuts/custom_region.dart';
 import '../shortcuts/region_commands.dart';
-import 'mac_theme.dart';
+import 'platform_theme.dart';
 
 /// A miniature diagram of where a command puts the window: an outlined "screen"
 /// with the target region filled.
@@ -36,7 +36,7 @@ class RegionGlyph extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.mac;
+    final t = context.tokens;
     return CustomPaint(
       size: _size,
       painter: _RegionGlyphPainter(

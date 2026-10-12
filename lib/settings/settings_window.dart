@@ -13,7 +13,7 @@ import '../shortcuts/shortcut_command.dart';
 import 'about_pane.dart';
 import 'general_pane.dart';
 import 'mac_control.dart';
-import 'mac_theme.dart';
+import 'platform_theme.dart';
 import 'settings.dart';
 import 'region_picker_sheet.dart';
 import 'shortcuts_screen.dart';
@@ -175,7 +175,7 @@ class _SettingsWindowState extends State<SettingsWindow> {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.mac;
+    final t = context.tokens;
     return Scaffold(
       backgroundColor: t.windowBackground,
       body: Column(
@@ -234,9 +234,9 @@ class _SettingsWindowState extends State<SettingsWindow> {
 }
 
 /// A centred segmented control, the idiom Apple's own `Settings` scene still
-/// produces for a small number of panes. Hand-built over [MacTokens] for the
-/// same reason the rest of this window is: the spec keeps dependencies lean,
-/// and window-owning packages fight over `MainFlutterWindow` (§5).
+/// produces for a small number of panes. Hand-built over [PlatformTokens] for
+/// the same reason the rest of this window is: the spec keeps dependencies
+/// lean, and window-owning packages fight over `MainFlutterWindow` (§5).
 class _TabBar extends StatelessWidget {
   const _TabBar({
     required this.current,
@@ -246,7 +246,7 @@ class _TabBar extends StatelessWidget {
 
   final SettingsTab current;
   final void Function(SettingsTab) onSelect;
-  final MacTokens tokens;
+  final PlatformTokens tokens;
 
   static const _labels = {
     SettingsTab.general: ('General', Icons.tune),

@@ -46,7 +46,10 @@ class _FakeWc implements WindowController {
   Future<void> openAccessibilitySettings() async =>
       calls.add('openAccessibilitySettings');
   @override
-  Future<void> showConfigWindow() async => calls.add('show');
+  Future<void> showConfigWindow() async {
+    calls.add('show');
+    events.add('show');
+  }
   /// Runs *inside* `hideConfigWindow`, so a test can observe app state at
   /// exactly that moment.
   ///
@@ -117,8 +120,22 @@ class _FakeWc implements WindowController {
   Map<int, String> labels = const {};
   @override
   Future<Map<int, String>> keyboardLabels() async => labels;
+  AccentColors? accent;
+
+  /// How many times the window had been shown when each accent read ran.
+  final List<int> accentReadsAtShows = [];
+
+  /// The accent reads (asked, then answered a turn later, as a channel would)
+  /// and the shows, in order; a test adds the screen changes.
+  final List<String> events = [];
   @override
-  Future<AccentColors?> accentColor() async => null;
+  Future<AccentColors?> accentColor() async {
+    accentReadsAtShows.add(calls.where((c) => c == 'show').length);
+    events.add('accent');
+    await Future<void>.delayed(Duration.zero);
+    events.add('accent answered');
+    return accent;
+  }
 
   @override
   Future<AppVersion> appVersion() async => version;
@@ -164,6 +181,8 @@ class _FakeRegistrar implements HotkeyRegistrar {
   Future<void> unregisterAll() async => unregisterAllCount++;
 }
 
+typedef _Harness = ({OrthantCoordinator app, _FakeWc wc, _FakeRegistrar keys});
+
 void main() {
   // For SharedPreferences' mock channel; no widget is built here.
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -207,6 +226,124 @@ void main() {
     final t = build(granted: true);
     await t.app.start();
     expect(t.app.openGridLabel, 'Open Grid\tWin+Ctrl+Shift+O');
+  });
+
+  group('the accent', () {
+    const purple = AccentColors(light: 0xFF953D96, dark: 0xFFA550A7);
+    const red = AccentColors(light: 0xFFE0383E, dark: 0xFFFF5257);
+
+    test('is read at launch and before every show, never cached', () async {
+      final t = build(granted: true);
+      t.wc.accent = purple;
+      await t.app.start();
+      expect(t.app.accent, purple,
+          reason: 'at launch, so the first open does not change it');
+      expect(t.wc.accentReadsAtShows, [0]);
+      await t.app.openSettings();
+      expect(t.wc.accentReadsAtShows, [0, 0], reason: 'read before the show');
+      // Changed in System Settings while the window was closed.
+      t.wc.accent = red;
+      await t.app.openSettings();
+      expect(t.app.accent, red);
+      expect(t.wc.accentReadsAtShows, [0, 0, 1]);
+    });
+
+    // Every way the window comes up: the accent read first, then the screen
+    // set and the window shown with nothing between them, since the screen's
+    // frame is what reveals the window on macOS and the show must arm it
+    // first. Each path's events are counted from its last step alone; a
+    // launch reads twice, at its start and before its show. The fake answers
+    // a turn after it is asked, so a read that is not awaited shows up as an
+    // answer after the screen change.
+    final paths = <String, (bool, AppScreen, Future<void> Function(_Harness),
+        Future<void> Function(_Harness))>{
+      'an ungranted launch': (
+        false,
+        AppScreen.onboarding,
+        (t) async {},
+        (t) => t.app.start(),
+      ),
+      'a launch granted after onboarding began': (
+        true,
+        AppScreen.ready,
+        (t) => build().app.start(), // began onboarding, then quit
+        (t) => t.app.start(),
+      ),
+      'the grant arriving': (
+        false,
+        AppScreen.ready,
+        (t) async {
+          await t.app.start();
+          await t.app.onConfigWindowClosed();
+        },
+        (t) async {
+          t.wc.permission = true;
+          await t.app.permissions.refresh();
+          await t.app.permissionSettled;
+        },
+      ),
+      'the grant lost': (
+        true,
+        AppScreen.onboarding,
+        (t) => t.app.start(),
+        (t) async {
+          t.wc.permission = false;
+          await t.app.recoverIfPermissionLost();
+        },
+      ),
+      'the tray\'s Enable Accessibility': (
+        false,
+        AppScreen.onboarding,
+        (t) async {
+          await t.app.start();
+          await t.app.onConfigWindowClosed();
+        },
+        (t) => t.app.showOnboarding(),
+      ),
+      'Settings': (
+        true,
+        AppScreen.settings,
+        (t) => t.app.start(),
+        (t) => t.app.openSettings(),
+      ),
+    };
+    for (final MapEntry(key: name, value: (granted, screen, setup, act))
+        in paths.entries) {
+      test('$name reads it, then sets the screen and shows at once', () async {
+        final t = build(granted: granted);
+        await setup(t);
+        t.wc.events.clear();
+        var last = t.app.screen;
+        t.app.addListener(() {
+          if (t.app.screen != last) t.wc.events.add('screen=${t.app.screen.name}');
+          last = t.app.screen;
+        });
+        await act(t);
+        final events = t.wc.events;
+        expect(t.app.screen, screen);
+        expect(events.where((e) => e == 'accent'),
+            hasLength(name.contains('launch') ? 2 : 1), reason: '$events');
+        expect(events.sublist(events.length - 4),
+            ['accent', 'accent answered', 'screen=${screen.name}', 'show'],
+            reason: 'answered before the screen changes: $events');
+      });
+    }
+
+    test('a change notifies the app, and the same accent does not', () async {
+      final t = build(granted: true);
+      await t.app.start();
+      var notified = 0;
+      t.app.addListener(() => notified++);
+      t.wc.accent = purple;
+      await t.app.refreshAccent();
+      expect(notified, 1);
+      await t.app.refreshAccent();
+      expect(notified, 1, reason: 'nothing changed');
+      t.wc.accent = null;
+      await t.app.refreshAccent();
+      expect(t.app.accent, isNull, reason: 'an OS that will not say: default');
+      expect(notified, 2);
+    });
   });
 
   test('input source changes update the tray without rebinding shortcuts', () async {

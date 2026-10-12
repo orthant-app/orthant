@@ -177,8 +177,8 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
         labels: app.keyboardLabels,
         child: MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: orthantTheme(Brightness.light),
-      darkTheme: orthantTheme(Brightness.dark),
+      theme: orthantTheme(Brightness.light, accent: app.accent),
+      darkTheme: orthantTheme(Brightness.dark, accent: app.accent),
       home: switch (app.screen) {
           AppScreen.onboarding => OnboardingScreen(
               controller: app.permissions,

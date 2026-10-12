@@ -131,6 +131,41 @@ class OrthantCoordinator extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The user's accent as the OS draws with it, or null for the platform's
+  /// default. Neither OS tells an app when it changes, so it is read at launch
+  /// and again each time the window is about to show ([_show]): a change made
+  /// in System Settings or Windows' Settings shows the next time the window
+  /// opens. Read at launch too, though nothing is drawn then, so that the
+  /// window's first open finds the accent it already has: a change at that
+  /// moment would put the old one in the frame that reveals the window.
+  AccentColors? _accent;
+  AccentColors? get accent => _accent;
+
+  Future<void> refreshAccent() async {
+    final accent = await wc.accentColor();
+    if (accent == _accent) return;
+    _accent = accent;
+    // Debug and Profile only: what the OS answered, for a person checking it.
+    if (!kReleaseMode) debugPrint('[orthant] accent: ${accent ?? 'default'}');
+    notifyListeners();
+  }
+
+  /// Every show of the config window: the accent read first, then [screen]
+  /// set and the window shown in the same turn, with nothing between them.
+  /// Setting the screen schedules the frame that reveals the window
+  /// (`configFirstFrame`), and macOS counts that frame only once the show has
+  /// armed it; a channel round trip between the two could let the frame land
+  /// first, and the window would then wait out its fallback.
+  ///
+  /// Notifies even when [screen] is already up, so a pane switch on an open
+  /// window (`openSettings` with another tab) is drawn.
+  Future<void> _show(AppScreen screen) async {
+    await refreshAccent();
+    _screen = screen;
+    notifyListeners();
+    await wc.showConfigWindow();
+  }
+
   /// The user's own regions, loaded and saved alongside the bindings so a
   /// partial write cannot orphan one against the other.
   List<CustomRegion> _regions = const [];
@@ -189,6 +224,7 @@ class OrthantCoordinator extends ChangeNotifier {
     // under a running process, so this is the only read.
     _appVersion = await wc.appVersion();
     await refreshKeyboardLabels();
+    await refreshAccent();
 
     // Preferences load **either way**. They are settings, not capabilities:
     // Accessibility governs whether a shortcut can move a window, not whether
@@ -209,8 +245,7 @@ class OrthantCoordinator extends ChangeNotifier {
         // mentions the grid, so the whole feature stayed undiscovered. Same
         // defect as the in-process path below already fixed; this is the version
         // that survives a relaunch.
-        _set(AppScreen.ready);
-        await wc.showConfigWindow();
+        await _show(AppScreen.ready);
       } else {
         // Granted before we ever showed anything: there is no moment to put the
         // ready screen in without opening a window unbidden, which M2
@@ -227,11 +262,10 @@ class OrthantCoordinator extends ChangeNotifier {
       // now what the onboarding button does first ([openAccessibility]), which
       // is where a permission prompt belongs: in response to being asked for.
       // Locked in spec §8, because it had flip-flopped four times.
-      _set(AppScreen.onboarding);
       // Recorded before the window, so a quit at any point after this counts as
       // having asked. See [SettingsStore.hasStartedOnboarding].
       await _settingsStore.markStartedOnboarding();
-      await wc.showConfigWindow();
+      await _show(AppScreen.onboarding);
       _startPolling();
     }
 
@@ -335,8 +369,7 @@ class OrthantCoordinator extends ChangeNotifier {
         // in place. Since this is the only screen that ever mentions the grid,
         // the whole feature went undiscovered for exactly that click. Shown
         // once, ever, so re-showing the window here cannot become a habit.
-        _set(AppScreen.ready);
-        await wc.showConfigWindow();
+        await _show(AppScreen.ready);
       }
     } else {
       // Never had it, or lost it: make sure we're watching for the grant.
@@ -373,8 +406,7 @@ class OrthantCoordinator extends ChangeNotifier {
     await permissions.refresh();
     if (permissions.granted) return;
     await hotkeys.unregisterAll();
-    _set(AppScreen.onboarding);
-    await wc.showConfigWindow();
+    await _show(AppScreen.onboarding);
   }
 
   // --------------------------------------------------------------- commands
@@ -529,8 +561,7 @@ class OrthantCoordinator extends ChangeNotifier {
 
   /// The tray's "Enable Accessibility…" row. Only reachable while ungranted.
   Future<void> showOnboarding() async {
-    _set(AppScreen.onboarding);
-    await wc.showConfigWindow();
+    await _show(AppScreen.onboarding);
     _startPolling();
   }
 
@@ -553,19 +584,19 @@ class OrthantCoordinator extends ChangeNotifier {
 
   /// Show the settings window.
   ///
-  /// The screen is set *before* any await, deliberately. Fetching the login
-  /// status first meant the window could be on screen with the screen state
-  /// still at its previous value for a whole channel round trip — and
-  /// `SMAppService.mainApp.status` is not fast. When that previous value was
-  /// `none`, the visible window rendered `SizedBox.shrink()`: an empty panel.
-  /// The status arrives a moment later and re-renders the one row that needs it,
-  /// which is what a status read should cost.
+  /// The screen is set before the window shows and before the status is read,
+  /// deliberately ([_show]; only the accent is read ahead of it, while the
+  /// window is still down). Fetching the login status first meant the window
+  /// could be on screen with the screen state still at its previous value for
+  /// a whole channel round trip — and `SMAppService.mainApp.status` is not
+  /// fast. When that previous value was `none`, the visible window rendered
+  /// `SizedBox.shrink()`: an empty panel. The status arrives a moment later
+  /// and re-renders the one row that needs it, which is what a status read
+  /// should cost.
   Future<void> openSettings({SettingsTab tab = SettingsTab.general}) async {
     final t0 = DateTime.now();
     _settingsTab = tab;
-    _set(AppScreen.settings);
-    notifyListeners();
-    await wc.showConfigWindow();
+    await _show(AppScreen.settings);
     final shown = DateTime.now();
     _loginStatus = await wc.loginItemStatus();
     _autoUpdateChecks = await wc.automaticUpdateChecks();

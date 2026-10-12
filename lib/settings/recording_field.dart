@@ -122,9 +122,11 @@ class _RecordingFieldState extends State<RecordingField> {
               ? 'Press keys…'
               : KeyWords.current.joinSpaced(symbols),
           style: TextStyle(
-            fontFamily: symbols.isEmpty ? null : PlatformTokens.monoFamily,
+            fontFamily: symbols.isEmpty ? null : t.keycapFamily,
             fontSize: 11.5,
-            color: Colors.white,
+            // White on the warning colour, as it always was; on the accent,
+            // what the platform draws there (black on Windows' dark theme).
+            color: pending != null ? Colors.white : t.onAccent,
             fontWeight: FontWeight.w500,
           ),
         ),

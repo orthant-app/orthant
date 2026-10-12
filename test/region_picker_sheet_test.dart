@@ -662,7 +662,7 @@ void main() {
     // one layer down: tertiary is what macOS greys an unavailable control with
     // — 2.4:1 against this pane — so an invitation wearing it still reads as a
     // verdict, however button-shaped the box around it is.
-    final t = PlatformTokens.light;
+    final t = PlatformTokens.macLight;
     final label = tester.widget<Text>(find.text('Click to record'));
     expect(label.style!.color, isNot(t.labelTertiary));
     expect(label.style!.color, t.labelSecondary);

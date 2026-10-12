@@ -164,8 +164,8 @@ class _MacControlState extends State<MacControl> {
           // panes were tuned against a mockup.
           child: CustomPaint(
             foregroundPainter: _focused
-                ? _FocusRingPainter(
-                    color: t.accent,
+                ? FocusRingPainter(
+                    tokens: t,
                     radius: widget.focusRingRadius,
                     inset: widget.inset,
                   )
@@ -185,34 +185,54 @@ class _MacControlState extends State<MacControl> {
   }
 }
 
-/// macOS's focus ring: the accent colour, semi-transparent, just outside the
-/// control's own bounds.
-class _FocusRingPainter extends CustomPainter {
-  _FocusRingPainter({
-    required this.color,
+/// A focused control's ring, in the platform's style
+/// ([PlatformTokens.focusRing]), drawn just outside the control: [inset] is how
+/// far its outer edge sits from the control's, [radius] the control's own
+/// corner radius.
+///
+/// macOS's halo is the accent at half strength, 3 pt wide and centred [inset]
+/// out. Windows' is WinUI's focus visual: a 2 px outer stroke and a 1 px inner
+/// one filling the 3 px band that ends [inset] out, so at the usual inset of 3
+/// it meets the control's edge.
+class FocusRingPainter extends CustomPainter {
+  FocusRingPainter({
+    required this.tokens,
     required this.radius,
     required this.inset,
   });
 
-  final Color color;
+  final PlatformTokens tokens;
   final double radius;
   final double inset;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Rect.fromLTWH(0, 0, size.width, size.height).inflate(inset);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, Radius.circular(radius + inset)),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..color = color.withValues(alpha: 0.5),
-    );
+    final control = Rect.fromLTWH(0, 0, size.width, size.height);
+    void ring(double out, double width, Color color) => canvas.drawRRect(
+          RRect.fromRectAndRadius(control.inflate(out),
+              Radius.circular((radius + out).clamp(0, double.infinity))),
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = width
+            ..color = color,
+        );
+    switch (tokens.focusRing) {
+      case FocusRingStyle.halo:
+        ring(inset, 3, tokens.accent.withValues(alpha: 0.5));
+      case FocusRingStyle.doubleStroke:
+        ring(inset - 1, 2, tokens.focusOuter);
+        ring(inset - 2.5, 1, tokens.focusInner);
+    }
   }
 
   @override
-  bool shouldRepaint(covariant _FocusRingPainter old) =>
-      old.color != color || old.radius != radius || old.inset != inset;
+  bool shouldRepaint(covariant FocusRingPainter old) =>
+      old.tokens.focusRing != tokens.focusRing ||
+      old.tokens.accent != tokens.accent ||
+      old.tokens.focusOuter != tokens.focusOuter ||
+      old.tokens.focusInner != tokens.focusInner ||
+      old.radius != radius ||
+      old.inset != inset;
 }
 
 /// A traversal group that also accepts ← → as "previous / next".

@@ -482,7 +482,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
                     // in the grid's layout moves when focus arrives — the same
                     // treatment MacControl gives every other control here.
                     foregroundPainter: _gridFocused
-                        ? _GridFocusRingPainter(color: t.accent)
+                        ? FocusRingPainter(tokens: t, radius: 3, inset: 3)
                         : null,
                     painter: _PickerGridPainter(
                       cols: _cols,
@@ -676,7 +676,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
             _creating ? 'Add' : 'Save',
             style: TextStyle(
               fontSize: 12.5,
-              color: _canSubmit ? Colors.white : t.labelTertiary,
+              color: _canSubmit ? t.onAccent : t.labelTertiary,
             ),
           ),
         ),
@@ -748,32 +748,4 @@ class _PickerGridPainter extends CustomPainter {
       old.block != block ||
       old.cell != cell ||
       old.fill != fill;
-}
-
-/// macOS's focus ring for the grid, which is a raw [Focus] rather than a
-/// [MacControl] and so has none of its own.
-///
-/// Same geometry as `_FocusRingPainter` in `mac_control.dart`: the accent at
-/// half alpha, 3 pt wide, just outside the bounds.
-class _GridFocusRingPainter extends CustomPainter {
-  _GridFocusRingPainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, 0, size.width, size.height).inflate(3),
-        const Radius.circular(6),
-      ),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..color = color.withValues(alpha: 0.5),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _GridFocusRingPainter old) => old.color != color;
 }

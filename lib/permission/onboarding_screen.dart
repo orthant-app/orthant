@@ -77,7 +77,7 @@ class OnboardingScreen extends StatelessWidget {
                 onPressed: onOpenAccessibility ?? controller.openSettings,
                 style: FilledButton.styleFrom(
                   backgroundColor: t.accent,
-                  foregroundColor: Colors.white,
+                  foregroundColor: t.onAccent,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   shape: RoundedRectangleBorder(

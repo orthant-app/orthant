@@ -5,7 +5,8 @@ import '../core/key_chord.dart';
 import 'platform_theme.dart';
 import 'keyboard_labels.dart';
 
-/// A single physical-looking key, the way macOS renders shortcut glyphs.
+/// A single physical-looking key, the way macOS renders shortcut glyphs and
+/// Windows' own shortcut editors render key names.
 ///
 /// Extracted so the shortcuts list and onboarding draw the *same* key. They
 /// show the same binding to the same user minutes apart; two implementations of
@@ -37,7 +38,7 @@ class Keycap extends StatelessWidget {
         glyph,
         textAlign: TextAlign.center,
         style: TextStyle(
-          fontFamily: PlatformTokens.monoFamily,
+          fontFamily: t.keycapFamily,
           fontSize: 11.5,
           height: 1.25,
           color: t.labelPrimary,

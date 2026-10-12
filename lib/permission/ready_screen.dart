@@ -202,7 +202,7 @@ class ReadyScreen extends StatelessWidget {
                   onPressed: onDone,
                   style: FilledButton.styleFrom(
                     backgroundColor: t.accent,
-                    foregroundColor: Colors.white,
+                    foregroundColor: t.onAccent,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
                       vertical: 12,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:orthant/settings/platform_theme.dart';
 import 'package:orthant/core/geometry.dart';
 import 'package:orthant/core/window_controller.dart';
 import 'package:orthant/permission/permission_controller.dart';
@@ -81,4 +82,17 @@ void main() {
 
     expect(wc.openSettingsCalls, 1);
   });
+
+  testWidgets('on macOS the button is white on the accent, as it always was',
+      (tester) async {
+    for (final b in Brightness.values) {
+      await tester.pumpWidget(MaterialApp(
+        theme: orthantTheme(b),
+        home: OnboardingScreen(controller: PermissionController(_FakeWc())),
+      ));
+      final button = tester.widget<FilledButton>(find.byType(FilledButton));
+      expect(button.style!.foregroundColor!.resolve({}),
+          const Color(0xFFFFFFFF), reason: '$b');
+    }
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 }

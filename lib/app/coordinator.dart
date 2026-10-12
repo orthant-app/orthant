@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../core/geometry.dart';
+import '../core/key_words.dart';
 import '../core/window_controller.dart';
 import '../permission/permission_controller.dart';
 import '../settings/settings.dart';
@@ -500,7 +501,9 @@ class OrthantCoordinator extends ChangeNotifier {
     const TrayEntry('quit', 'Quit Orthant'),
   ];
 
-  /// "Open Grid", with the summon's combo appended when there is one to show.
+  /// "Open Grid", with the summon's combo beside it when there is one to show:
+  /// inline on macOS, in the menu's accelerator column on Windows
+  /// ([KeyWords.menuItem]).
   ///
   /// The same words as the shortcut row and the General pane, in menu title
   /// case. It read "Show Grid" while everything else said "Open grid", which is
@@ -519,7 +522,9 @@ class OrthantCoordinator extends ChangeNotifier {
             keyLabels: _keyboardLabels,
           )
         : null;
-    return combo == null ? 'Open Grid' : 'Open Grid   $combo';
+    return combo == null
+        ? 'Open Grid'
+        : KeyWords.current.menuItem('Open Grid', combo);
   }
 
   /// The tray's "Enable Accessibility…" row. Only reachable while ungranted.

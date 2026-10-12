@@ -162,7 +162,7 @@ void main() {
         logical: LogicalKeyboardKey.keyZ.keyId,
         modifiers: Modifiers.ctrl,
       );
-      expect(comboSymbols(german), ['⌃', 'Z']);
+      expect(comboSymbols(german), ['Ctrl', 'Z']);
     });
 
     test('take the layout label for punctuation, by logical key', () {
@@ -171,15 +171,15 @@ void main() {
         logical: LogicalKeyboardKey.quote.keyId,
         modifiers: Modifiers.ctrl,
       );
-      expect(comboSymbols(quote), ['⌃', "'"]);
+      expect(comboSymbols(quote), ['Ctrl', "'"]);
       expect(
           comboSymbols(quote,
               keyLabels: {LogicalKeyboardKey.quote.keyId: 'Ä'}),
-          ['⌃', 'Ä']);
+          ['Ctrl', 'Ä']);
       expect(
           comboSymbols(quote,
               keyLabels: {PhysicalKeyboardKey.quote.usbHidUsage: 'X'}),
-          ['⌃', "'"],
+          ['Ctrl', "'"],
           reason: 'a label keyed by position is macOS\'s, not this one');
     });
 
@@ -190,7 +190,7 @@ void main() {
         logical: 0xE2,
         modifiers: Modifiers.ctrl,
       );
-      expect(comboSymbols(iso, keyLabels: {0xE2: '<'}), ['⌃', '<']);
+      expect(comboSymbols(iso, keyLabels: {0xE2: '<'}), ['Ctrl', '<']);
       // Brazil's keypad separator shares the ISO key's logical id and has a
       // label of its own.
       final separator = KeyChord(
@@ -199,9 +199,57 @@ void main() {
         modifiers: Modifiers.ctrl,
       );
       expect(comboSymbols(separator, keyLabels: {0xE2: '\\', 0xC2: '.'}),
-          ['⌃', '.']);
-      expect(comboSymbols(iso), ['⌃', 'key:0xe2']);
+          ['Ctrl', '.']);
+      expect(comboSymbols(iso), ['Ctrl', 'key:0xe2']);
     });
+
+    test('say Win, Ctrl, Alt and Shift, Win first, joined with +', () {
+      final defaults = runningDefaults();
+      KeyChord chordOf(ShortcutCommand c) =>
+          defaults.firstWhere((b) => b.command == BuiltIn(c)).chord!;
+      expect(comboSymbols(chordOf(ShortcutCommand.leftHalf)),
+          ['Win', 'Ctrl', 'Shift', '←']);
+      expect(formatCombo(chordOf(ShortcutCommand.leftHalf)), 'Win+Ctrl+Shift+←');
+      expect(formatCombo(chordOf(ShortcutCommand.maximize)),
+          'Win+Ctrl+Shift+Enter');
+      expect(formatCombo(chordOf(ShortcutCommand.showGrid)), 'Win+Ctrl+Shift+O');
+      expect(modifierSymbols(Modifiers.alt | Modifiers.ctrl), ['Ctrl', 'Alt']);
+      expect(
+          comboLabelFor(defaults, const BuiltIn(ShortcutCommand.center)),
+          'Win+Ctrl+Shift+C');
+    });
+
+    test('name the named keys, and keep the arrows', () {
+      KeyChord ctrl(LogicalKeyboardKey key) => KeyChord(
+            physical: usPhysicalFor(key.keyId)!,
+            logical: key.keyId,
+            modifiers: Modifiers.ctrl,
+          );
+      expect(
+        [
+          for (final key in [
+            LogicalKeyboardKey.space, LogicalKeyboardKey.backspace,
+            LogicalKeyboardKey.home, LogicalKeyboardKey.end,
+            LogicalKeyboardKey.pageUp, LogicalKeyboardKey.pageDown,
+            LogicalKeyboardKey.delete, LogicalKeyboardKey.arrowUp,
+            LogicalKeyboardKey.f5,
+          ])
+            formatCombo(ctrl(key)),
+        ],
+        ['Ctrl+Space', 'Ctrl+Backspace', 'Ctrl+Home', 'Ctrl+End', 'Ctrl+PgUp',
+            'Ctrl+PgDn', 'Ctrl+Del', 'Ctrl+↑', 'Ctrl+F5'],
+      );
+      expect(keySymbol(PhysicalKeyboardKey.enter.usbHidUsage), 'Enter');
+    });
+  });
+
+  test('keySymbol is the shared glyph on macOS', () {
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    expect(keySymbol(PhysicalKeyboardKey.enter.usbHidUsage), '↩');
+    expect(keySymbol(PhysicalKeyboardKey.arrowLeft.usbHidUsage), '←');
+    expect(keySymbol(PhysicalKeyboardKey.keyA.usbHidUsage), 'A');
+    expect(keySymbol(0x00070001), isNull, reason: 'no shortcut uses it');
   });
 
   test('conflictFor finds a different command already using the combo', () {

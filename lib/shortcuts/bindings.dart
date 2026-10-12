@@ -3,6 +3,7 @@ import 'package:flutter/services.dart' show PhysicalKeyboardKey;
 
 import 'command_ref.dart';
 import '../core/key_chord.dart';
+import '../core/key_words.dart';
 import 'shortcut_command.dart';
 
 /// A command and the chord that fires it.
@@ -182,12 +183,13 @@ List<Binding> withRebind(List<Binding> bindings, Binding updated) {
   ];
 }
 
-/// A key's USB HID usage → how macOS displays that key in a shortcut.
+/// A key's USB HID usage → how a shortcut displays that key, macOS's glyphs
+/// for the named keys; `KeyWords.named` holds the names Windows uses instead.
 ///
 /// Must cover every key `isBindableKey` accepts, or a rebound key shows up as
-/// a raw `key:0x…`. Letters are uppercase because that is how macOS renders
-/// shortcuts (⌘C, not ⌘c). Tab and Escape are labelled though neither can be
-/// bound.
+/// a raw `key:0x…`. Letters are uppercase because that is how both platforms
+/// render shortcuts (⌘C, not ⌘c). Tab and Escape are labelled though neither
+/// can be bound.
 const Map<int, String> _keySymbols = {
   // Letters, in alphabetical order.
   0x00070004: 'A', 0x00070005: 'B', 0x00070006: 'C', 0x00070007: 'D',
@@ -225,8 +227,9 @@ const Map<int, String> _keySymbols = {
   0x00070061: 'Num 9',
 };
 
-/// The combo as individual symbols, in macOS order (⌃⌥⇧⌘ then the key), for
-/// rendering one keycap per element. Empty when unbound.
+/// The combo as individual symbols, in the platform's order (⌃⌥⇧⌘ then the
+/// key on macOS, Win Ctrl Alt Shift then the key on Windows), for rendering
+/// one keycap per element. Empty when unbound.
 ///
 /// [keyLabels] is the keyboard layout's own labels, keyed by
 /// [KeyChord.labelKey] (`WindowController.keyboardLabels`); a key it does not
@@ -243,30 +246,33 @@ List<String> comboSymbols(KeyChord? chord, {
   return [
     ...modifierSymbols(chord.modifiers),
     keyLabels[chord.labelKey] ??
-        _keySymbols[glyph] ??
+        keySymbol(glyph) ??
         'key:0x${chord.labelKey.toRadixString(16)}',
   ];
 }
 
-/// The modifier glyphs held, in macOS's canonical order.
+/// How the running platform labels the key at [usage] (a USB HID usage) in a
+/// shortcut: its own name for it ([KeyWords.keyName]), else the shared glyph.
+/// Null for a key no shortcut uses.
+String? keySymbol(int? usage) =>
+    KeyWords.current.keyName(usage) ?? _keySymbols[usage];
+
+/// The modifiers held, as the platform names them, in its order
+/// ([KeyWords.modifierNames]).
 ///
 /// Split out of [comboSymbols], which answers with **nothing at all** for an
 /// unbound command, precisely the moment the recorder needs to draw: while
 /// modifiers are down and no key has completed the combination yet. A field
 /// that shows the same "Press keys…" whether or not ⌃⌥ is held reads as one
 /// that is not listening.
-List<String> modifierSymbols(Modifiers modifiers) => [
-  if (modifiers.has(Modifiers.ctrl)) '⌃',
-  if (modifiers.has(Modifiers.alt)) '⌥',
-  if (modifiers.has(Modifiers.shift)) '⇧',
-  if (modifiers.has(Modifiers.meta)) '⌘',
-];
+List<String> modifierSymbols(Modifiers modifiers) =>
+    KeyWords.current.modifierNames(modifiers);
 
-/// Human-readable combo, e.g. `⌃⌥←`.
+/// Human-readable combo: `⌃⌥←` on macOS, `Win+Ctrl+Shift+←` on Windows.
 String formatCombo(KeyChord chord, {
   Map<int, String> keyLabels = const {},
 }) =>
-    comboSymbols(chord, keyLabels: keyLabels).join();
+    KeyWords.current.join(comboSymbols(chord, keyLabels: keyLabels));
 
 /// [command]'s combo for display outside the settings list, or null when there
 /// is nothing honest to show.

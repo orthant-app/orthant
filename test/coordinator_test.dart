@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/app/coordinator.dart';
 import 'package:orthant/core/geometry.dart';
@@ -196,6 +197,15 @@ void main() {
     built.add(app);
     return (app: app, wc: wc, keys: keys);
   }
+
+  test('on Windows the tray puts the grid\'s chord in the menu\'s accelerator '
+      'column, in Windows\' words', () async {
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    final t = build(granted: true);
+    await t.app.start();
+    expect(t.app.openGridLabel, 'Open Grid\tWin+Ctrl+Shift+O');
+  });
 
   test('input source changes update the tray without rebinding shortcuts', () async {
     final t = build(granted: true);

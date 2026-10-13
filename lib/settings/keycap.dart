@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../shortcuts/bindings.dart';
 import '../core/key_chord.dart';
-import 'mac_theme.dart';
+import 'platform_theme.dart';
 import 'keyboard_labels.dart';
 
-/// A single physical-looking key, the way macOS renders shortcut glyphs.
+/// A single physical-looking key, the way macOS renders shortcut glyphs and
+/// Windows' own shortcut editors render key names.
 ///
 /// Extracted so the shortcuts list and onboarding draw the *same* key. They
 /// show the same binding to the same user minutes apart; two implementations of
@@ -17,7 +18,7 @@ class Keycap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.mac;
+    final t = context.tokens;
     return Container(
       constraints: const BoxConstraints(minWidth: 21),
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.5),
@@ -37,7 +38,7 @@ class Keycap extends StatelessWidget {
         glyph,
         textAlign: TextAlign.center,
         style: TextStyle(
-          fontFamily: MacTokens.monoFamily,
+          fontFamily: t.keycapFamily,
           fontSize: 11.5,
           height: 1.25,
           color: t.labelPrimary,
@@ -63,7 +64,7 @@ class KeycapRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.mac;
+    final t = context.tokens;
     final symbols = comboSymbols(chord, keyLabels: KeyboardLabels.of(context));
     if (symbols.isEmpty) {
       return Text(unsetLabel,
@@ -108,7 +109,7 @@ class SetShortcutPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.mac;
+    final t = context.tokens;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
       decoration: BoxDecoration(

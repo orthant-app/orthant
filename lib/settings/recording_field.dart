@@ -3,9 +3,10 @@ import 'package:flutter/services.dart';
 
 import '../shortcuts/bindings.dart';
 import '../core/key_chord.dart';
+import '../core/key_words.dart';
 import 'key_capture.dart';
 import 'keyboard_labels.dart';
-import 'mac_theme.dart';
+import 'platform_theme.dart';
 
 /// The field while it is listening for a key combination.
 ///
@@ -95,7 +96,7 @@ class _RecordingFieldState extends State<RecordingField> {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.mac;
+    final t = context.tokens;
     final pending = widget.pending;
     final symbols = pending != null
         ? comboSymbols(pending, keyLabels: KeyboardLabels.of(context))
@@ -117,11 +118,15 @@ class _RecordingFieldState extends State<RecordingField> {
           borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
-          symbols.isEmpty ? 'Press keys…' : symbols.join(' '),
+          symbols.isEmpty
+              ? 'Press keys…'
+              : KeyWords.current.joinSpaced(symbols),
           style: TextStyle(
-            fontFamily: symbols.isEmpty ? null : MacTokens.monoFamily,
+            fontFamily: symbols.isEmpty ? null : t.keycapFamily,
             fontSize: 11.5,
-            color: Colors.white,
+            // White on the warning colour, as it always was; on the accent,
+            // what the platform draws there (black on Windows' dark theme).
+            color: pending != null ? Colors.white : t.onAccent,
             fontWeight: FontWeight.w500,
           ),
         ),

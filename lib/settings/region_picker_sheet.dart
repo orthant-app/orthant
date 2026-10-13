@@ -3,12 +3,13 @@ import 'package:flutter/services.dart';
 
 import '../overlay/grid_selection.dart';
 import '../core/key_chord.dart';
+import '../core/key_words.dart';
 import '../shortcuts/bindings.dart';
 import '../shortcuts/custom_region.dart';
 import 'keycap.dart';
 import 'keyboard_labels.dart';
 import 'mac_control.dart';
-import 'mac_theme.dart';
+import 'platform_theme.dart';
 import 'recording_field.dart';
 
 /// What the sheet hands back: the region, plus the combo to bind it to.
@@ -357,7 +358,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.mac;
+    final t = context.tokens;
     return Center(
       // Its own Material, because the sheet is presented in a dialog route with
       // no Scaffold above it — and a TextField without one throws at build
@@ -419,7 +420,8 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
                   _grid(t),
                   const SizedBox(height: 6),
                   Text(
-                    'Drag to draw · arrows to move, ⇧ to extend',
+                    'Drag to draw · arrows to move, '
+                    '${KeyWords.current.shiftName} to extend',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 10.5, color: t.labelTertiary),
                   ),
@@ -439,7 +441,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
     );
   }
 
-  Widget _grid(MacTokens t) {
+  Widget _grid(PlatformTokens t) {
     return Focus(
       onKeyEvent: _onGridKey,
       onFocusChange: (f) => setState(() => _gridFocused = f),
@@ -480,7 +482,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
                     // in the grid's layout moves when focus arrives — the same
                     // treatment MacControl gives every other control here.
                     foregroundPainter: _gridFocused
-                        ? _GridFocusRingPainter(color: t.accent)
+                        ? FocusRingPainter(tokens: t, radius: 3, inset: 3)
                         : null,
                     painter: _PickerGridPainter(
                       cols: _cols,
@@ -502,7 +504,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
   Cell _cellAt(Offset local) =>
       pointToCell(local, _gridSize, cols: _cols, rows: _rows);
 
-  Widget _nameField(MacTokens t) => Row(
+  Widget _nameField(PlatformTokens t) => Row(
     children: [
       SizedBox(
         width: 62,
@@ -538,7 +540,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
     ],
   );
 
-  Widget _shortcutRow(MacTokens t) => Row(
+  Widget _shortcutRow(PlatformTokens t) => Row(
     children: [
       SizedBox(
         width: 62,
@@ -587,7 +589,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
   /// Warning at the moment of choice is the difference between "pick another
   /// one" and "why is Left half suddenly unset". Offering the take in the same
   /// breath is the difference between that and "then go and find Left half".
-  Widget _conflictNotice(MacTokens t) => Padding(
+  Widget _conflictNotice(PlatformTokens t) => Padding(
     padding: const EdgeInsets.only(left: 62, top: 7),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -619,7 +621,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
             inset: 2,
             child: Text(
               'Use it here',
-              style: TextStyle(fontSize: 11, color: t.accent),
+              style: TextStyle(fontSize: 11, color: t.link),
             ),
           ),
         ],
@@ -627,7 +629,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
     ),
   );
 
-  Widget _buttons(MacTokens t) => Row(
+  Widget _buttons(PlatformTokens t) => Row(
     children: [
       if (widget.onDelete != null)
         MacControl(
@@ -674,7 +676,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
             _creating ? 'Add' : 'Save',
             style: TextStyle(
               fontSize: 12.5,
-              color: _canSubmit ? Colors.white : t.labelTertiary,
+              color: _canSubmit ? t.onAccent : t.labelTertiary,
             ),
           ),
         ),
@@ -746,32 +748,4 @@ class _PickerGridPainter extends CustomPainter {
       old.block != block ||
       old.cell != cell ||
       old.fill != fill;
-}
-
-/// macOS's focus ring for the grid, which is a raw [Focus] rather than a
-/// [MacControl] and so has none of its own.
-///
-/// Same geometry as `_FocusRingPainter` in `mac_control.dart`: the accent at
-/// half alpha, 3 pt wide, just outside the bounds.
-class _GridFocusRingPainter extends CustomPainter {
-  _GridFocusRingPainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, 0, size.width, size.height).inflate(3),
-        const Radius.circular(6),
-      ),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..color = color.withValues(alpha: 0.5),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _GridFocusRingPainter old) => old.color != color;
 }

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'channel.dart';
 import 'geometry.dart';
 import 'window_controller.dart';
+import 'windows_accent.dart';
 import 'windows_app_icon.dart';
 import 'windows_capture.dart';
 import 'windows_keys.dart';
@@ -32,7 +33,7 @@ import 'windows_window_ops.dart';
 /// the methods that do call it).
 class WindowsWindowController implements WindowController {
   WindowsWindowController._(this._readVersion, this._desktop, this._placer,
-      this._clock, this._keyLabel, this._readIcon);
+      this._clock, this._keyLabel, this._readIcon, this._readAccentPalette);
 
   /// The one way to obtain the controller in production.
   ///
@@ -43,7 +44,8 @@ class WindowsWindowController implements WindowController {
   static WindowsWindowController start() {
     final win32 = FfiWin32WindowOps();
     return WindowsWindowController._(readFixedFileVersion, win32, win32,
-        RealPlacementClock(), win32.keyLabel, _readIconInBackground);
+        RealPlacementClock(), win32.keyLabel, _readIconInBackground,
+        readAccentPalette);
   }
 
   /// [readAppIconPng] blocks, so it runs on an isolate of its own.
@@ -60,10 +62,11 @@ class WindowsWindowController implements WindowController {
     PlacementClock? clock,
     String? Function(int vk)? keyLabel,
     Future<Uint8List?> Function(String exe)? readIcon,
+    AccentPaletteReader? readAccentPalette,
   }) =>
       WindowsWindowController._(readVersion, desktop, placer,
           clock ?? RealPlacementClock(), keyLabel ?? (_) => null,
-          readIcon ?? (_) async => null);
+          readIcon ?? (_) async => null, readAccentPalette ?? () => null);
 
   final VersionReader _readVersion;
   final Win32Desktop _desktop;
@@ -76,6 +79,9 @@ class WindowsWindowController implements WindowController {
 
   /// An executable's icon as a PNG ([readAppIconPng], off this isolate).
   final Future<Uint8List?> Function(String exe) _readIcon;
+
+  /// Windows' accent palette ([readAccentPalette]), for [accentColor].
+  final AccentPaletteReader _readAccentPalette;
 
   /// Icons by executable path, null for an app that has none to read. Read
   /// once per app per run: an executable's icon does not change while it
@@ -495,6 +501,20 @@ class WindowsWindowController implements WindowController {
       return const {};
     }
     return labels;
+  }
+
+  /// Read from the registry every time, where Windows' Settings writes it, so
+  /// a change of accent shows the next time the window opens. A registry
+  /// read, not the runner's: nothing here needs a window or the message loop.
+  @override
+  Future<AccentColors?> accentColor() async {
+    try {
+      return accentFromPalette(_readAccentPalette());
+    } catch (e) {
+      // Display data only: the theme draws the default accent.
+      _log('accent: threw ($e)');
+      return null;
+    }
   }
 
   // W5: the Run key plus StartupApproved (§5.2). `unavailable` is the one

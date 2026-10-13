@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/permission/ready_screen.dart';
 import 'package:orthant/settings/keyboard_labels.dart';
-import 'package:orthant/settings/mac_theme.dart';
+import 'package:orthant/settings/platform_theme.dart';
 import 'package:orthant/settings/region_picker_sheet.dart';
 
 import 'support/carbon_terms.dart';
@@ -15,7 +15,7 @@ void main() {
       valueListenable: labels,
       builder: (_, value, child) => KeyboardLabels(labels: value, child: child!),
       child: MaterialApp(
-        theme: macTheme(Brightness.light),
+        theme: orthantTheme(Brightness.light),
         home: ReadyScreen(bindings: macDefaults, onDone: () {},
             onOpenShortcuts: () {}),
       ),
@@ -36,7 +36,7 @@ void main() {
       valueListenable: labels,
       builder: (_, value, child) => KeyboardLabels(labels: value, child: child!),
       child: MaterialApp(
-        theme: macTheme(Brightness.light),
+        theme: orthantTheme(Brightness.light),
         home: Builder(builder: (context) => TextButton(
           onPressed: () => showDialog<void>(context: context, builder: (_) =>
             RegionPickerSheet(gridCols: 6, gridRows: 6,

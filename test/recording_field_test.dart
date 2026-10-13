@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:orthant/settings/mac_theme.dart';
+import 'package:orthant/settings/platform_theme.dart';
 import 'package:orthant/settings/recording_field.dart';
 import 'package:orthant/shortcuts/bindings.dart';
 import 'package:orthant/core/key_chord.dart';
@@ -16,7 +16,7 @@ void main() {
   }) async {
     final combos = <KeyChord>[];
     await tester.pumpWidget(MaterialApp(
-      theme: macTheme(Brightness.light),
+      theme: orthantTheme(Brightness.light),
       home: Scaffold(
         body: Center(
           child: RecordingField(
@@ -203,6 +203,7 @@ void main() {
     await pump(tester, pending: carbon(123, kControlOption));
     expect(fill(), isNot(listening),
         reason: 'the row carrying the question looks like every other row');
-    expect(fill(), macTheme(Brightness.light).extension<MacTokens>()!.warning);
+    expect(fill(),
+        orthantTheme(Brightness.light).extension<PlatformTokens>()!.warning);
   });
 }

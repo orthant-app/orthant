@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../settings/mac_theme.dart';
+import '../settings/platform_theme.dart';
 import '../settings/region_glyph.dart';
 import '../shortcuts/region_commands.dart';
 import 'permission_controller.dart';
@@ -21,7 +21,7 @@ class OnboardingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.mac;
+    final t = context.tokens;
     return Scaffold(
       backgroundColor: t.windowBackground,
       body: Center(
@@ -77,7 +77,7 @@ class OnboardingScreen extends StatelessWidget {
                 onPressed: onOpenAccessibility ?? controller.openSettings,
                 style: FilledButton.styleFrom(
                   backgroundColor: t.accent,
-                  foregroundColor: Colors.white,
+                  foregroundColor: t.onAccent,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   shape: RoundedRectangleBorder(

@@ -82,6 +82,24 @@ void main() {
     expect((await unreadable.appVersion()).isKnown, isFalse);
   });
 
+  test('the accent is read from the palette, never from the runner', () async {
+    final palette = Uint8List.fromList([
+      for (var i = 0; i < 8; i++) ...[i * 16, i * 16 + 1, i * 16 + 2, 0],
+    ]);
+    WindowsWindowController withReader(Uint8List? Function() read) =>
+        WindowsWindowController.forTest(
+            readVersion: () => null,
+            desktop: NoWindows(),
+            placer: NoWindows(),
+            readAccentPalette: read);
+    expect(await withReader(() => palette).accentColor(),
+        const AccentColors(light: 0xFF404142, dark: 0xFF101112));
+    expect(await withReader(() => null).accentColor(), isNull);
+    expect(await withReader(() => throw StateError('advapi32 went away'))
+        .accentColor(), isNull, reason: 'display data never throws');
+    expect(calls, isEmpty);
+  });
+
   test('the remaining stubs answer safely and never reach native', () async {
     final c = wc();
     expect(await c.loginItemStatus(), LoginItemStatus.unavailable);

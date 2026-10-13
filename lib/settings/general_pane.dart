@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/key_words.dart';
 import '../core/window_controller.dart';
 import '../shortcuts/bindings.dart';
 import '../shortcuts/command_ref.dart';
@@ -9,7 +10,7 @@ import 'keycap.dart';
 import 'mac_controls.dart';
 import 'mac_control.dart';
 import 'mac_stepper.dart';
-import 'mac_theme.dart';
+import 'platform_theme.dart';
 import 'settings.dart';
 
 /// The General tab: everything configurable that is not a keyboard shortcut.
@@ -64,7 +65,7 @@ class GeneralPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.mac;
+    final t = context.tokens;
     // Scrolling content, pinned footer — the same shape as the Shortcuts pane.
     // `Reset Grid & Gaps` used to live at the bottom of the scroll area, so on
     // a window shorter than the content (an ungranted permission row, or simply
@@ -80,7 +81,7 @@ class GeneralPane extends StatelessWidget {
     );
   }
 
-  Widget _footer(MacTokens t) => Padding(
+  Widget _footer(PlatformTokens t) => Padding(
     padding: const EdgeInsets.fromLTRB(24, 10, 24, 16),
     child: Align(
       alignment: Alignment.centerRight,
@@ -96,7 +97,7 @@ class GeneralPane extends StatelessWidget {
     ),
   );
 
-  Widget _fields(MacTokens t) {
+  Widget _fields(PlatformTokens t) {
     return SingleChildScrollView(
       controller: scrollController,
       child: Padding(
@@ -122,12 +123,12 @@ class GeneralPane extends StatelessWidget {
     );
   }
 
-  Widget _hairline(MacTokens t) => Padding(
+  Widget _hairline(PlatformTokens t) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 16),
     child: Divider(height: 0.5, thickness: 0.5, color: t.separator),
   );
 
-  Widget _group(MacTokens t, String label, List<Widget> fields) => Row(
+  Widget _group(PlatformTokens t, String label, List<Widget> fields) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       SizedBox(
@@ -153,7 +154,7 @@ class GeneralPane extends StatelessWidget {
   /// Grid and Gaps share one preview: two groups of controls, one picture.
   /// That sharing is what makes an arbitrary 7 x 3 comprehensible, and so what
   /// lets the grid be two steppers rather than a list of safe presets.
-  Widget _gridAndGaps(MacTokens t) => Row(
+  Widget _gridAndGaps(PlatformTokens t) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Expanded(
@@ -217,7 +218,7 @@ class GeneralPane extends StatelessWidget {
   );
 
   Widget _stepperRow(
-    MacTokens t,
+    PlatformTokens t,
     String caption,
     int value,
     int min,
@@ -255,7 +256,7 @@ class GeneralPane extends StatelessWidget {
   );
 
   /// The summon's combo plus a way to the tab that owns it.
-  Widget _summonRow(MacTokens t) {
+  Widget _summonRow(PlatformTokens t) {
     final summon = bindings.firstWhere(
       (b) => b.command == const BuiltIn(ShortcutCommand.showGrid),
       orElse: () => const Binding.unbound(BuiltIn(ShortcutCommand.showGrid)),
@@ -265,8 +266,8 @@ class GeneralPane extends StatelessWidget {
         if (summonUnavailable && summon.isBound) ...[
           Tooltip(
             message:
-                'macOS or another app already uses this combination, so '
-                'it never reaches Orthant.',
+                '${KeyWords.current.system} or another app already uses this '
+                'combination, so it never reaches Orthant.',
             child: Icon(
               Icons.warning_amber_rounded,
               size: 15,
@@ -282,7 +283,7 @@ class GeneralPane extends StatelessWidget {
     );
   }
 
-  Widget _permissionRow(MacTokens t) {
+  Widget _permissionRow(PlatformTokens t) {
     if (permissionGranted) {
       return Row(
         children: [
@@ -346,7 +347,7 @@ class GeneralPane extends StatelessWidget {
     );
   }
 
-  Widget _loginRow(MacTokens t) {
+  Widget _loginRow(PlatformTokens t) {
     // Only `enabled` renders as on: `unavailable` means the OS would not say,
     // and a ticked box there would claim something nothing established.
     //
@@ -419,7 +420,7 @@ class _LinkButton extends StatelessWidget {
   });
 
   final String label;
-  final MacTokens tokens;
+  final PlatformTokens tokens;
   final VoidCallback? onPressed;
 
   @override
@@ -430,7 +431,7 @@ class _LinkButton extends StatelessWidget {
       inset: 2,
       child: Text(
         label,
-        style: TextStyle(fontSize: 12.5, color: tokens.accent),
+        style: TextStyle(fontSize: 12.5, color: tokens.link),
       ),
     );
   }

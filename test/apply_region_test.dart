@@ -49,6 +49,8 @@ class _FakeWc implements WindowController {
   @override
   Future<Map<int, String>> keyboardLabels() async => const {};
   @override
+  Future<AccentColors?> accentColor() async => null;
+  @override
   Future<AppVersion> appVersion() async => const AppVersion('1.0.0', '1');
   @override
   Future<bool> automaticUpdateChecks() async => true;

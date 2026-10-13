@@ -96,6 +96,32 @@ class AppVersion {
       'AppVersion($shortVersion, $buildNumber, releaseName: $releaseName)';
 }
 
+/// The user's accent colour as the OS draws its own controls with it, once
+/// for a light appearance and once for a dark one, each 0xAARRGGBB.
+///
+/// Two, not one, because both platforms draw two. macOS resolves
+/// `controlAccentColor` per appearance: a purple accent is #953D96 in light
+/// and #A550A7 in dark (measured on macOS 26). Windows fills an accent control
+/// with a darker shade of the accent in its light theme and a lighter one in
+/// its dark theme (`windows_accent.dart`).
+class AccentColors {
+  const AccentColors({required this.light, required this.dark});
+
+  final int light;
+  final int dark;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AccentColors && other.light == light && other.dark == dark;
+
+  @override
+  int get hashCode => Object.hash(light, dark);
+
+  @override
+  String toString() => 'AccentColors(light: 0x${light.toRadixString(16)}, '
+      'dark: 0x${dark.toRadixString(16)})';
+}
+
 /// Platform-agnostic window control. Native handles never cross this seam —
 /// only plain data does. macOS is backed by a MethodChannel to Swift.
 abstract class WindowController {
@@ -202,6 +228,14 @@ abstract class WindowController {
   /// its logical key but for two Brazilian keys) on Windows, which registers
   /// by meaning. Display data only: a binding keeps its key whatever this says.
   Future<Map<int, String>> keyboardLabels();
+
+  /// The user's accent, as the OS draws its own controls with it, or null
+  /// when the OS will not say, which the theme reads as the platform's
+  /// default. Read from the OS every time, never cached: the user can change
+  /// it in System Settings or Windows' Settings at any moment. Display data
+  /// only, and never throws: it is read on the way to showing the config
+  /// window, which a throw would leave unshown.
+  Future<AccentColors?> accentColor();
 
   /// Whether the app currently launches at login, per the OS.
   Future<LoginItemStatus> loginItemStatus();

@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/grid_config.dart';
 import 'package:orthant/core/window_controller.dart';
-import 'package:orthant/settings/mac_theme.dart';
+import 'package:orthant/settings/platform_theme.dart';
 import 'package:orthant/settings/settings.dart';
 import 'package:orthant/settings/settings_window.dart';
 import 'package:orthant/shortcuts/bindings.dart';
@@ -36,7 +36,7 @@ void main() {
     VoidCallback? onOpenAccessibility,
     SettingsTab initialTab = SettingsTab.general,
   }) => MaterialApp(
-    theme: macTheme(Brightness.light),
+    theme: orthantTheme(Brightness.light),
     home: SettingsWindow(
       initialTab: initialTab,
       onOpenAccessibility: onOpenAccessibility,
@@ -293,7 +293,7 @@ void main() {
       // icon; an icon is not something a screen reader can convey.
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(MaterialApp(
-        theme: macTheme(Brightness.light),
+        theme: orthantTheme(Brightness.light),
         home: SettingsWindow(
           initialTab: SettingsTab.shortcuts,
           settings: const Settings(),

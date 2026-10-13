@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/permission/ready_screen.dart';
-import 'package:orthant/settings/mac_theme.dart';
+import 'package:orthant/settings/platform_theme.dart';
 import 'package:orthant/settings/region_glyph.dart';
 import 'package:orthant/shortcuts/bindings.dart';
 import 'package:orthant/shortcuts/command_ref.dart';
@@ -17,7 +17,7 @@ void main() {
     Set<CommandRef> unavailable = const {},
   }) =>
       MaterialApp(
-        theme: macTheme(Brightness.light),
+        theme: orthantTheme(Brightness.light),
         home: SizedBox(
           width: 560,
           height: 430,

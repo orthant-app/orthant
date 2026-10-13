@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'mac_control.dart';
-import 'mac_theme.dart';
+import 'platform_theme.dart';
 
 /// A small numeric field with stacked ▲/▼ buttons — AppKit's `NSStepper`, which
 /// is what macOS uses for a bounded integer nobody wants to type.
@@ -34,7 +34,7 @@ class MacStepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.mac;
+    final t = context.tokens;
     final canRaise = enabled && value < max;
     final canLower = enabled && value > min;
 
@@ -114,7 +114,7 @@ class _Arrow extends StatelessWidget {
   });
 
   final bool up;
-  final MacTokens tokens;
+  final PlatformTokens tokens;
   final VoidCallback? onPressed;
   final String label;
 

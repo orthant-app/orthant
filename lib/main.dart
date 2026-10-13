@@ -9,7 +9,7 @@ import 'overlay/overlay_main.dart';
 import 'permission/onboarding_screen.dart';
 import 'permission/permission_controller.dart';
 import 'permission/ready_screen.dart';
-import 'settings/mac_theme.dart';
+import 'settings/platform_theme.dart';
 import 'settings/keyboard_labels.dart';
 import 'settings/settings_window.dart';
 import 'shortcuts/hotkey_service.dart';
@@ -177,8 +177,8 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
         labels: app.keyboardLabels,
         child: MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: macTheme(Brightness.light),
-      darkTheme: macTheme(Brightness.dark),
+      theme: orthantTheme(Brightness.light, accent: app.accent),
+      darkTheme: orthantTheme(Brightness.dark, accent: app.accent),
       home: switch (app.screen) {
           AppScreen.onboarding => OnboardingScreen(
               controller: app.permissions,

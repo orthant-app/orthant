@@ -22,8 +22,9 @@ enum FocusRingStyle {
 /// runner's window. The palette, radii and spacing are the macOS window's,
 /// shared by Windows. What differs by platform is only what the OS owns: the
 /// accent (the user's, through `WindowController.accentColor`), what is drawn
-/// on it, the focus ring, and the keycaps' font. Key names and glyphs are
-/// `KeyWords`', and the UI font is Flutter's own per-platform `Typography`.
+/// on it, the link colour, the focus ring, and the keycaps' font. Key names and
+/// glyphs are `KeyWords`', and the UI font is Flutter's own per-platform
+/// `Typography`.
 @immutable
 class PlatformTokens extends ThemeExtension<PlatformTokens> {
   const PlatformTokens({
@@ -36,6 +37,7 @@ class PlatformTokens extends ThemeExtension<PlatformTokens> {
     required this.labelTertiary,
     required this.accent,
     required this.onAccent,
+    required this.link,
     required this.keycapFill,
     required this.keycapBorder,
     required this.keycapShadow,
@@ -60,6 +62,11 @@ class PlatformTokens extends ThemeExtension<PlatformTokens> {
   /// white in its light theme and black in its dark one, whose accent fill is
   /// a light shade.
   final Color onAccent;
+
+  /// Text and glyphs that act as links. macOS draws them in its link colour
+  /// (`NSColor.linkColor`), which does not follow the accent and reads better
+  /// than it in dark mode; on Windows a link is the accent.
+  final Color link;
 
   final Color keycapFill;
   final Color keycapBorder;
@@ -92,6 +99,7 @@ class PlatformTokens extends ThemeExtension<PlatformTokens> {
     labelTertiary: Color(0x59000000),
     accent: Color(0xFF007AFF),
     onAccent: Color(0xFFFFFFFF),
+    link: Color(0xFF0068DA),
     keycapFill: Color(0xFFFDFDFD),
     keycapBorder: Color(0x24000000),
     keycapShadow: Color(0x14000000),
@@ -113,6 +121,7 @@ class PlatformTokens extends ThemeExtension<PlatformTokens> {
     labelTertiary: Color(0x59FFFFFF),
     accent: Color(0xFF0A84FF),
     onAccent: Color(0xFFFFFFFF),
+    link: Color(0xFF419CFF),
     keycapFill: Color(0xFF3A3A3C),
     keycapBorder: Color(0x33FFFFFF),
     keycapShadow: Color(0x33000000),
@@ -125,12 +134,13 @@ class PlatformTokens extends ThemeExtension<PlatformTokens> {
   );
 
   /// macOS's palette, with Windows' own accent (the default blue's shades,
-  /// until the user's is read), what it draws on it, its focus ring and its
-  /// UI font for the keycaps. The focus colours are WinUI's
-  /// `FocusStrokeColorOuter` and `FocusStrokeColorInner`.
+  /// until the user's is read), what it draws on it, its links (the accent),
+  /// its focus ring and its UI font for the keycaps. The focus colours are
+  /// WinUI's `FocusStrokeColorOuter` and `FocusStrokeColorInner`.
   static final windowsLight = macLight.copyWith(
     accent: const Color(0xFF0067C0),
     onAccent: const Color(0xFFFFFFFF),
+    link: const Color(0xFF0067C0),
     focusRing: FocusRingStyle.doubleStroke,
     focusOuter: const Color(0xE4000000),
     focusInner: const Color(0xB3FFFFFF),
@@ -140,6 +150,7 @@ class PlatformTokens extends ThemeExtension<PlatformTokens> {
   static final windowsDark = macDark.copyWith(
     accent: const Color(0xFF4CC2FF),
     onAccent: const Color(0xFF000000),
+    link: const Color(0xFF4CC2FF),
     focusRing: FocusRingStyle.doubleStroke,
     focusOuter: const Color(0xFFFFFFFF),
     focusInner: const Color(0xB3000000),
@@ -159,7 +170,11 @@ class PlatformTokens extends ThemeExtension<PlatformTokens> {
         ? (dark ? windowsDark : windowsLight)
         : (dark ? macDark : macLight);
     if (accent == null) return base;
-    return base.copyWith(accent: Color(dark ? accent.dark : accent.light));
+    final shade = Color(dark ? accent.dark : accent.light);
+    // A link is the accent on Windows and never is on macOS.
+    return platform == TargetPlatform.windows
+        ? base.copyWith(accent: shade, link: shade)
+        : base.copyWith(accent: shade);
   }
 
   @override
@@ -173,6 +188,7 @@ class PlatformTokens extends ThemeExtension<PlatformTokens> {
     Color? labelTertiary,
     Color? accent,
     Color? onAccent,
+    Color? link,
     Color? keycapFill,
     Color? keycapBorder,
     Color? keycapShadow,
@@ -193,6 +209,7 @@ class PlatformTokens extends ThemeExtension<PlatformTokens> {
       labelTertiary: labelTertiary ?? this.labelTertiary,
       accent: accent ?? this.accent,
       onAccent: onAccent ?? this.onAccent,
+      link: link ?? this.link,
       keycapFill: keycapFill ?? this.keycapFill,
       keycapBorder: keycapBorder ?? this.keycapBorder,
       keycapShadow: keycapShadow ?? this.keycapShadow,
@@ -214,7 +231,9 @@ class PlatformTokens extends ThemeExtension<PlatformTokens> {
     // The accent is not blended at all: a new one is drawn from the first
     // frame. Blended, the window's first open of a session faded from the
     // default blue to the user's accent over the theme's animation, as did
-    // every open after an accent change.
+    // every open after an accent change. A link is the accent on Windows, so
+    // it snaps with it; on macOS it snaps too, switching with the appearance
+    // where the colours around it blend.
     return PlatformTokens(
       windowBackground: c(windowBackground, other.windowBackground),
       contentBackground: c(contentBackground, other.contentBackground),
@@ -225,6 +244,7 @@ class PlatformTokens extends ThemeExtension<PlatformTokens> {
       labelTertiary: c(labelTertiary, other.labelTertiary),
       accent: other.accent,
       onAccent: c(onAccent, other.onAccent),
+      link: other.link,
       keycapFill: c(keycapFill, other.keycapFill),
       keycapBorder: c(keycapBorder, other.keycapBorder),
       keycapShadow: c(keycapShadow, other.keycapShadow),
@@ -252,6 +272,7 @@ class PlatformTokens extends ThemeExtension<PlatformTokens> {
       other.labelTertiary == labelTertiary &&
       other.accent == accent &&
       other.onAccent == onAccent &&
+      other.link == link &&
       other.keycapFill == keycapFill &&
       other.keycapBorder == keycapBorder &&
       other.keycapShadow == keycapShadow &&
@@ -273,6 +294,7 @@ class PlatformTokens extends ThemeExtension<PlatformTokens> {
         labelTertiary,
         accent,
         onAccent,
+        link,
         keycapFill,
         keycapBorder,
         keycapShadow,
@@ -305,11 +327,10 @@ ThemeData orthantTheme(
   return base.copyWith(
     scaffoldBackgroundColor: t.windowBackground,
     canvasColor: t.windowBackground,
-    // Material draws a checkbox's tick in onPrimary. Windows' is what it draws
-    // on the accent; macOS keeps the tick it has always had.
-    colorScheme: on == TargetPlatform.windows
-        ? base.colorScheme.copyWith(primary: t.accent, onPrimary: t.onAccent)
-        : base.colorScheme.copyWith(primary: t.accent),
+    // Material draws a checkbox's tick in onPrimary: what the platform draws
+    // on the accent (white on macOS, as its own checkboxes do).
+    colorScheme:
+        base.colorScheme.copyWith(primary: t.accent, onPrimary: t.onAccent),
     extensions: [t],
     // Tighter, quieter text than Material's defaults — closer to AppKit metrics.
     textTheme: base.textTheme.apply(

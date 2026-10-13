@@ -845,7 +845,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
                         style: TextStyle(
                           fontSize: 11.5,
                           height: 1.4,
-                          color: t.accent,
+                          color: t.link,
                         ),
                       ),
                     ),
@@ -938,7 +938,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
               focusRingRadius: 5,
               child: Text(
                 label,
-                style: TextStyle(fontSize: 11.5, color: t.accent),
+                style: TextStyle(fontSize: 11.5, color: t.link),
               ),
             ),
           ],
@@ -1015,13 +1015,13 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
             children: [
               SizedBox(
                 width: 26,
-                child: Icon(Icons.add, size: 16, color: t.accent),
+                child: Icon(Icons.add, size: 16, color: t.link),
               ),
               const SizedBox(width: 12),
               ExcludeSemantics(
                 child: Text(
                   'Add region…',
-                  style: TextStyle(fontSize: 13, color: t.accent),
+                  style: TextStyle(fontSize: 13, color: t.link),
                 ),
               ),
             ],

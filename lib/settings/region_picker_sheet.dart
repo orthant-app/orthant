@@ -621,7 +621,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
             inset: 2,
             child: Text(
               'Use it here',
-              style: TextStyle(fontSize: 11, color: t.accent),
+              style: TextStyle(fontSize: 11, color: t.link),
             ),
           ),
         ],

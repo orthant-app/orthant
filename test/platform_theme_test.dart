@@ -5,17 +5,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/key_chord.dart';
 import 'package:orthant/core/window_controller.dart';
 import 'package:orthant/permission/ready_screen.dart';
+import 'package:orthant/settings/general_pane.dart';
 import 'package:orthant/settings/keycap.dart';
 import 'package:orthant/settings/mac_control.dart';
 import 'package:orthant/settings/platform_theme.dart';
 import 'package:orthant/settings/recording_field.dart';
 import 'package:orthant/settings/region_picker_sheet.dart';
+import 'package:orthant/settings/settings.dart';
+import 'package:orthant/settings/shortcuts_screen.dart';
 import 'package:orthant/shortcuts/bindings.dart';
+import 'package:orthant/shortcuts/command_ref.dart';
 import 'package:orthant/shortcuts/custom_region.dart';
+import 'package:orthant/shortcuts/shortcut_command.dart';
 
 /// One design on both platforms: macOS's palette, radii and spacing, shared.
-/// What differs is what the OS owns: the accent, what is drawn on it, the
-/// focus ring and the keycaps' font. macOS's values are pinned exactly.
+/// What differs is what the OS owns: the accent, what is drawn on it, the link
+/// colour, the focus ring and the keycaps' font. macOS's values are pinned
+/// exactly.
 void main() {
   final both = TargetPlatformVariant(
       {TargetPlatform.macOS, TargetPlatform.windows});
@@ -121,6 +127,36 @@ void main() {
     expect(winLight.focusRing, FocusRingStyle.doubleStroke);
   });
 
+  test('a link is macOS\'s link colour, which does not follow the accent, and '
+      'on Windows the accent', () {
+    // NSColor.linkColor, measured under the blue, purple and graphite accents
+    // alike.
+    expect(PlatformTokens.macLight.link, const Color(0xFF0068DA));
+    expect(PlatformTokens.macDark.link, const Color(0xFF419CFF));
+    const purple = AccentColors(light: 0xFF953D96, dark: 0xFFA550A7);
+    expect(
+        PlatformTokens.of(TargetPlatform.macOS, Brightness.light,
+                accent: purple)
+            .link,
+        const Color(0xFF0068DA));
+    expect(
+        PlatformTokens.of(TargetPlatform.macOS, Brightness.dark,
+                accent: purple)
+            .link,
+        const Color(0xFF419CFF));
+    for (final t in [PlatformTokens.windowsLight, PlatformTokens.windowsDark]) {
+      expect(t.link, t.accent, reason: 'the default palette');
+    }
+    for (final (b, shade) in [
+      (Brightness.light, const Color(0xFF953D96)),
+      (Brightness.dark, const Color(0xFFA550A7)),
+    ]) {
+      final t = PlatformTokens.of(TargetPlatform.windows, b, accent: purple);
+      expect(t.accent, shade);
+      expect(t.link, shade, reason: 'a custom palette, $b');
+    }
+  });
+
   test('the theme carries the tokens and makes the accent Material\'s primary',
       () {
     const accent = AccentColors(light: 0xFFE0383E, dark: 0xFFFF5257);
@@ -135,12 +171,11 @@ void main() {
         reason: 'the test host reads as macOS, with no accent read');
   });
 
-  test('a checkbox\'s tick is what Windows draws on the accent; macOS keeps '
-      'the one it has always had', () {
+  test('a checkbox\'s tick is what each platform draws on the accent: white on '
+      'macOS in both appearances, Windows\' own on Windows', () {
     for (final b in Brightness.values) {
-      final base = ThemeData(brightness: b, useMaterial3: true);
       expect(orthantTheme(b, platform: TargetPlatform.macOS).colorScheme.onPrimary,
-          base.colorScheme.onPrimary, reason: 'macOS, $b');
+          const Color(0xFFFFFFFF), reason: 'macOS, $b');
       expect(
           orthantTheme(b, platform: TargetPlatform.windows).colorScheme.onPrimary,
           b == Brightness.dark
@@ -151,7 +186,7 @@ void main() {
   });
 
   test('a blend blends the colours, switches the style and the font at its '
-      'midpoint, and draws the new accent from its start', () {
+      'midpoint, and draws the new accent and link from their start', () {
     final a = PlatformTokens.macLight;
     final b = PlatformTokens.windowsDark;
     expect(a.lerp(b, 0.4).focusRing, FocusRingStyle.halo);
@@ -166,6 +201,8 @@ void main() {
         Color.lerp(a.windowBackground, b.windowBackground, 0.5));
     for (final t in [0.0, 0.5, 1.0]) {
       expect(a.lerp(b, t).accent, b.accent, reason: 'at $t');
+      // On Windows a link is the accent, so it snaps with it.
+      expect(a.lerp(b, t).link, b.link, reason: 'at $t');
     }
   });
 
@@ -183,6 +220,15 @@ void main() {
             platform: TargetPlatform.macOS, accent: purple),
         orthantTheme(Brightness.light,
             platform: TargetPlatform.macOS, accent: purple));
+  });
+
+  test('tokens differing only in the link colour are unequal', () {
+    PlatformTokens withLink(int argb) =>
+        PlatformTokens.macLight.copyWith(link: Color(argb));
+    expect(withLink(0xFF0068DA), withLink(0xFF0068DA));
+    expect(withLink(0xFF0068DA).hashCode, withLink(0xFF0068DA).hashCode);
+    expect(withLink(0xFF0068DA), isNot(withLink(0xFF419CFF)));
+    expect(withLink(0xFF0068DA).hashCode, isNot(withLink(0xFF419CFF).hashCode));
   });
 
   group('the theme in the app', () {
@@ -427,5 +473,122 @@ void main() {
           const Color(0xFFFFFFFF));
       await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+  });
+
+  // Text that acts as a link is drawn in the platform's link colour: on macOS
+  // that is not the accent (a purple one here, so the two cannot be mistaken),
+  // and on Windows it is the accent.
+  group('links', () {
+    const purple = AccentColors(light: 0xFF953D96, dark: 0xFFA550A7);
+    const macLink = Color(0xFF419CFF);
+    const windowsLink = Color(0xFFA550A7);
+
+    Future<void> pumpIn(
+        WidgetTester tester, TargetPlatform platform, Widget child) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(MaterialApp(
+        theme: orthantTheme(Brightness.dark,
+            platform: platform, accent: purple),
+        home: Scaffold(body: SizedBox(width: 760, height: 900, child: child)),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    Color? textColor(WidgetTester tester, String text) =>
+        tester.widget<Text>(find.text(text)).style!.color;
+
+    Widget general() => GeneralPane(
+          settings: const Settings(),
+          onSettingsChanged: (_) {},
+          permissionGranted: true,
+          loginStatus: LoginItemStatus.disabled,
+          bindings: runningDefaults(),
+        );
+
+    Widget ready() => ReadyScreen(
+          bindings: runningDefaults(),
+          onDone: () {},
+          onOpenShortcuts: () {},
+        );
+
+    testWidgets('General\'s Change… is the link colour on macOS',
+        (tester) async {
+      await pumpIn(tester, TargetPlatform.macOS, general());
+      expect(textColor(tester, 'Change…'), macLink);
+    });
+
+    testWidgets('General\'s Change… is the accent on Windows', (tester) async {
+      await pumpIn(tester, TargetPlatform.windows, general());
+      expect(textColor(tester, 'Change…'), windowsLink);
+    });
+
+    testWidgets('the ready screen\'s link is the link colour on macOS',
+        (tester) async {
+      await pumpIn(tester, TargetPlatform.macOS, ready());
+      expect(textColor(tester, 'Change these shortcuts…'), macLink);
+    });
+
+    testWidgets('the picker\'s Use it here is the link colour on macOS',
+        (tester) async {
+      await pumpIn(
+          tester,
+          TargetPlatform.macOS,
+          RegionPickerSheet(
+            initialChord: runningDefaults()
+                .firstWhere(
+                    (b) => b.command == const BuiltIn(ShortcutCommand.leftHalf))
+                .chord,
+            gridCols: 6,
+            gridRows: 6,
+            onSubmit: (_) {},
+            onCancel: () {},
+            conflictName: (_) => 'Left half',
+          ));
+      expect(textColor(tester, 'Use it here'), macLink);
+    });
+
+    testWidgets('the shortcuts pane\'s links are the link colour on macOS',
+        (tester) async {
+      await pumpIn(
+          tester,
+          TargetPlatform.macOS,
+          ShortcutsScreen(
+            bindings: runningDefaults(),
+            onRebound: (_) {},
+            onResetBindings: () {},
+            onRestoreBindings: (_) {},
+            onRegionSaved: (_) {},
+            permissionGranted: false,
+          ));
+      expect(textColor(tester, 'Open Accessibility Settings…'), macLink);
+      expect(textColor(tester, 'Add region…'), macLink);
+      expect(tester.widget<Icon>(find.byIcon(Icons.add)).color, macLink);
+      await tester.tap(find.text('Reset Shortcuts'));
+      await tester.pumpAndSettle();
+      expect(
+          tester
+              .widget<Text>(find.descendant(
+                  of: find.byKey(const ValueKey('notice-action')),
+                  matching: find.byType(Text)))
+              .style!
+              .color,
+          macLink,
+          reason: 'the notice\'s action');
+    });
+
+    testWidgets('the shortcuts pane\'s links are the accent on Windows',
+        (tester) async {
+      await pumpIn(
+          tester,
+          TargetPlatform.windows,
+          ShortcutsScreen(
+            bindings: runningDefaults(),
+            onRebound: (_) {},
+            onRegionSaved: (_) {},
+          ));
+      expect(textColor(tester, 'Add region…'), windowsLink);
+      expect(tester.widget<Icon>(find.byIcon(Icons.add)).color, windowsLink);
+    });
   });
 }

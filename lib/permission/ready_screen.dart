@@ -195,7 +195,7 @@ class ReadyScreen extends StatelessWidget {
                   inset: 2,
                   child: Text(
                     'Change these shortcuts…',
-                    style: TextStyle(fontSize: 12.5, color: t.accent),
+                    style: TextStyle(fontSize: 12.5, color: t.link),
                   ),
                 ),
                 FilledButton(
@@ -237,11 +237,11 @@ class _Card extends StatelessWidget {
   final PlatformTokens tokens;
   final Widget art;
 
-  /// Each chord whole, side by side while they fit. Windows names its keys
-  /// (Win, Ctrl, Shift), so two of its chords are wider than a card and the
-  /// second goes beneath the first. macOS's default chords fit on one line,
-  /// laid out exactly as a centred row would; two rebound to four modifiers
-  /// each do not, and wrap too, where the row they replace ran past the card.
+  /// Each chord whole, on one line always: a centred row at full size while
+  /// they fit, as macOS's default chords do, and scaled down together when
+  /// they are wider than the card. Two of Windows' are, since it names its
+  /// keys (Win, Ctrl, Shift); so are two on macOS rebound to four modifiers
+  /// each, where the row they replace ran past the card.
   final List<Widget> chords;
   final String caption;
 
@@ -259,12 +259,18 @@ class _Card extends StatelessWidget {
         children: [
           art,
           const SizedBox(height: 12),
-          Wrap(
-            alignment: WrapAlignment.center,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            runSpacing: 6,
-            children: chords,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                for (var i = 0; i < chords.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 8),
+                  chords[i],
+                ],
+              ],
+            ),
           ),
           const SizedBox(height: 10),
           Text(

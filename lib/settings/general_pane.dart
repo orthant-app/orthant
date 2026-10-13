@@ -431,7 +431,7 @@ class _LinkButton extends StatelessWidget {
       inset: 2,
       child: Text(
         label,
-        style: TextStyle(fontSize: 12.5, color: tokens.accent),
+        style: TextStyle(fontSize: 12.5, color: tokens.link),
       ),
     );
   }

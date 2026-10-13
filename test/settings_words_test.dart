@@ -253,32 +253,79 @@ void main() {
     }, variant: windows);
   });
 
-  // The ready screen's second card shows two chords. macOS's glyphs fit side
-  // by side; Windows' words do not, and the second goes beneath the first
-  // rather than past the card's edge. 600 wide, not the window's 560: in
-  // flutter_test's font even one of Windows' chords is wider than a card at
-  // 560 (Segoe UI's is not, which the VM's screenshots show), and what is
-  // tested here is that two chords wrap where one fits.
-  double gapBetweenChordRows(WidgetTester tester) {
-    final rows = find.byType(KeycapRow);
-    expect(rows, findsNWidgets(3), reason: 'the summon, then left and right');
-    return tester.getTopLeft(rows.at(2)).dy - tester.getTopLeft(rows.at(1)).dy;
+  // The ready screen's second card shows two chords and keeps them on one
+  // line: side by side at full size while they fit, and scaled down together
+  // when they are wider than the card. macOS's default chords fit. Windows'
+  // words do not (Win, Ctrl and Shift are words, not glyphs), and neither do
+  // two rebound to four modifiers each. The widths are not special: in
+  // flutter_test's font (a square a font size wide per character) Windows'
+  // two chords are wider than a card at each of them, so they scale, as they
+  // would at the window's own 560.
+
+  /// Both chords of the second card on one line, inside the card, centred in
+  /// it and in the proportions they were laid out in, whatever the scale
+  /// (which is returned: 1 when they fit). A rectangle is as drawn, scaling
+  /// included; [WidgetTester.getSize] is the size laid out, which scaling
+  /// leaves alone.
+  double expectChordsOnOneLine(WidgetTester tester) {
+    final keycaps = find.byType(KeycapRow);
+    expect(keycaps, findsNWidgets(3),
+        reason: 'the summon, then left and right');
+    final card = tester.getRect(find
+        .ancestor(
+            of: keycaps.at(1),
+            matching: find.byWidgetPredicate((w) =>
+                w is Container &&
+                w.decoration is BoxDecoration &&
+                (w.decoration! as BoxDecoration).border != null))
+        .first);
+    final left = tester.getRect(keycaps.at(1));
+    final right = tester.getRect(keycaps.at(2));
+    expect(left.center.dy, closeTo(right.center.dy, 0.01), reason: 'one line');
+    expect(left.right, lessThan(right.left), reason: 'side by side');
+    final inner = Rect.fromLTRB(
+        card.left + 16, card.top, card.right - 16, card.bottom);
+    final warnings = find.byIcon(Icons.warning_amber_rounded);
+    final drawn = [
+      left,
+      right,
+      for (var i = 0; i < warnings.evaluate().length; i++)
+        tester.getRect(warnings.at(i)),
+    ];
+    for (final r in drawn) {
+      expect(r.left, greaterThanOrEqualTo(inner.left - 0.01), reason: '$r');
+      expect(r.right, lessThanOrEqualTo(inner.right + 0.01), reason: '$r');
+      expect(r.top, greaterThanOrEqualTo(inner.top), reason: '$r');
+      expect(r.bottom, lessThanOrEqualTo(inner.bottom), reason: '$r');
+    }
+    expect((left.left + right.right) / 2, closeTo(card.center.dx, 0.01),
+        reason: 'centred in the card');
+    final scale = left.width / tester.getSize(keycaps.at(1)).width;
+    for (var i = 1; i <= 2; i++) {
+      final natural = tester.getSize(keycaps.at(i));
+      final r = tester.getRect(keycaps.at(i));
+      expect(r.width, closeTo(natural.width * scale, 0.01),
+          reason: 'chord $i, scaled together with the other');
+      expect(r.height, closeTo(natural.height * scale, 0.01),
+          reason: 'chord $i keeps its keycaps\' proportions');
+    }
+    return scale;
   }
 
-  testWidgets('on macOS the two chords share a line', (tester) async {
-    await pumpHost(tester, ready(refused: false), width: 600);
-    expect(gapBetweenChordRows(tester), 0);
-  }, variant: macOS);
-
-  testWidgets('on Windows the second chord goes beneath the first, centred',
+  testWidgets('on macOS the two chords share a line at full size',
       (tester) async {
     await pumpHost(tester, ready(refused: false), width: 600);
-    expect(gapBetweenChordRows(tester), 21 + 6,
-        reason: 'one keycap row, then the wrap\'s run spacing');
-    // A refused right half puts a warning (14 wide, 5 before the keycaps) on
-    // the second line only, so the lines differ in width and only centring
-    // puts its keycaps 9.5 right of the first line's. 700 wide: in the test
-    // font a refused chord alone is wider than a card at 600.
+    expect(expectChordsOnOneLine(tester), 1);
+  }, variant: macOS);
+
+  testWidgets('on Windows both chords stay on one line, scaled down together '
+      'to fit the card', (tester) async {
+    await pumpHost(tester, ready(refused: false), width: 600);
+    expect(expectChordsOnOneLine(tester), lessThan(1));
+    // A refused right half puts a warning (14 wide, 5 before the keycaps) in
+    // front of the second chord, which scales and stays inside the card with
+    // it. 700 wide, a wider card than above and still too narrow for two
+    // chords.
     await pumpHost(
         tester,
         ReadyScreen(
@@ -288,13 +335,13 @@ void main() {
           onOpenShortcuts: () {},
         ),
         width: 700);
-    final rows = find.byType(KeycapRow);
-    expect(tester.getRect(rows.at(2)).left - tester.getRect(rows.at(1)).left,
-        9.5);
+    expect(expectChordsOnOneLine(tester), lessThan(1));
+    expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
   }, variant: windows);
 
-  testWidgets('on macOS two chords rebound to four modifiers wrap rather than '
-      'run past the card, which the row before R1 did', (tester) async {
+  testWidgets('on macOS two chords rebound to four modifiers share a line, '
+      'scaled down, where the row before R1 ran past the card',
+      (tester) async {
     KeyChord all(LogicalKeyboardKey key) => KeyChord(
           physical: usPhysicalFor(key.keyId)!,
           logical: key.keyId,
@@ -318,7 +365,7 @@ void main() {
           onDone: () {},
           onOpenShortcuts: () {},
         ));
-    expect(gapBetweenChordRows(tester), 21 + 6);
+    expect(expectChordsOnOneLine(tester), lessThan(1));
   }, variant: macOS);
 
   // The same three keycap rows and two warnings, measured on macOS at the base

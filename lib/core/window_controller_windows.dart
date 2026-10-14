@@ -1,4 +1,5 @@
 import 'dart:async' show unawaited;
+import 'dart:io' show Platform;
 import 'dart:isolate' show Isolate;
 
 import 'package:flutter/foundation.dart'
@@ -11,6 +12,7 @@ import 'windows_accent.dart';
 import 'windows_app_icon.dart';
 import 'windows_capture.dart';
 import 'windows_keys.dart';
+import 'windows_login_item.dart';
 import 'windows_placement.dart';
 import 'windows_version_resource.dart';
 import 'windows_win32_ops.dart';
@@ -32,8 +34,17 @@ import 'windows_window_ops.dart';
 /// `MissingPluginException` (`test/windows_channel_contract_test.dart` guards
 /// the methods that do call it).
 class WindowsWindowController implements WindowController {
-  WindowsWindowController._(this._readVersion, this._desktop, this._placer,
-      this._clock, this._keyLabel, this._readIcon, this._readAccentPalette);
+  WindowsWindowController._(
+      this._readVersion,
+      this._desktop,
+      this._placer,
+      this._clock,
+      this._keyLabel,
+      this._readIcon,
+      this._readAccentPalette,
+      this._startup,
+      this._exePath,
+      this._openStartupApps);
 
   /// The one way to obtain the controller in production.
   ///
@@ -43,9 +54,17 @@ class WindowsWindowController implements WindowController {
   /// was a lazy static nothing read until the settings window did (spec §5.6).
   static WindowsWindowController start() {
     final win32 = FfiWin32WindowOps();
-    return WindowsWindowController._(readFixedFileVersion, win32, win32,
-        RealPlacementClock(), win32.keyLabel, _readIconInBackground,
-        readAccentPalette);
+    return WindowsWindowController._(
+        readFixedFileVersion,
+        win32,
+        win32,
+        RealPlacementClock(),
+        win32.keyLabel,
+        _readIconInBackground,
+        readAccentPalette,
+        const FfiStartupRegistry(),
+        () => Platform.resolvedExecutable,
+        openStartupAppsSettings);
   }
 
   /// [readAppIconPng] blocks, so it runs on an isolate of its own.
@@ -63,10 +82,21 @@ class WindowsWindowController implements WindowController {
     String? Function(int vk)? keyLabel,
     Future<Uint8List?> Function(String exe)? readIcon,
     AccentPaletteReader? readAccentPalette,
+    StartupRegistry? startup,
+    String Function()? exePath,
+    bool Function()? openStartupApps,
   }) =>
-      WindowsWindowController._(readVersion, desktop, placer,
-          clock ?? RealPlacementClock(), keyLabel ?? (_) => null,
-          readIcon ?? (_) async => null, readAccentPalette ?? () => null);
+      WindowsWindowController._(
+          readVersion,
+          desktop,
+          placer,
+          clock ?? RealPlacementClock(),
+          keyLabel ?? (_) => null,
+          readIcon ?? (_) async => null,
+          readAccentPalette ?? () => null,
+          startup ?? const _NoStartup(),
+          exePath ?? () => r'C:\Orthant\Orthant.exe',
+          openStartupApps ?? () => false);
 
   final VersionReader _readVersion;
   final Win32Desktop _desktop;
@@ -82,6 +112,16 @@ class WindowsWindowController implements WindowController {
 
   /// Windows' accent palette ([readAccentPalette]), for [accentColor].
   final AccentPaletteReader _readAccentPalette;
+
+  /// The registry values launch at login lives in ([FfiStartupRegistry]).
+  final StartupRegistry _startup;
+
+  /// This executable's path, which the startup entry must name to be this
+  /// copy's ([Platform.resolvedExecutable]).
+  final String Function() _exePath;
+
+  /// Opens Settings' Startup apps page ([openStartupAppsSettings]).
+  final bool Function() _openStartupApps;
 
   /// Icons by executable path, null for an app that has none to read. Read
   /// once per app per run: an executable's icon does not change while it
@@ -517,16 +557,46 @@ class WindowsWindowController implements WindowController {
     }
   }
 
-  // W5: the Run key plus StartupApproved (§5.2). `unavailable` is the one
-  // status the pane never renders as "on".
+  /// The Run value and its StartupApproved record, read every time: the user
+  /// can change either in Task Manager or Settings without telling anyone, as
+  /// on macOS. A registry read, so Dart, with no window and no runner.
   @override
-  Future<LoginItemStatus> loginItemStatus() async =>
-      LoginItemStatus.unavailable;
+  Future<LoginItemStatus> loginItemStatus() async {
+    try {
+      return loginItemStatusOf(
+          run: _startup.readRun(),
+          approved: _startup.readApproved(),
+          exe: _exePath());
+    } catch (e) {
+      _log('login item: threw ($e)');
+      return LoginItemStatus.unavailable;
+    }
+  }
+
+  /// Writes or deletes the Run value, then answers what the registry says,
+  /// never what was asked: turning it on over the user's off in Startup apps
+  /// leaves it off, which is [LoginItemStatus.requiresApproval].
   @override
-  Future<LoginItemStatus> setLoginItem(bool enabled) async =>
-      LoginItemStatus.unavailable;
+  Future<LoginItemStatus> setLoginItem(bool enabled) async {
+    try {
+      final done = enabled
+          ? _startup.writeRun(runCommandFor(_exePath()))
+          : _startup.deleteRun();
+      if (!done) _log('login item: ${enabled ? 'write' : 'delete'} failed');
+    } catch (e) {
+      _log('login item: threw ($e)');
+    }
+    return loginItemStatus();
+  }
+
   @override
-  Future<void> openLoginItemsSettings() async {}
+  Future<void> openLoginItemsSettings() async {
+    try {
+      if (!_openStartupApps()) _log('startup apps: not opened');
+    } catch (e) {
+      _log('startup apps: threw ($e)');
+    }
+  }
 
   // W6: WinSparkle over FFI (§5.6).
   @override
@@ -535,6 +605,19 @@ class WindowsWindowController implements WindowController {
   Future<bool> setAutomaticUpdateChecks(bool enabled) async => false;
   @override
   Future<void> checkForUpdates() async {}
+}
+
+/// No startup entry, for a test that does not name one.
+class _NoStartup implements StartupRegistry {
+  const _NoStartup();
+  @override
+  RegRead<String> readRun() => (found: RegFound.absent, data: null);
+  @override
+  RegRead<Uint8List> readApproved() => (found: RegFound.absent, data: null);
+  @override
+  bool writeRun(String command) => false;
+  @override
+  bool deleteRun() => true;
 }
 
 /// One display from the runner's reply, or null if any field is missing,

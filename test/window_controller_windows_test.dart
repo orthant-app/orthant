@@ -7,6 +7,7 @@ import 'package:orthant/core/channel.dart';
 import 'package:orthant/core/geometry.dart';
 import 'package:orthant/core/window_controller.dart';
 import 'package:orthant/core/window_controller_windows.dart';
+import 'package:orthant/core/windows_login_item.dart';
 import 'package:orthant/core/windows_window_ops.dart';
 
 import 'support/fake_win32.dart';
@@ -22,6 +23,44 @@ class _NameThrowingDesktop extends FakeDesktop {
 
   @override
   String? processName(int pid) => throw StateError('OpenProcess went away');
+}
+
+/// The two registry values launch at login lives in, held in memory.
+class _Startup implements StartupRegistry {
+  String? run;
+  Uint8List? approved;
+  bool throws = false;
+  bool refuses = false;
+  final List<String> writes = [];
+
+  @override
+  RegRead<String> readRun() {
+    if (throws) throw StateError('advapi32 went away');
+    return run == null
+        ? (found: RegFound.absent, data: null)
+        : (found: RegFound.present, data: run);
+  }
+
+  @override
+  RegRead<Uint8List> readApproved() => approved == null
+      ? (found: RegFound.absent, data: null)
+      : (found: RegFound.present, data: approved);
+
+  @override
+  bool writeRun(String command) {
+    writes.add('write $command');
+    if (refuses) return false;
+    run = command;
+    return true;
+  }
+
+  @override
+  bool deleteRun() {
+    writes.add('delete');
+    if (refuses) return false;
+    run = null;
+    return true;
+  }
 }
 
 // Built through functions so equality is tested, not const identity.
@@ -100,11 +139,86 @@ void main() {
     expect(calls, isEmpty);
   });
 
+  group('launch at login', () {
+    const exe = r'C:\Programs\Orthant\Orthant.exe';
+    late _Startup startup;
+    late int opened;
+    WindowsWindowController login({bool opens = true}) =>
+        WindowsWindowController.forTest(
+          readVersion: () => null,
+          desktop: NoWindows(),
+          placer: NoWindows(),
+          startup: startup,
+          exePath: () => exe,
+          openStartupApps: () {
+            opened++;
+            return opens;
+          },
+        );
+    setUp(() {
+      startup = _Startup();
+      opened = 0;
+    });
+
+    test('reads the Run value and its StartupApproved record', () async {
+      expect(await login().loginItemStatus(), LoginItemStatus.disabled);
+      startup.run = '"$exe"';
+      expect(await login().loginItemStatus(), LoginItemStatus.enabled);
+      startup.approved = Uint8List.fromList([3, 0, 0, 0]);
+      expect(await login().loginItemStatus(), LoginItemStatus.requiresApproval);
+      expect(calls, isEmpty, reason: 'a registry read needs no window');
+    });
+
+    test('on writes this executable, quoted; off deletes the value', () async {
+      final c = login();
+      expect(await c.setLoginItem(true), LoginItemStatus.enabled);
+      expect(startup.run, '"$exe"');
+      expect(await c.setLoginItem(false), LoginItemStatus.disabled);
+      expect(startup.run, isNull);
+      expect(startup.writes, ['write "$exe"', 'delete']);
+      expect(calls, isEmpty);
+    });
+
+    test("turning it on never overrides the user's off in Startup apps",
+        () async {
+      // Measured: Task Manager keeps a disabled record across a rewrite of
+      // the Run value, so the status after the write says so; the record is
+      // Windows' and is never written here.
+      startup.approved = Uint8List.fromList([1, 0, 0, 0, 9, 9, 9, 9]);
+      expect(await login().setLoginItem(true),
+          LoginItemStatus.requiresApproval);
+      expect(startup.approved, [1, 0, 0, 0, 9, 9, 9, 9]);
+    });
+
+    test('the answer is what the registry says after the write, not the ask',
+        () async {
+      startup.refuses = true;
+      expect(await login().setLoginItem(true), LoginItemStatus.disabled);
+      startup
+        ..refuses = false
+        ..run = '"$exe"'
+        ..refuses = true;
+      expect(await login().setLoginItem(false), LoginItemStatus.enabled);
+    });
+
+    test('a registry that throws reads as unavailable, never as a throw',
+        () async {
+      startup.throws = true;
+      expect(await login().loginItemStatus(), LoginItemStatus.unavailable);
+      expect(await login().setLoginItem(true), LoginItemStatus.unavailable);
+    });
+
+    test("opens Settings' Startup apps page, never through the channel",
+        () async {
+      await login().openLoginItemsSettings();
+      await login(opens: false).openLoginItemsSettings();
+      expect(opened, 2);
+      expect(calls, isEmpty);
+    });
+  });
+
   test('the remaining stubs answer safely and never reach native', () async {
     final c = wc();
-    expect(await c.loginItemStatus(), LoginItemStatus.unavailable);
-    expect(await c.setLoginItem(true), LoginItemStatus.unavailable);
-    await c.openLoginItemsSettings();
     expect(await c.automaticUpdateChecks(), isFalse);
     expect(await c.setAutomaticUpdateChecks(true), isFalse);
     await c.checkForUpdates();

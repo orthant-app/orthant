@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../core/key_words.dart';
@@ -12,6 +13,51 @@ import 'mac_control.dart';
 import 'mac_stepper.dart';
 import 'platform_theme.dart';
 import 'settings.dart';
+
+/// What the General pane says that differs by platform: whether there is a
+/// permission to show (macOS's Accessibility grant; Windows has none), where
+/// the OS keeps the startup entry, and what a gap is counted in (points on
+/// macOS; on Windows the device-independent pixels its own controls are
+/// sized in). macOS's are exactly what 1.0.x says.
+class _Words {
+  const _Words({
+    required this.hasPermission,
+    required this.loginUnrecognised,
+    required this.loginTurnedOff,
+    required this.openLoginItems,
+    required this.gapUnit,
+  });
+
+  final bool hasPermission;
+  final String loginUnrecognised;
+  final String loginTurnedOff;
+  final String openLoginItems;
+  final String gapUnit;
+
+  static const macOS = _Words(
+    hasPermission: true,
+    loginUnrecognised: 'macOS reported a login-item state Orthant does not '
+        'recognise. Switching this on may still work.',
+    loginTurnedOff: 'Turned off in System Settings ▸ General ▸ Login Items, so '
+        'Orthant will not start automatically.',
+    openLoginItems: 'Open Login Items…',
+    gapUnit: 'pt',
+  );
+
+  static const windows = _Words(
+    hasPermission: false,
+    loginUnrecognised: 'Windows reported a startup state Orthant does not '
+        'recognise. Switching this on may still work.',
+    loginTurnedOff: 'Turned off in Settings ▸ Apps ▸ Startup, so Orthant '
+        'will not start automatically.',
+    openLoginItems: 'Open Startup Apps…',
+    gapUnit: 'px',
+  );
+
+  /// Read at use, so a test can name its platform.
+  static _Words get current =>
+      defaultTargetPlatform == TargetPlatform.windows ? windows : macOS;
+}
 
 /// The General tab: everything configurable that is not a keyboard shortcut.
 ///
@@ -51,7 +97,8 @@ class GeneralPane extends StatelessWidget {
   final Settings settings;
   final void Function(Settings) onSettingsChanged;
 
-  /// Rendered either way — a green "Granted" or a warning with a way to fix it.
+  /// Rendered either way on macOS, a green "Granted" or a warning with a way
+  /// to fix it. Windows has no grant, so neither.
   final bool permissionGranted;
 
   final LoginItemStatus loginStatus;
@@ -110,8 +157,10 @@ class GeneralPane extends StatelessWidget {
             // "does Orthant actually have permission?" is the first thing anyone
             // debugging it wants to see. Spec §6 lists permission status as an M7
             // deliverable in its own right.
-            _group(t, 'Accessibility', [_permissionRow(t)]),
-            _hairline(t),
+            if (_Words.current.hasPermission) ...[
+              _group(t, 'Accessibility', [_permissionRow(t)]),
+              _hairline(t),
+            ],
             _group(t, 'Open grid', [_summonRow(t)]),
             _hairline(t),
             _gridAndGaps(t),
@@ -200,7 +249,7 @@ class GeneralPane extends StatelessWidget {
                 kMaxGapSize,
                 (v) => onSettingsChanged(settings.copyWith(gapSize: v)),
                 enabled: settings.gaps,
-                unit: 'pt',
+                unit: _Words.current.gapUnit,
               ),
             ]),
           ],
@@ -374,8 +423,7 @@ class GeneralPane extends StatelessWidget {
           SizedBox(
             width: 320,
             child: Text(
-              'macOS reported a login-item state Orthant does not recognise. '
-              'Switching this on may still work.',
+              _Words.current.loginUnrecognised,
               style: TextStyle(
                 fontSize: 11.5,
                 height: 1.45,
@@ -389,8 +437,7 @@ class GeneralPane extends StatelessWidget {
           SizedBox(
             width: 320,
             child: Text(
-              'Turned off in System Settings ▸ General ▸ Login Items, so '
-              'Orthant will not start automatically.',
+              _Words.current.loginTurnedOff,
               style: TextStyle(
                 fontSize: 11.5,
                 height: 1.45,
@@ -400,7 +447,7 @@ class GeneralPane extends StatelessWidget {
           ),
           const SizedBox(height: 7),
           _LinkButton(
-            label: 'Open Login Items…',
+            label: _Words.current.openLoginItems,
             tokens: t,
             onPressed: onOpenLoginItems,
           ),

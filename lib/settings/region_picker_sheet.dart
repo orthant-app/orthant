@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart' show EagerGestureRecognizer;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -368,80 +369,87 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
   Widget build(BuildContext context) {
     final t = context.tokens;
     return Center(
-      // Its own Material, because the sheet is presented in a dialog route with
-      // no Scaffold above it — and a TextField without one throws at build
-      // time, which in a Release build is a featureless grey box rather than
-      // an error anybody can read.
-      child: Material(
-        type: MaterialType.transparency,
-        // Return is the default button, as it is in every macOS dialog — but
-        // only when nothing is listening for a combination, because ⌃⌥↩ is a
-        // perfectly ordinary shortcut to want to record (it is Maximize's
-        // default).
-        // CallbackShortcuts must be an ANCESTOR of the focused node: key events
-        // travel *up* the focus chain, so a shortcut widget nested below the
-        // node that holds focus is simply never on the path.
-        child: CallbackShortcuts(
-          bindings: {
-            const SingleActivator(LogicalKeyboardKey.enter): () {
-              if (_canSubmit) _submit();
+      // Scrolls in a window shorter than the sheet: on Windows the window's
+      // floor gives way to a short screen's work area (a 768-pixel screen at
+      // 200 % leaves about 300 points), and Save sat below the bottom edge.
+      // A sheet that fits takes no drag, so the grid keeps every one.
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        // Its own Material, because the sheet is presented in a dialog route
+        // with no Scaffold above it — and a TextField without one throws at
+        // build time, which in a Release build is a featureless grey box
+        // rather than an error anybody can read.
+        child: Material(
+          type: MaterialType.transparency,
+          // Return is the default button, as it is in every macOS dialog — but
+          // only when nothing is listening for a combination, because ⌃⌥↩ is a
+          // perfectly ordinary shortcut to want to record (it is Maximize's
+          // default).
+          // CallbackShortcuts must be an ANCESTOR of the focused node: key
+          // events travel *up* the focus chain, so a shortcut widget nested
+          // below the node that holds focus is simply never on the path.
+          child: CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.enter): () {
+                if (_canSubmit) _submit();
+              },
+              const SingleActivator(LogicalKeyboardKey.numpadEnter): () {
+                if (_canSubmit) _submit();
+              },
             },
-            const SingleActivator(LogicalKeyboardKey.numpadEnter): () {
-              if (_canSubmit) _submit();
-            },
-          },
-          // And an anchor below it, so the subtree always holds focus. With
-          // nothing focused — after a recording is cancelled, say — Return
-          // would reach nobody. skipTraversal keeps it out of the Tab order.
-          child: Focus(
-            focusNode: _anchorNode,
-            autofocus: true,
-            skipTraversal: true,
-            child: Container(
-              width: 344,
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-              decoration: BoxDecoration(
-                color: t.windowBackground,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: t.separator),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x33000000),
-                    blurRadius: 24,
-                    offset: Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    _creating ? 'New region' : 'Edit region',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: t.labelPrimary,
+            // And an anchor below it, so the subtree always holds focus. With
+            // nothing focused — after a recording is cancelled, say — Return
+            // would reach nobody. skipTraversal keeps it out of the Tab order.
+            child: Focus(
+              focusNode: _anchorNode,
+              autofocus: true,
+              skipTraversal: true,
+              child: Container(
+                width: 344,
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+                decoration: BoxDecoration(
+                  color: t.windowBackground,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: t.separator),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x33000000),
+                      blurRadius: 24,
+                      offset: Offset(0, 8),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  _grid(t),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Drag to draw · arrows to move, '
-                    '${KeyWords.current.shiftName} to extend',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 10.5, color: t.labelTertiary),
-                  ),
-                  const SizedBox(height: 14),
-                  _nameField(t),
-                  const SizedBox(height: 10),
-                  _shortcutRow(t),
-                  if (_conflict != null) _conflictNotice(t),
-                  if (_refusal != null) _refusalNotice(t, _refusal!),
-                  const SizedBox(height: 16),
-                  _buttons(t),
-                ],
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      _creating ? 'New region' : 'Edit region',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: t.labelPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _grid(t),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Drag to draw · arrows to move, '
+                      '${KeyWords.current.shiftName} to extend',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 10.5, color: t.labelTertiary),
+                    ),
+                    const SizedBox(height: 14),
+                    _nameField(t),
+                    const SizedBox(height: 10),
+                    _shortcutRow(t),
+                    if (_conflict != null) _conflictNotice(t),
+                    if (_refusal != null) _refusalNotice(t, _refusal!),
+                    const SizedBox(height: 16),
+                    _buttons(t),
+                  ],
+                ),
               ),
             ),
           ),
@@ -466,25 +474,37 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
               key: const ValueKey('region-grid'),
               width: _gridSize.width,
               height: _gridSize.height,
-              // A raw Listener for the press, not GestureDetector's onTapDown or
-              // onPanStart. Both are arena-mediated: onTapDown may never fire
-              // when a pan is competing, and onPanStart reports where the pan was
-              // *recognised* — about 18 points after the press — so pressing near
-              // a cell edge would anchor the selection to the neighbouring cell.
-              // onPointerDown fires immediately, at the real position.
-              child: Listener(
-                onPointerDown: (e) {
-                  focusNode.requestFocus();
-                  final c = _cellAt(e.localPosition);
-                  _pressCell = c;
-                  _select(c, c);
+              // A raw Listener for the press and the drag, not
+              // GestureDetector's onTapDown or onPanUpdate. Both are
+              // arena-mediated: onTapDown may never fire when a pan is
+              // competing, and a pan is recognised only once it has moved, so
+              // a press near a cell edge anchored the selection to the
+              // neighbouring cell. The grid also claims the pointer at once
+              // (an EagerGestureRecognizer): when the window is too short for
+              // the sheet, its scroll view would otherwise take a finger's or
+              // a pen's vertical drag that started here. A trackpad's
+              // two-finger scroll is no press, and still scrolls it.
+              child: RawGestureDetector(
+                gestures: {
+                  EagerGestureRecognizer:
+                      GestureRecognizerFactoryWithHandlers<
+                          EagerGestureRecognizer>(
+                    EagerGestureRecognizer.new,
+                    (_) {},
+                  ),
                 },
-                child: GestureDetector(
+                child: Listener(
                   behavior: HitTestBehavior.opaque,
-                  onPanUpdate: (d) {
+                  onPointerDown: (e) {
+                    focusNode.requestFocus();
+                    final c = _cellAt(e.localPosition);
+                    _pressCell = c;
+                    _select(c, c);
+                  },
+                  onPointerMove: (e) {
                     final anchor = _pressCell;
                     if (anchor == null) return;
-                    _select(anchor, _cellAt(d.localPosition));
+                    _select(anchor, _cellAt(e.localPosition));
                   },
                   child: CustomPaint(
                     // A *foreground* ring drawn outside the cells, so nothing

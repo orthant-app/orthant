@@ -10,7 +10,8 @@ enum FocusRingStyle {
 
   /// Windows (WinUI's focus visual): a 2 px outer stroke in
   /// [PlatformTokens.focusOuter] and a 1 px inner one in
-  /// [PlatformTokens.focusInner], filling the 3 px just outside the control.
+  /// [PlatformTokens.focusInner], filling a 3 px band (`FocusRingPainter`
+  /// says where: just outside the control at the usual inset of 3).
   doubleStroke,
 }
 

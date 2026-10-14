@@ -43,7 +43,8 @@ AccentColors? accentFromPalette(Uint8List? palette) {
 /// in reverse in the finally.
 ///
 /// Windows only. `package:win32` resolves `advapi32.dll` on first call, so
-/// importing this library on macOS is harmless and calling it there is not.
+/// importing this library on macOS is harmless, and calling it there returns
+/// null: the library fails to load inside the try.
 Uint8List? readAccentPalette() {
   Pointer<Utf16>? keyPtr;
   Pointer<Utf16>? valuePtr;

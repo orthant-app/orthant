@@ -132,12 +132,15 @@ class OrthantCoordinator extends ChangeNotifier {
   }
 
   /// The user's accent as the OS draws with it, or null for the platform's
-  /// default. Neither OS tells an app when it changes, so it is read at launch
-  /// and again each time the window is about to show ([_show]): a change made
-  /// in System Settings or Windows' Settings shows the next time the window
-  /// opens. Read at launch too, though nothing is drawn then, so that the
-  /// window's first open finds the accent it already has: a change at that
-  /// moment would put the old one in the frame that reveals the window.
+  /// default. Both OSes announce a change (macOS posts
+  /// `NSSystemColorsDidChangeNotification`, Windows sends `WM_SETTINGCHANGE`),
+  /// but neither reaches Dart without native forwarding this app does not
+  /// have, so it is read at launch and again each time the window is about to
+  /// show ([_show]): a change made in System Settings or Windows' Settings
+  /// shows the next time the window opens. Read at launch too, though nothing
+  /// is drawn then, so that the window's first open finds the accent it
+  /// already has: a change at that moment would put the old one in the frame
+  /// that reveals the window.
   AccentColors? _accent;
   AccentColors? get accent => _accent;
 
@@ -585,12 +588,12 @@ class OrthantCoordinator extends ChangeNotifier {
   /// Show the settings window.
   ///
   /// The screen is set before the window shows and before the status is read,
-  /// deliberately ([_show]; only the accent is read ahead of it, while the
-  /// window is still down). Fetching the login status first meant the window
-  /// could be on screen with the screen state still at its previous value for
-  /// a whole channel round trip — and `SMAppService.mainApp.status` is not
-  /// fast. When that previous value was `none`, the visible window rendered
-  /// `SizedBox.shrink()`: an empty panel. The status arrives a moment later
+  /// deliberately ([_show]; only the accent is read ahead of them). Fetching
+  /// the login status first meant the window could be on screen with the
+  /// screen state still at its previous value for a whole channel round trip,
+  /// and `SMAppService.mainApp.status` is not fast. When that previous value
+  /// was `none`, the visible window rendered `SizedBox.shrink()`: an empty
+  /// panel. The status arrives a moment later
   /// and re-renders the one row that needs it, which is what a status read
   /// should cost.
   Future<void> openSettings({SettingsTab tab = SettingsTab.general}) async {
@@ -604,7 +607,7 @@ class OrthantCoordinator extends ChangeNotifier {
     notifyListeners();
     if (!kReleaseMode) {
       debugPrint('[orthant] openSettings: '
-          'showConfigWindow ${shown.difference(t0).inMilliseconds} ms, '
+          'accent and show ${shown.difference(t0).inMilliseconds} ms, '
           'loginItemStatus ${statused.difference(shown).inMilliseconds} ms');
     }
   }

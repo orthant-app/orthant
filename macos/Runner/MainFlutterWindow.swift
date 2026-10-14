@@ -131,16 +131,6 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       case "openLoginItemsSettings":
         LoginItem.openLoginItemsSettings()
         result(nil)
-      // Read from the running bundle, never from a Dart constant or a build-time
-      // define: those drift from what actually shipped, and a version display that
-      // can be wrong about itself is worse than none. `Bundle.main` is the only
-      // source that cannot disagree with the binary being asked.
-      //
-      // A pre-release label is deliberately absent. CFBundleShortVersionString is
-      // three integers by Apple's rule, so "1.0.0-beta.2" lives only in the tag,
-      // the DMG name and the release title. The build number is what actually
-      // distinguishes one beta from the next, which is why both halves are
-      // returned rather than the marketing string alone.
       // Display data only: what each key position prints under the layout the
       // user has selected. Bindings keep their key codes; see KeyboardLayout.
       case "keyboardLabels":
@@ -156,6 +146,15 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         } else {
           result(nil)
         }
+      // Read from the running bundle, never from a Dart constant or a build-time
+      // define: those drift from what actually shipped, and a version display that
+      // can be wrong about itself is worse than none. `Bundle.main` is the only
+      // source that cannot disagree with the binary being asked.
+      //
+      // CFBundleShortVersionString is three integers by Apple's rule, so a
+      // pre-release label such as "1.0.0-beta.2" cannot live there: the build
+      // number is what distinguishes one beta from the next, which is why both
+      // halves are returned, and releaseName below carries the label itself.
       case "appVersion":
         let info = Bundle.main.infoDictionary
         result([

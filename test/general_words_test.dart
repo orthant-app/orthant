@@ -23,7 +23,7 @@ void main() {
       .singleWhere((l) => l.startsWith('Size'));
 
   Future<void> pumpPane(WidgetTester tester, LoginItemStatus status,
-      {bool granted = true}) async {
+      {bool granted = true, Settings settings = const Settings()}) async {
     openedLoginItems = 0;
     await tester.binding.setSurfaceSize(const Size(600, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -34,7 +34,7 @@ void main() {
           width: 560,
           height: 860,
           child: GeneralPane(
-            settings: const Settings(),
+            settings: settings,
             onSettingsChanged: (_) {},
             permissionGranted: granted,
             loginStatus: status,
@@ -78,6 +78,12 @@ void main() {
       expect(find.text('pt'), findsOneWidget);
       expect(gapLabel(tester), 'Size 8 pt');
     }, variant: macOS);
+
+    testWidgets('the preview counts its gaps in points', (tester) async {
+      await pumpPane(tester, LoginItemStatus.disabled,
+          settings: const Settings(gaps: true));
+      expect(find.text('6 × 6 · up to 8 pt gaps'), findsOneWidget);
+    }, variant: macOS);
   });
 
   group('Windows', () {
@@ -115,6 +121,15 @@ void main() {
       expect(find.text('px'), findsOneWidget);
       expect(find.text('pt'), findsNothing);
       expect(gapLabel(tester), 'Size 8 px');
+    }, variant: windows);
+
+    testWidgets('the preview counts its gaps in pixels too', (tester) async {
+      await pumpPane(tester, LoginItemStatus.disabled,
+          settings: const Settings(gaps: true));
+      expect(find.text('6 × 6 · up to 8 px gaps'), findsOneWidget);
+      // find.text('pt') matches whole strings only; this sees "pt" inside any
+      // caption or label in the pane.
+      expect(find.textContaining(RegExp(r'\bpt\b')), findsNothing);
     }, variant: windows);
 
     testWidgets('the startup checkbox is the same control', (tester) async {

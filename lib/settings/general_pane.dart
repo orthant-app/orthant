@@ -262,6 +262,7 @@ class GeneralPane extends StatelessWidget {
         // effectiveGap, not gapSize: the picture must show what a
         // placement would actually do, which is nothing when gaps are off.
         gap: settings.effectiveGap,
+        unit: _Words.current.gapUnit,
       ),
     ],
   );

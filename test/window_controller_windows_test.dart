@@ -131,8 +131,13 @@ void main() {
             desktop: NoWindows(),
             placer: NoWindows(),
             readAccentPalette: read);
-    expect(await withReader(() => palette).accentColor(),
-        const AccentColors(light: 0xFF404142, dark: 0xFF101112));
+    expect(
+        await withReader(() => palette).accentColor(),
+        const AccentColors(
+            light: 0xFF404142,
+            dark: 0xFF101112,
+            linkLight: 0xFF505152,
+            linkDark: 0xFF000102));
     expect(await withReader(() => null).accentColor(), isNull);
     expect(await withReader(() => throw StateError('advapi32 went away'))
         .accentColor(), isNull, reason: 'display data never throws');

@@ -18,8 +18,10 @@ typedef AccentPaletteReader = Uint8List? Function();
 /// three darker shades, and an eighth no control uses. A light theme fills an
 /// accent control with the first darker shade and a dark theme with the
 /// second lighter one (the default blue: #0067C0 and #4CC2FF, measured on
-/// Windows 11 25H2), so those are the two returned. Null for a palette
-/// shorter than the eight.
+/// Windows 11 25H2), so those are the two fills returned. Link text is one
+/// shade further each way, WinUI's `AccentTextFillColorPrimary`: the second
+/// darker shade and the third lighter one (#003E92 and #99EBFF). Null for a
+/// palette shorter than the eight.
 ///
 /// Not `DwmGetColorizationColor`, which on the same machine answered
 /// 0xE3006FC4: the colour DWM blends into a window frame, not the accent.
@@ -32,7 +34,12 @@ AccentColors? accentFromPalette(Uint8List? palette) {
       palette[i * 4] << 16 |
       palette[i * 4 + 1] << 8 |
       palette[i * 4 + 2];
-  return AccentColors(light: shade(4), dark: shade(1));
+  return AccentColors(
+    light: shade(4),
+    dark: shade(1),
+    linkLight: shade(5),
+    linkDark: shade(0),
+  );
 }
 
 /// `AccentPalette` under

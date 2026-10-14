@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/key_chord.dart';
 import 'package:orthant/core/window_controller.dart';
+import 'package:orthant/core/windows_accent.dart';
 import 'package:orthant/permission/ready_screen.dart';
 import 'package:orthant/settings/general_pane.dart';
 import 'package:orthant/settings/keycap.dart';
@@ -22,6 +23,8 @@ import 'package:orthant/shortcuts/shortcut_command.dart';
 /// What differs is what the OS owns: the accent, what is drawn on it, the link
 /// colour, the focus ring and the keycaps' font. macOS's values are pinned
 /// exactly.
+import 'support/accent_palettes.dart';
+
 void main() {
   final both = TargetPlatformVariant(
       {TargetPlatform.macOS, TargetPlatform.windows});
@@ -127,13 +130,22 @@ void main() {
     expect(winLight.focusRing, FocusRingStyle.doubleStroke);
   });
 
+  double contrast(Color a, Color b) {
+    final (x, y) = (a.computeLuminance(), b.computeLuminance());
+    return (x > y ? x + 0.05 : y + 0.05) / (x > y ? y + 0.05 : x + 0.05);
+  }
+
   test('a link is macOS\'s link colour, which does not follow the accent, and '
-      'on Windows the accent', () {
+      'on Windows WinUI\'s link text, one shade past the accent\'s fill', () {
     // NSColor.linkColor, measured under the blue, purple and graphite accents
     // alike.
     expect(PlatformTokens.macLight.link, const Color(0xFF0068DA));
     expect(PlatformTokens.macDark.link, const Color(0xFF419CFF));
-    const purple = AccentColors(light: 0xFF953D96, dark: 0xFFA550A7);
+    const purple = AccentColors(
+        light: 0xFF953D96,
+        dark: 0xFFA550A7,
+        linkLight: 0xFF5B0C6D,
+        linkDark: 0xFFEFACF2);
     expect(
         PlatformTokens.of(TargetPlatform.macOS, Brightness.light,
                 accent: purple)
@@ -144,17 +156,57 @@ void main() {
                 accent: purple)
             .link,
         const Color(0xFF419CFF));
-    for (final t in [PlatformTokens.windowsLight, PlatformTokens.windowsDark]) {
-      expect(t.link, t.accent, reason: 'the default palette');
-    }
-    for (final (b, shade) in [
-      (Brightness.light, const Color(0xFF953D96)),
-      (Brightness.dark, const Color(0xFFA550A7)),
+    // The default blue's AccentTextFillColorPrimary, before any is read.
+    expect(PlatformTokens.windowsLight.link, const Color(0xFF003E92));
+    expect(PlatformTokens.windowsDark.link, const Color(0xFF99EBFF));
+    for (final (b, fill, link) in [
+      (Brightness.light, const Color(0xFF953D96), const Color(0xFF5B0C6D)),
+      (Brightness.dark, const Color(0xFFA550A7), const Color(0xFFEFACF2)),
     ]) {
       final t = PlatformTokens.of(TargetPlatform.windows, b, accent: purple);
-      expect(t.accent, shade);
-      expect(t.link, shade, reason: 'a custom palette, $b');
+      expect(t.accent, fill);
+      expect(t.link, link, reason: 'a custom palette, $b');
     }
+  });
+
+  test('on Windows a link reads at 4.5:1 or better on the window and on a '
+      'card, in every accent measured, in both themes', () {
+    for (final MapEntry(key: name, value: palette)
+        in measuredPalettes.entries) {
+      final accent = accentFromPalette(paletteBytes(palette))!;
+      for (final b in Brightness.values) {
+        final t = PlatformTokens.of(TargetPlatform.windows, b, accent: accent);
+        for (final ground in [t.windowBackground, t.contentBackground]) {
+          expect(contrast(t.link, ground), greaterThanOrEqualTo(4.5),
+              reason: '$name, $b, on $ground: ${t.link}');
+        }
+      }
+    }
+  });
+
+  test('a link already that readable is WinUI\'s exactly, and one that is not '
+      'is moved only as far as it must', () {
+    final blue = accentFromPalette(paletteBytes(measuredPalettes['blue']!))!;
+    final light = PlatformTokens.of(TargetPlatform.windows, Brightness.light,
+        accent: blue);
+    expect(light.link, const Color(0xFF003E92));
+    // Yellow gold's darker shade, #9B5D00, reads 4.495:1 on the window's
+    // #ECECEE (4.78:1 on WinUI's own #F3F3F3): darkened just past the line.
+    final gold =
+        accentFromPalette(paletteBytes(measuredPalettes['yellow gold']!))!;
+    final t = PlatformTokens.of(TargetPlatform.windows, Brightness.light,
+        accent: gold);
+    expect(t.link, isNot(const Color(0xFF9B5D00)));
+    expect(contrast(t.link, t.windowBackground), greaterThanOrEqualTo(4.5));
+    expect(contrast(t.link, t.windowBackground), lessThan(4.7),
+        reason: 'no further than needed');
+    // Where a link has no shade of its own, it is the fill, made readable
+    // the same way: purple's fill reads 3.4:1 on a dark card.
+    const fillOnly = AccentColors(light: 0xFF953D96, dark: 0xFFA550A7);
+    final d = PlatformTokens.of(TargetPlatform.windows, Brightness.dark,
+        accent: fillOnly);
+    expect(d.accent, const Color(0xFFA550A7));
+    expect(contrast(d.link, d.contentBackground), greaterThanOrEqualTo(4.5));
   });
 
   test('the theme carries the tokens and makes the accent Material\'s primary',
@@ -201,7 +253,7 @@ void main() {
         Color.lerp(a.windowBackground, b.windowBackground, 0.5));
     for (final t in [0.0, 0.5, 1.0]) {
       expect(a.lerp(b, t).accent, b.accent, reason: 'at $t');
-      // On Windows a link is the accent, so it snaps with it.
+      // On Windows a link follows the accent, so it snaps with it.
       expect(a.lerp(b, t).link, b.link, reason: 'at $t');
     }
   });
@@ -479,9 +531,12 @@ void main() {
   // that is not the accent (a purple one here, so the two cannot be mistaken),
   // and on Windows it is the accent.
   group('links', () {
-    const purple = AccentColors(light: 0xFF953D96, dark: 0xFFA550A7);
+    // Violet red as Windows computed it: the dark theme's link is its
+    // lightest shade, #EFACF2, where the fill is #D95BE6.
+    final purple =
+        accentFromPalette(paletteBytes(measuredPalettes['violet red']!))!;
     const macLink = Color(0xFF419CFF);
-    const windowsLink = Color(0xFFA550A7);
+    const windowsLink = Color(0xFFEFACF2);
 
     Future<void> pumpIn(
         WidgetTester tester, TargetPlatform platform, Widget child) async {
@@ -518,7 +573,8 @@ void main() {
       expect(textColor(tester, 'Change…'), macLink);
     });
 
-    testWidgets('General\'s Change… is the accent on Windows', (tester) async {
+    testWidgets('General\'s Change… is WinUI\'s link text on Windows',
+        (tester) async {
       await pumpIn(tester, TargetPlatform.windows, general());
       expect(textColor(tester, 'Change…'), windowsLink);
     });
@@ -577,7 +633,8 @@ void main() {
           reason: 'the notice\'s action');
     });
 
-    testWidgets('the shortcuts pane\'s links are the accent on Windows',
+    testWidgets('the shortcuts pane\'s links are WinUI\'s link text on '
+        'Windows',
         (tester) async {
       await pumpIn(
           tester,

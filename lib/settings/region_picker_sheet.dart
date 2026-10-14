@@ -146,6 +146,10 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
   late KeyChord? _chord = widget.initialChord;
   bool _recording = false;
 
+  /// Why the last key pressed while recording could not be used, if it could
+  /// not (`RecordingField.onRefused`); gone with the recording.
+  String? _refusal;
+
   /// The cell the pointer went down on — the drag's true anchor.
   Cell? _pressCell;
 
@@ -273,7 +277,10 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
   Future<void> _startRecording() async {
     await widget.onCaptureStart?.call();
     if (!mounted) return;
-    setState(() => _recording = true);
+    setState(() {
+      _recording = true;
+      _refusal = null;
+    });
   }
 
   /// End the recording, applying [combo] if one was pressed.
@@ -304,6 +311,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
           _takeAnyway = false;
         }
         _recording = false;
+        _refusal = null;
       });
       // The recorder's node goes with it, so take focus back or the sheet is
       // left with none and Return reaches nobody.
@@ -430,6 +438,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
                   const SizedBox(height: 10),
                   _shortcutRow(t),
                   if (_conflict != null) _conflictNotice(t),
+                  if (_refusal != null) _refusalNotice(t, _refusal!),
                   const SizedBox(height: 16),
                   _buttons(t),
                 ],
@@ -555,6 +564,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
                 verticalPadding: 4,
                 onCombo: (combo) => _stopRecording(combo: combo),
                 onCancel: _stopRecording,
+                onRefused: (why) => setState(() => _refusal = why),
               )
             : MacControl(
                 key: const ValueKey('region-record'),
@@ -626,6 +636,16 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
           ),
         ],
       ],
+    ),
+  );
+
+  /// Why a key pressed while recording was not used, under the field it was
+  /// pressed in, while the field goes on listening.
+  Widget _refusalNotice(PlatformTokens t, String why) => Padding(
+    padding: const EdgeInsets.only(left: 62, top: 7),
+    child: Text(
+      why,
+      style: TextStyle(fontSize: 11, height: 1.35, color: t.labelSecondary),
     ),
   );
 

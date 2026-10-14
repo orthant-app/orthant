@@ -196,6 +196,13 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   bool _presenting = false;
 
   CommandRef? _recording;
+
+  /// Why the last key pressed on the listening row could not be used, if it
+  /// could not (`RecordingField.onRefused`). Drawn only under the row that is
+  /// listening, and cleared at the next usable chord and whenever a row starts
+  /// listening, this one or another.
+  String? _refusal;
+
   CommandRef? _hovered;
   CommandRef? _focused;
   /// Which row a screen reader's cursor is on. Tracked apart from [_focused]
@@ -273,6 +280,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
         _pending = null;
       }
       _recording = cmd;
+      _refusal = null;
     });
     await widget.onCaptureStart?.call();
   }
@@ -1255,7 +1263,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
     final isHovered =
         _hovered == cmd || _focused == cmd || _readerOn == cmd;
 
-    return MouseRegion(
+    final row = MouseRegion(
       // Hover stays on its own MouseRegion rather than moving to
       // FocusableActionDetector's callback: that callback did not fire for this
       // row, and what it drives — the only way to clear a binding — is too
@@ -1388,8 +1396,15 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
                     // The combination in question, on the row it was pressed
                     // on, so the footer's sentence has a visible subject.
                     pending: _pending?.row == cmd ? _pending!.chord : null,
-                    onCombo: (combo) => _commit(cmd, combo),
+                    onCombo: (combo) {
+                      if (_refusal != null) setState(() => _refusal = null);
+                      _commit(cmd, combo);
+                    },
                     onCancel: _stopRecording,
+                    // Beside the recorder, under its row ([_refusalLine]),
+                    // not in the footer, where the question about a taken
+                    // chord and an Undo live and must not be displaced.
+                    onRefused: (why) => setState(() => _refusal = why),
                   ),
                 )
               else ...[
@@ -1484,7 +1499,29 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
         ),
       ),
     );
+    // One wrapper for every row, refused or not: a line appearing must not
+    // change what the row is built under, which would rebuild the recorder
+    // and lose the modifiers it is showing as held.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        row,
+        if (isRecording && _refusal != null) _refusalLine(t, _refusal!),
+      ],
+    );
   }
+
+  /// Why a key pressed on the listening row was not used, under its recorder.
+  /// Outside the row's control, whose label replaces everything inside it, so
+  /// a screen reader can find the sentence again after hearing it once.
+  Widget _refusalLine(PlatformTokens t, String why) => Padding(
+    padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+    child: Text(
+      why,
+      textAlign: TextAlign.right,
+      style: TextStyle(fontSize: 11, height: 1.35, color: t.labelSecondary),
+    ),
+  );
 }
 
 class _ClearButton extends StatelessWidget {

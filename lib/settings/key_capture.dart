@@ -9,9 +9,9 @@ import '../core/windows_keys.dart';
 ///
 /// On Windows the key must also have a virtual key to register
 /// ([windowsVirtualKey]): a keypad digit has none, since it is a different
-/// virtual key in each NumLock state. Refused here, the press is ignored and
-/// the recorder keeps listening, rather than recording a shortcut that could
-/// never fire.
+/// virtual key in each NumLock state. Refused here, the recorder keeps
+/// listening, rather than recording a shortcut that could never fire, and
+/// says why ([refusalFor]).
 ///
 /// Both of the key's identities come from this one event: its position, which
 /// macOS registers, and what it typed under the current layout, which Windows
@@ -34,6 +34,48 @@ KeyChord? chordFromKeyEvent(KeyEvent event) {
     modifiers: modifiers,
   );
 }
+
+/// What the recorder says when a key cannot be part of a shortcut on Windows:
+/// the keypad's digits, decimal point and = (each is a different virtual key
+/// in each NumLock state, so no registration fires in both), or a key Windows
+/// has no virtual key for at all.
+const keypadRefusal =
+    "Windows can't use the keypad's digits, decimal point or = in a shortcut.";
+const unregistrableRefusal = "Windows can't use that key in a shortcut.";
+
+/// Why [event], pressed with a modifier held, cannot be recorded on this
+/// platform: a sentence for the person recording, or null when it records, or
+/// when there is nothing to explain (a modifier on its own, a bare key, Tab:
+/// the footer already says a combination needs a modifier). Only Windows
+/// refuses keys this way; on macOS every bindable key registers.
+String? refusalFor(KeyEvent event) {
+  if (defaultTargetPlatform != TargetPlatform.windows) return null;
+  final physical = event.physicalKey.usbHidUsage;
+  if (!isBindableKey(physical) || heldModifiers().isEmpty) return null;
+  final logical = event.logicalKey.keyId;
+  if (windowsVirtualKey(windowsKeyId(logical, physical)) != null) return null;
+  return _keypadUnregistrable.contains(logical)
+      ? keypadRefusal
+      : unregistrableRefusal;
+}
+
+final _keypadUnregistrable = {
+  for (final key in [
+    LogicalKeyboardKey.numpad0,
+    LogicalKeyboardKey.numpad1,
+    LogicalKeyboardKey.numpad2,
+    LogicalKeyboardKey.numpad3,
+    LogicalKeyboardKey.numpad4,
+    LogicalKeyboardKey.numpad5,
+    LogicalKeyboardKey.numpad6,
+    LogicalKeyboardKey.numpad7,
+    LogicalKeyboardKey.numpad8,
+    LogicalKeyboardKey.numpad9,
+    LogicalKeyboardKey.numpadDecimal,
+    LogicalKeyboardKey.numpadEqual,
+  ])
+    key.keyId,
+};
 
 /// The modifiers held down right now.
 ///

@@ -416,6 +416,40 @@ void main() {
         reason: 'centred in the card');
   }, variant: windows);
 
+  testWidgets('on Windows a chord wider than its card shrinks to fit it',
+      (tester) async {
+    // Every modifier and the longest key name: in the test font, which draws
+    // each character a font size wide, far wider than a card at 560.
+    final summon = Binding(
+        const BuiltIn(ShortcutCommand.showGrid),
+        KeyChord(
+          physical: usPhysicalFor(LogicalKeyboardKey.backspace.keyId)!,
+          logical: LogicalKeyboardKey.backspace.keyId,
+          modifiers: Modifiers.ctrl |
+              Modifiers.alt |
+              Modifiers.shift |
+              Modifiers.meta,
+        ));
+    await pumpHost(
+        tester,
+        ReadyScreen(
+          bindings: withRebind(runningDefaults(), summon),
+          unavailable: const {},
+          onDone: () {},
+          onOpenShortcuts: () {},
+        ));
+    expect(tester.takeException(), isNull, reason: 'no overflow');
+    final chord = tester.getRect(find.byType(KeycapRow).first);
+    final card = tester.getRect(find
+        .ancestor(
+            of: find.byType(KeycapRow).first, matching: find.byType(Container))
+        .first);
+    expect(chord.left, greaterThanOrEqualTo(card.left));
+    expect(chord.right, lessThanOrEqualTo(card.right));
+    expect(chord.width, lessThan(tester.getSize(find.byType(KeycapRow).first).width),
+        reason: 'scaled down, not clipped');
+  }, variant: windows);
+
   testWidgets('on macOS two chords rebound to four modifiers share a line, '
       'scaled down, where the row before R1 ran past the card',
       (tester) async {

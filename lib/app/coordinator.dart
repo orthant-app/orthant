@@ -82,6 +82,7 @@ class OrthantCoordinator extends ChangeNotifier {
     CommandQueue? commands,
     this.pollPeriod = const Duration(milliseconds: 1500),
     this.debugPlacementItems = false,
+    this.permissionGate = true,
   }) : _bindingsStore = bindingsStore ?? BindingsStore(),
        _settingsStore = settingsStore ?? SettingsStore(),
        _commands = commands ?? CommandQueue() {
@@ -109,6 +110,13 @@ class OrthantCoordinator extends ChangeNotifier {
   /// acceptance until W2's hotkeys do, and never appear on macOS or in a
   /// release.
   final bool debugPlacementItems;
+
+  /// Whether the platform has a permission a first launch asks for: macOS's
+  /// Accessibility grant. Where it does, a launch that finds the grant before
+  /// anything was ever shown is a reinstall and opens nothing. Windows has
+  /// none, so every first launch is genuine and opens the ready screen, the
+  /// one screen that names the grid's chord (`main.dart` passes false there).
+  final bool permissionGate;
 
   Timer? _poll;
 
@@ -162,7 +170,14 @@ class OrthantCoordinator extends ChangeNotifier {
   ///
   /// Notifies even when [screen] is already up, so a pane switch on an open
   /// window (`openSettings` with another tab) is drawn.
+  ///
+  /// Anything that replaces the ready screen retires it, as Done does: the
+  /// tray's Settings... over a first launch's ready screen (to turn on launch
+  /// at login, say) would otherwise leave it to come back at the next launch.
   Future<void> _show(AppScreen screen) async {
+    if (_screen == AppScreen.ready && screen != AppScreen.ready) {
+      await _settingsStore.markOnboarded();
+    }
     await refreshAccent();
     _screen = screen;
     notifyListeners();
@@ -240,7 +255,7 @@ class OrthantCoordinator extends ChangeNotifier {
     if (permissions.granted) {
       _unavailable = await hotkeys.apply(_bindings);
       if (!await _settingsStore.hasOnboarded() &&
-          await _settingsStore.hasStartedOnboarding()) {
+          (!permissionGate || await _settingsStore.hasStartedOnboarding())) {
         // Onboarding was shown, never finished, and the grant is here now: they
         // read that window, went to System Settings and granted — with Orthant
         // quit in between, which is an ordinary way to do it. Marking onboarding
@@ -579,8 +594,17 @@ class OrthantCoordinator extends ChangeNotifier {
   /// the next rebind or relaunch. Re-applying is idempotent, so it costs nothing
   /// to do it on every close rather than track whether a recording was in
   /// flight.
+  ///
+  /// Closing the ready screen retires it, as Done does: it was seen, and on
+  /// Windows, where a first launch shows it, a window closed unread would
+  /// otherwise come back at every launch, every login included. Closing
+  /// onboarding does not: the ready screen is still owed after the grant.
   Future<void> onConfigWindowClosed() async {
+    final wasReady = _screen == AppScreen.ready;
+    // Emptied before anything is awaited, so a show landing in the await
+    // cannot have its screen overwritten on a visible window.
     _set(AppScreen.none);
+    if (wasReady) await _settingsStore.markOnboarded();
     if (permissions.granted) _unavailable = await hotkeys.apply(_bindings);
     notifyListeners();
   }

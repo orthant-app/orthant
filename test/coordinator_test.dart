@@ -203,6 +203,7 @@ void main() {
   ({OrthantCoordinator app, _FakeWc wc, _FakeRegistrar keys}) build({
     bool granted = false,
     bool debugPlacementItems = false,
+    bool permissionGate = true,
   }) {
     final wc = _FakeWc()..permission = granted;
     final keys = _FakeRegistrar();
@@ -214,6 +215,7 @@ void main() {
       // are driven by calling refresh directly.
       pollPeriod: const Duration(hours: 1),
       debugPlacementItems: debugPlacementItems,
+      permissionGate: permissionGate,
     );
     built.add(app);
     return (app: app, wc: wc, keys: keys);
@@ -659,6 +661,106 @@ void main() {
       expect(entry.disabled, isFalse,
           reason: 'updating has nothing to do with the Accessibility grant — '
               'greying it would strand an ungranted user on a broken version');
+    });
+  });
+
+  group('the first launch where there is no permission to ask for', () {
+    // Windows: nothing to grant, so every first launch is genuine and opens
+    // the ready screen, the one screen that names the grid's chord.
+    _Harness windows() => build(granted: true, permissionGate: false);
+
+    test('opens the ready screen, with the shortcuts already live', () async {
+      final t = windows();
+      await t.app.start();
+      expect(t.app.screen, AppScreen.ready);
+      expect(t.wc.calls, contains('show'));
+      expect(t.wc.calls, isNot(contains('hide')));
+      expect(t.keys.applied, hasLength(1),
+          reason: 'the chords it names already work');
+      expect(await SettingsStore().hasOnboarded(), isFalse,
+          reason: 'retired by Done or by closing it, not by being shown');
+    });
+
+    test('a launch after Done opens nothing', () async {
+      final first = windows();
+      await first.app.start();
+      await first.app.finishOnboarding();
+      expect(first.app.screen, AppScreen.none);
+
+      final second = windows();
+      await second.app.start();
+      expect(second.app.screen, AppScreen.none);
+      expect(second.wc.calls, isNot(contains('show')));
+    });
+
+    test('closing it retires it too', () async {
+      final first = windows();
+      await first.app.start();
+      await first.app.onConfigWindowClosed();
+      expect(await SettingsStore().hasOnboarded(), isTrue);
+
+      final second = windows();
+      await second.app.start();
+      expect(second.app.screen, AppScreen.none,
+          reason: 'a window closed unread is not shown again at every login');
+    });
+
+    test('anything that replaces it retires it, as Done does', () async {
+      // The tray's Settings... (to turn on launch at login, say) replaces the
+      // ready screen in the same window; closing that window must not bring
+      // the ready screen back at the next launch.
+      final first = windows();
+      await first.app.start();
+      await first.app.openSettings();
+      await first.app.onConfigWindowClosed();
+      expect(await SettingsStore().hasOnboarded(), isTrue);
+
+      final second = windows();
+      await second.app.start();
+      expect(second.app.screen, AppScreen.none);
+    });
+
+    test('the tray never asks for a grant', () async {
+      final t = windows();
+      await t.app.start();
+      expect(t.app.trayMenu.map((e) => e.key), isNot(contains('permission')));
+    });
+  });
+
+  group('closing the ready screen', () {
+    test('retires it on macOS too: a close is having seen it', () async {
+      final first = build();
+      await first.app.start();
+      first.wc.permission = true;
+      await first.app.permissions.refresh();
+      await first.app.permissionSettled;
+      expect(first.app.screen, AppScreen.ready);
+      await first.app.onConfigWindowClosed();
+      expect(await SettingsStore().hasOnboarded(), isTrue);
+
+      final second = build(granted: true);
+      await second.app.start();
+      expect(second.app.screen, AppScreen.none);
+    });
+
+    test('on macOS too, anything that replaces it retires it', () async {
+      final t = build();
+      await t.app.start();
+      t.wc.permission = true;
+      await t.app.permissions.refresh();
+      await t.app.permissionSettled;
+      expect(t.app.screen, AppScreen.ready);
+      await t.app.openSettings();
+      expect(await SettingsStore().hasOnboarded(), isTrue);
+    });
+
+    test('closing onboarding does not: the ready screen is still owed',
+        () async {
+      final t = build();
+      await t.app.start();
+      expect(t.app.screen, AppScreen.onboarding);
+      await t.app.onConfigWindowClosed();
+      expect(await SettingsStore().hasOnboarded(), isFalse);
     });
   });
 

@@ -98,8 +98,9 @@ std::optional<std::vector<HotkeyRequest>> ParseHotkeys(
 
 WindowChannel::WindowChannel(flutter::BinaryMessenger* messenger,
                              HWND config_window,
-                             WindowsOverlaySet* overlays)
-    : config_window_(config_window), overlays_(overlays) {
+                             WindowsOverlaySet* overlays,
+                             ConfigWindow* config)
+    : config_window_(config_window), overlays_(overlays), config_(config) {
   channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
       messenger, kChannelName, &flutter::StandardMethodCodec::GetInstance());
   channel_->SetMethodCallHandler(
@@ -202,27 +203,21 @@ void WindowChannel::HandleMethodCall(
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
   const std::string& method = call.method_name();
   if (method == "showConfigWindow") {
-    // A minimized window shown with SW_SHOW stays minimized; restore it.
     // Dart asks for this window from the tray, from the grid's Ctrl+S (its
     // picker opens here once overlaySaveRegion has placed the captured
-    // window), and at launch and on a lost permission for the onboarding. In
-    // the first two SetForegroundWindow succeeds because the click or the
-    // WM_HOTKEY that started them granted the process foreground rights.
-    ShowWindow(config_window_,
-               IsIconic(config_window_) ? SW_RESTORE : SW_SHOW);
-    SetForegroundWindow(config_window_);
+    // window), and at a first launch for the ready screen. In the first two
+    // SetForegroundWindow succeeds because the click or the WM_HOTKEY that
+    // started them granted the process foreground rights; a first launch has
+    // them as the process the user just started.
+    config_->Show();
     result->Success();
   } else if (method == "hideConfigWindow") {
-    ShowWindow(config_window_, SW_HIDE);
+    config_->Hide();
     result->Success();
   } else if (method == "configFirstFrame") {
-    // On macOS this signal is load-bearing: native shows the window
-    // transparent and waits for Dart's first frame before revealing it, so
-    // the pane appears already painted instead of as a black rectangle
-    // filling in. W0's showConfigWindow shows the window directly, so there
-    // is nothing here to reveal yet, but the method must still be answered
-    // rather than refused, because the Dart caller does not catch. W5 owns
-    // the real reveal-on-first-frame, with a deadline.
+    // The screen has drawn: a show waiting for it is revealed (ConfigWindow),
+    // as on macOS. Every screen sends it, and a show not waiting ignores it.
+    config_->FirstFrame();
     result->Success();
   } else if (method == "replaceHotkeys") {
     const auto refused = ReplaceHotkeys(call.arguments());

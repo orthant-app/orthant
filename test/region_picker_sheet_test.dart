@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' show PointerDeviceKind, Tristate;
 
+import 'package:flutter/gestures.dart' show kSecondaryMouseButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
@@ -191,6 +192,122 @@ void main() {
 
     expect(submitted!.region.c0, 0);
     expect(submitted!.region.c1, 3);
+  });
+
+  group('which pointer draws', () {
+    // The press anchors for any button and any pointer, as it did before the
+    // grid learned to scroll. The drawing that follows is the pan's old rule:
+    // the pressing pointer, with its primary button or contact.
+    Offset centre(WidgetTester tester, int c, int r) {
+      final grid = tester.getRect(find.byKey(const ValueKey('region-grid')));
+      return grid.topLeft +
+          Offset(grid.width / 6 * (c + 0.5), grid.height / 6 * (r + 0.5));
+    }
+
+    testWidgets('a right-button drag selects the pressed cell and no more',
+        (tester) async {
+      RegionDraft? submitted;
+      await tester.pumpWidget(_host(RegionPickerSheet(
+        gridCols: 6,
+        gridRows: 6,
+        onSubmit: (d) => submitted = d,
+        onCancel: () {},
+      )));
+
+      final mouse = await tester.createGesture(
+        kind: PointerDeviceKind.mouse,
+        buttons: kSecondaryMouseButton,
+      );
+      await mouse.addPointer(location: centre(tester, 1, 1));
+      addTearDown(mouse.removePointer);
+      await mouse.down(centre(tester, 1, 1));
+      await tester.pump();
+      await mouse.moveTo(centre(tester, 3, 1));
+      await tester.pump();
+      await mouse.moveTo(centre(tester, 4, 4));
+      await tester.pump();
+      await mouse.up();
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('region-submit')));
+      await tester.pumpAndSettle();
+
+      expect(submitted, isNotNull);
+      expect(submitted!.region.c0, 1);
+      expect(submitted!.region.c1, 1);
+      expect(submitted!.region.r0, 1);
+      expect(submitted!.region.r1, 1);
+    });
+
+    testWidgets('only the pointer that pressed last draws', (tester) async {
+      RegionDraft? submitted;
+      await tester.pumpWidget(_host(RegionPickerSheet(
+        gridCols: 6,
+        gridRows: 6,
+        onSubmit: (d) => submitted = d,
+        onCancel: () {},
+      )));
+
+      // The sheet stays open on submit here, so the selection can be read
+      // while both fingers are still down.
+      Future<RegionDraft> selection() async {
+        submitted = null;
+        await tester.tap(find.byKey(const ValueKey('region-submit')));
+        await tester.pump();
+        return submitted!;
+      }
+
+      final first = await tester.startGesture(centre(tester, 1, 1));
+      await tester.pump();
+      final second = await tester.startGesture(centre(tester, 4, 4));
+      await tester.pump();
+
+      // The second press re-anchors, as any press does. The first finger,
+      // moving on, no longer draws.
+      await first.moveTo(centre(tester, 2, 3));
+      await tester.pump();
+      var s = (await selection()).region;
+      expect([s.c0, s.c1, s.r0, s.r1], [4, 4, 4, 4]);
+
+      // The second finger is the one that pressed last: it draws.
+      await second.moveTo(centre(tester, 2, 3));
+      await tester.pump();
+      s = (await selection()).region;
+      expect([s.c0, s.c1, s.r0, s.r1], [2, 4, 3, 4]);
+
+      await first.up();
+      await second.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('a primary-button mouse drag still draws', (tester) async {
+      RegionDraft? submitted;
+      await tester.pumpWidget(_host(RegionPickerSheet(
+        gridCols: 6,
+        gridRows: 6,
+        onSubmit: (d) => submitted = d,
+        onCancel: () {},
+      )));
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: centre(tester, 1, 2));
+      addTearDown(mouse.removePointer);
+      await mouse.down(centre(tester, 1, 2));
+      await tester.pump();
+      await mouse.moveTo(centre(tester, 3, 2));
+      await tester.pump();
+      await mouse.up();
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('region-submit')));
+      await tester.pumpAndSettle();
+
+      expect(submitted, isNotNull);
+      expect(submitted!.region.c0, 1);
+      expect(submitted!.region.c1, 3);
+      expect(submitted!.region.r0, 2);
+      expect(submitted!.region.r1, 2);
+    });
   });
 
   testWidgets('the name fills in from the shape drawn', (tester) async {

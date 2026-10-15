@@ -1,4 +1,5 @@
-import 'package:flutter/gestures.dart' show EagerGestureRecognizer;
+import 'package:flutter/gestures.dart'
+    show EagerGestureRecognizer, kPrimaryButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -153,6 +154,9 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
 
   /// The cell the pointer went down on — the drag's true anchor.
   Cell? _pressCell;
+
+  /// The pointer that went down last, the only one whose moves draw.
+  int? _pressPointer;
 
   /// Whether the grid holds keyboard focus, so it can draw a ring. Without one
   /// a keyboard user tabs into it, sees nothing change, and then finds the
@@ -372,83 +376,91 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
       // Scrolls in a window shorter than the sheet: on Windows the window's
       // floor gives way to a short screen's work area (a 768-pixel screen at
       // 200 % leaves about 300 points), and Save sat below the bottom edge.
-      // A sheet that fits takes no drag, so the grid keeps every one.
-      child: SingleChildScrollView(
+      // A sheet that fits takes no drag, so the grid keeps every one. The
+      // margin is outside the scroll view because a Scrollable hit-tests as
+      // opaque over its padding too, which hid it from the route's barrier.
+      child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        // Its own Material, because the sheet is presented in a dialog route
-        // with no Scaffold above it — and a TextField without one throws at
-        // build time, which in a Release build is a featureless grey box
-        // rather than an error anybody can read.
-        child: Material(
-          type: MaterialType.transparency,
-          // Return is the default button, as it is in every macOS dialog — but
-          // only when nothing is listening for a combination, because ⌃⌥↩ is a
-          // perfectly ordinary shortcut to want to record (it is Maximize's
-          // default).
-          // CallbackShortcuts must be an ANCESTOR of the focused node: key
-          // events travel *up* the focus chain, so a shortcut widget nested
-          // below the node that holds focus is simply never on the path.
-          child: CallbackShortcuts(
-            bindings: {
-              const SingleActivator(LogicalKeyboardKey.enter): () {
-                if (_canSubmit) _submit();
+        child: SingleChildScrollView(
+          // Its own Material, because the sheet is presented in a dialog route
+          // with no Scaffold above it — and a TextField without one throws at
+          // build time, which in a Release build is a featureless grey box
+          // rather than an error anybody can read.
+          child: Material(
+            type: MaterialType.transparency,
+            // Return is the default button, as it is in every macOS dialog —
+            // but only when nothing is listening for a combination, because
+            // ⌃⌥↩ is a perfectly ordinary shortcut to want to record (it is
+            // Maximize's default).
+            // CallbackShortcuts must be an ANCESTOR of the focused node: key
+            // events travel *up* the focus chain, so a shortcut widget nested
+            // below the node that holds focus is simply never on the path.
+            child: CallbackShortcuts(
+              bindings: {
+                const SingleActivator(LogicalKeyboardKey.enter): () {
+                  if (_canSubmit) _submit();
+                },
+                const SingleActivator(LogicalKeyboardKey.numpadEnter): () {
+                  if (_canSubmit) _submit();
+                },
               },
-              const SingleActivator(LogicalKeyboardKey.numpadEnter): () {
-                if (_canSubmit) _submit();
-              },
-            },
-            // And an anchor below it, so the subtree always holds focus. With
-            // nothing focused — after a recording is cancelled, say — Return
-            // would reach nobody. skipTraversal keeps it out of the Tab order.
-            child: Focus(
-              focusNode: _anchorNode,
-              autofocus: true,
-              skipTraversal: true,
-              child: Container(
-                width: 344,
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-                decoration: BoxDecoration(
-                  color: t.windowBackground,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: t.separator),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x33000000),
-                      blurRadius: 24,
-                      offset: Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      _creating ? 'New region' : 'Edit region',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: t.labelPrimary,
+              // And an anchor below it, so the subtree always holds focus. With
+              // nothing focused — after a recording is cancelled, say — Return
+              // would reach nobody. skipTraversal keeps it out of the Tab
+              // order.
+              child: Focus(
+                focusNode: _anchorNode,
+                autofocus: true,
+                skipTraversal: true,
+                child: Container(
+                  width: 344,
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+                  decoration: BoxDecoration(
+                    color: t.windowBackground,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: t.separator),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x33000000),
+                        blurRadius: 24,
+                        offset: Offset(0, 8),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    _grid(t),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Drag to draw · arrows to move, '
-                      '${KeyWords.current.shiftName} to extend',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 10.5, color: t.labelTertiary),
-                    ),
-                    const SizedBox(height: 14),
-                    _nameField(t),
-                    const SizedBox(height: 10),
-                    _shortcutRow(t),
-                    if (_conflict != null) _conflictNotice(t),
-                    if (_refusal != null) _refusalNotice(t, _refusal!),
-                    const SizedBox(height: 16),
-                    _buttons(t),
-                  ],
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        _creating ? 'New region' : 'Edit region',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: t.labelPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      _grid(t),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Drag to draw · arrows to move, '
+                        '${KeyWords.current.shiftName} to extend',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: t.labelTertiary,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      _nameField(t),
+                      const SizedBox(height: 10),
+                      _shortcutRow(t),
+                      if (_conflict != null) _conflictNotice(t),
+                      if (_refusal != null) _refusalNotice(t, _refusal!),
+                      const SizedBox(height: 16),
+                      _buttons(t),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -483,7 +495,9 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
               // (an EagerGestureRecognizer): when the window is too short for
               // the sheet, its scroll view would otherwise take a finger's or
               // a pen's vertical drag that started here. A trackpad's
-              // two-finger scroll is no press, and still scrolls it.
+              // two-finger scroll is no press, and still scrolls it. Moves
+              // draw only for the pressing pointer's primary button or
+              // contact, as the pan they replaced did.
               child: RawGestureDetector(
                 gestures: {
                   EagerGestureRecognizer:
@@ -499,11 +513,16 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
                     focusNode.requestFocus();
                     final c = _cellAt(e.localPosition);
                     _pressCell = c;
+                    _pressPointer = e.pointer;
                     _select(c, c);
                   },
                   onPointerMove: (e) {
                     final anchor = _pressCell;
                     if (anchor == null) return;
+                    if (e.pointer != _pressPointer ||
+                        (e.buttons & kPrimaryButton) == 0) {
+                      return;
+                    }
                     _select(anchor, _cellAt(e.localPosition));
                   },
                   child: CustomPaint(

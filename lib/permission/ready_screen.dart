@@ -230,6 +230,7 @@ class ReadyScreen extends StatelessWidget {
     );
     return FirstFrameReport(
       name: 'ready',
+      onMacOS: false,
       child: Scaffold(
         backgroundColor: t.windowBackground,
         body: LayoutBuilder(

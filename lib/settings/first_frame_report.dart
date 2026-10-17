@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart' show kReleaseMode;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kReleaseMode;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -15,10 +16,22 @@ import '../core/channel.dart';
 ///
 /// Once per screen: a rebuild of the same screen is not a new one.
 class FirstFrameReport extends StatefulWidget {
-  const FirstFrameReport({super.key, required this.name, required this.child});
+  const FirstFrameReport({
+    super.key,
+    required this.name,
+    this.onMacOS = true,
+    required this.child,
+  });
 
   /// For the timing line in Debug and Profile: which screen drew.
   final String name;
+
+  /// False for a screen macOS reveals by its fallback instead. macOS reveals
+  /// on this report, which follows the frame's build rather than its
+  /// presentation, and a screen that is a cold engine's first frame (the
+  /// ready and onboarding screens, at launch) was not shown to be painted by
+  /// then. Windows waits for the presented frame, so reports everywhere.
+  final bool onMacOS;
   final Widget child;
 
   @override
@@ -29,6 +42,9 @@ class _FirstFrameReportState extends State<FirstFrameReport> {
   @override
   void initState() {
     super.initState();
+    if (!widget.onMacOS && defaultTargetPlatform == TargetPlatform.macOS) {
+      return;
+    }
     final built = DateTime.now();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Not kDebugMode: profile builds are the ones worth timing, and that

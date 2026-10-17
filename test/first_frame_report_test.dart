@@ -43,6 +43,20 @@ void main() {
         onRebound: (_) {},
       );
 
+  final macOS = TargetPlatformVariant.only(TargetPlatform.macOS);
+
+  testWidgets('on macOS the ready screen leaves its reveal to the fallback, '
+      'and the settings window still reports', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(600, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(app(ready()));
+    await tester.pump();
+    expect(calls, isEmpty);
+    await tester.pumpWidget(app(settings()));
+    await tester.pump();
+    expect(calls, ['configFirstFrame']);
+  }, variant: macOS);
+
   testWidgets('the ready screen reports its first frame, once', (tester) async {
     await tester.pumpWidget(app(ready()));
     await tester.pump();

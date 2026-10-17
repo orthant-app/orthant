@@ -25,6 +25,7 @@ class OnboardingScreen extends StatelessWidget {
     final t = context.tokens;
     return FirstFrameReport(
       name: 'onboarding',
+      onMacOS: false,
       child: Scaffold(
         backgroundColor: t.windowBackground,
         body: Center(

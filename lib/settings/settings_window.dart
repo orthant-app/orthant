@@ -1,8 +1,4 @@
-import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
-import '../core/channel.dart';
 import 'package:flutter/semantics.dart';
 
 import '../core/window_controller.dart';
@@ -11,6 +7,7 @@ import '../shortcuts/command_ref.dart';
 import '../shortcuts/custom_region.dart';
 import '../shortcuts/shortcut_command.dart';
 import 'about_pane.dart';
+import 'first_frame_report.dart';
 import 'general_pane.dart';
 import 'mac_control.dart';
 import 'platform_theme.dart';
@@ -125,28 +122,6 @@ class _SettingsWindowState extends State<SettingsWindow> {
   };
 
   @override
-  void initState() {
-    super.initState();
-    final built = DateTime.now();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Not kDebugMode: profile builds are the ones worth timing, and that
-      // constant is false in exactly those.
-      if (!kReleaseMode) {
-        debugPrint('[orthant] settings first frame: '
-            '${DateTime.now().difference(built).inMilliseconds} ms after the '
-            'pane was created');
-      }
-      // Not debug-only: native shows the window transparent and waits for this
-      // to reveal it, so the pane appears already painted rather than as a
-      // black rectangle filling in. Native also has a deadline, so failing to
-      // send this costs the effect, not the window.
-      const MethodChannel(kOrthantChannel).invokeMethod<void>(
-        'configFirstFrame',
-      );
-    });
-  }
-
-  @override
   void didUpdateWidget(covariant SettingsWindow old) {
     super.didUpdateWidget(old);
     // A newly-arrived pending region is the one prop change allowed to move
@@ -176,58 +151,61 @@ class _SettingsWindowState extends State<SettingsWindow> {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Scaffold(
-      backgroundColor: t.windowBackground,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _TabBar(current: _tab, onSelect: _select, tokens: t),
-          Expanded(
-            child: switch (_tab) {
-              SettingsTab.general => GeneralPane(
-                scrollController: _scroll[SettingsTab.general],
-                settings: widget.settings,
-                onSettingsChanged: widget.onSettingsChanged,
-                permissionGranted: widget.permissionGranted,
-                loginStatus: widget.loginStatus,
-                bindings: widget.bindings,
-                summonUnavailable: widget.unavailable.contains(
-                  const BuiltIn(ShortcutCommand.showGrid),
+    return FirstFrameReport(
+      name: 'settings',
+      child: Scaffold(
+        backgroundColor: t.windowBackground,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _TabBar(current: _tab, onSelect: _select, tokens: t),
+            Expanded(
+              child: switch (_tab) {
+                SettingsTab.general => GeneralPane(
+                  scrollController: _scroll[SettingsTab.general],
+                  settings: widget.settings,
+                  onSettingsChanged: widget.onSettingsChanged,
+                  permissionGranted: widget.permissionGranted,
+                  loginStatus: widget.loginStatus,
+                  bindings: widget.bindings,
+                  summonUnavailable: widget.unavailable.contains(
+                    const BuiltIn(ShortcutCommand.showGrid),
+                  ),
+                  onEditShortcuts: () => _select(SettingsTab.shortcuts),
+                  onSetLoginItem: widget.onSetLoginItem,
+                  onOpenLoginItems: widget.onOpenLoginItems,
+                  onOpenAccessibility: widget.onOpenAccessibility,
                 ),
-                onEditShortcuts: () => _select(SettingsTab.shortcuts),
-                onSetLoginItem: widget.onSetLoginItem,
-                onOpenLoginItems: widget.onOpenLoginItems,
-                onOpenAccessibility: widget.onOpenAccessibility,
-              ),
-              SettingsTab.shortcuts => ShortcutsScreen(
-                scrollController: _scroll[SettingsTab.shortcuts],
-                bindings: widget.bindings,
-                unavailable: widget.unavailable,
-                permissionGranted: widget.permissionGranted,
-                onOpenAccessibility: widget.onOpenAccessibility,
-                onRebound: widget.onRebound,
-                onRestoreBindings: widget.onRestoreBindings,
-                onCaptureStart: widget.onCaptureStart,
-                onCaptureEnd: widget.onCaptureEnd,
-                onResetBindings: widget.onResetBindings,
-                regions: widget.regions,
-                gridCols: widget.settings.gridCols,
-                gridRows: widget.settings.gridRows,
-                onRegionSaved: widget.onRegionSaved,
-                onRegionDeleted: widget.onRegionDeleted,
-                pendingRegion: widget.pendingRegion,
-                onPendingConsumed: widget.onPendingConsumed,
-              ),
-              SettingsTab.about => AboutPane(
-                scrollController: _scroll[SettingsTab.about],
-                version: widget.version,
-                onCheckForUpdates: widget.onCheckForUpdates,
-                automaticChecks: widget.automaticChecks,
-                onAutomaticChecksChanged: widget.onAutomaticChecksChanged,
-              ),
-            },
-          ),
-        ],
+                SettingsTab.shortcuts => ShortcutsScreen(
+                  scrollController: _scroll[SettingsTab.shortcuts],
+                  bindings: widget.bindings,
+                  unavailable: widget.unavailable,
+                  permissionGranted: widget.permissionGranted,
+                  onOpenAccessibility: widget.onOpenAccessibility,
+                  onRebound: widget.onRebound,
+                  onRestoreBindings: widget.onRestoreBindings,
+                  onCaptureStart: widget.onCaptureStart,
+                  onCaptureEnd: widget.onCaptureEnd,
+                  onResetBindings: widget.onResetBindings,
+                  regions: widget.regions,
+                  gridCols: widget.settings.gridCols,
+                  gridRows: widget.settings.gridRows,
+                  onRegionSaved: widget.onRegionSaved,
+                  onRegionDeleted: widget.onRegionDeleted,
+                  pendingRegion: widget.pendingRegion,
+                  onPendingConsumed: widget.onPendingConsumed,
+                ),
+                SettingsTab.about => AboutPane(
+                  scrollController: _scroll[SettingsTab.about],
+                  version: widget.version,
+                  onCheckForUpdates: widget.onCheckForUpdates,
+                  automaticChecks: widget.automaticChecks,
+                  onAutomaticChecksChanged: widget.onAutomaticChecksChanged,
+                ),
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

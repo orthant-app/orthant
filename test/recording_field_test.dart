@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:orthant/settings/key_capture.dart';
 import 'package:orthant/settings/platform_theme.dart';
 import 'package:orthant/settings/recording_field.dart';
 import 'package:orthant/shortcuts/bindings.dart';
@@ -13,6 +14,7 @@ void main() {
     WidgetTester tester, {
     KeyChord? pending,
     VoidCallback? onCancel,
+    List<String>? refusals,
   }) async {
     final combos = <KeyChord>[];
     await tester.pumpWidget(MaterialApp(
@@ -23,6 +25,7 @@ void main() {
             pending: pending,
             onCombo: combos.add,
             onCancel: onCancel ?? () {},
+            onRefused: refusals?.add,
           ),
         ),
       ),
@@ -117,6 +120,93 @@ void main() {
     expect(combos.map((c) => c.logical),
         [LogicalKeyboardKey.numpadAdd.keyId]);
   }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
+
+  testWidgets('on Windows a keypad digit held with a modifier says why',
+      (tester) async {
+    final refusals = <String>[];
+    final combos = await pump(tester, refusals: refusals);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.numpad1);
+    await tester.sendKeyEvent(LogicalKeyboardKey.numpadDecimal);
+    await tester.sendKeyEvent(LogicalKeyboardKey.numpadAdd);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(refusals, [keypadRefusal, keypadRefusal],
+        reason: 'the digit and the decimal, not the operator, which records');
+    expect(combos, hasLength(1));
+    expect(find.byType(RecordingField), findsOneWidget,
+        reason: 'still listening: a refusal is not a cancel');
+  }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
+
+  testWidgets('a key Windows has no virtual key for says so, in other words',
+      (tester) async {
+    // The ISO key under its own name: no virtual key, and not the keypad.
+    // Windows' engine names a key by what its virtual key types, so this name
+    // may never arrive there (the test simulator has no Windows key code for
+    // it): the sentence is the fallback for any key that does, and refusalFor
+    // is asked directly.
+    KeyDownEvent down(PhysicalKeyboardKey physical, LogicalKeyboardKey logical) =>
+        KeyDownEvent(
+            physicalKey: physical, logicalKey: logical, timeStamp: Duration.zero);
+    final iso = down(
+        PhysicalKeyboardKey.intlBackslash, LogicalKeyboardKey.intlBackslash);
+    expect(refusalFor(iso), isNull, reason: 'no modifier held');
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    expect(refusalFor(iso), unregistrableRefusal);
+    expect(
+        refusalFor(
+            down(PhysicalKeyboardKey.numpad1, LogicalKeyboardKey.numpad1)),
+        keypadRefusal);
+    expect(refusalFor(down(PhysicalKeyboardKey.keyA, LogicalKeyboardKey.keyA)),
+        isNull, reason: 'a key Windows can register is not refused');
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
+
+  testWidgets('the refusal is spoken, for someone who cannot see the footer',
+      (tester) async {
+    final spoken = <String>[];
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockDecodedMessageHandler<dynamic>(
+        SystemChannels.accessibility, (message) async {
+      final m = message as Map;
+      if (m['type'] == 'announce') {
+        spoken.add((m['data'] as Map)['message'] as String);
+      }
+      return null;
+    });
+    addTearDown(() => messenger.setMockDecodedMessageHandler<dynamic>(
+        SystemChannels.accessibility, null));
+    await pump(tester, refusals: []);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.numpad7);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(spoken, [keypadRefusal]);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
+
+  testWidgets('a key pressed with no modifier is never refused aloud',
+      (tester) async {
+    // The footer already says a combination needs a modifier.
+    final refusals = <String>[];
+    await pump(tester, refusals: refusals);
+    await tester.sendKeyEvent(LogicalKeyboardKey.numpad1);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+    await tester.pumpAndSettle();
+    expect(refusals, isEmpty);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
+
+  testWidgets('on macOS a keypad digit records, as it always has',
+      (tester) async {
+    final refusals = <String>[];
+    final combos = await pump(tester, refusals: refusals);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.numpad1);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(refusals, isEmpty);
+    expect(combos.single.logical, LogicalKeyboardKey.numpad1.keyId);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   testWidgets('a bare key is not a combination', (tester) async {
     final combos = await pump(tester);

@@ -71,6 +71,11 @@ class Win32Window {
   // Called when Destroy is called.
   virtual void OnDestroy();
 
+  // Update the window frame's theme to match the system theme. Protected
+  // rather than private so a subclass can follow a theme switch, which the
+  // template's own WM_DWMCOLORIZATIONCOLORCHANGED does not announce.
+  static void UpdateTheme(HWND const window);
+
  private:
   friend class WindowClassRegistrar;
 
@@ -86,9 +91,6 @@ class Win32Window {
 
   // Retrieves a class instance pointer for |window|
   static Win32Window* GetThisFromHandle(HWND const window) noexcept;
-
-  // Update the window frame's theme to match the system theme.
-  static void UpdateTheme(HWND const window);
 
   bool quit_on_close_ = false;
 

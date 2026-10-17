@@ -32,7 +32,8 @@ void main() {
     for (final spec in const [(2, 2, 0.0), (12, 12, 0.0), (12, 12, 64.0)]) {
       await tester.pumpWidget(MaterialApp(
         home: Center(
-          child: GridPreview(cols: spec.$1, rows: spec.$2, gap: spec.$3),
+          child: GridPreview(
+              cols: spec.$1, rows: spec.$2, gap: spec.$3, unit: 'pt'),
         ),
       ));
       expect(tester.takeException(), isNull, reason: 'grid $spec');
@@ -80,11 +81,13 @@ void main() {
   testWidgets('the caption states the grid, and the gap only when set',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(
-        home: Center(child: GridPreview(cols: 10, rows: 4, gap: 0))));
+        home: Center(
+            child: GridPreview(cols: 10, rows: 4, gap: 0, unit: 'pt'))));
     expect(find.text('10 × 4'), findsOneWidget);
 
     await tester.pumpWidget(const MaterialApp(
-        home: Center(child: GridPreview(cols: 10, rows: 4, gap: 12))));
+        home: Center(
+            child: GridPreview(cols: 10, rows: 4, gap: 12, unit: 'pt'))));
     expect(find.text('10 × 4 · up to 12 pt gaps'), findsOneWidget);
   });
 }

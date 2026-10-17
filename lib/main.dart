@@ -53,6 +53,9 @@ Future<void> main() async {
     permissions: PermissionController(wc),
     hotkeys: hotkeys,
     debugPlacementItems: Platform.isWindows && !kReleaseMode,
+    // Windows has no grant to ask for, so its first launch shows the ready
+    // screen.
+    permissionGate: !Platform.isWindows,
   );
 
   // macOS: isTemplate, because the icon is solid black + alpha and the menu

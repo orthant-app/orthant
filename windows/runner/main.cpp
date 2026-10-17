@@ -27,9 +27,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 
   FlutterWindow window(project);
-  // The settings window's floor (spec §5.5); W5 owns the frame rules proper.
-  // Win32Window::Create leaves the window hidden until Show(), and nothing
-  // here calls Show(): Dart asks for it over the channel when the user does.
+  // Created hidden at a placeholder frame: FlutterWindow places it (its saved
+  // frame, or centred) before its Flutter view exists. Win32Window::Create
+  // leaves the window hidden until Show(), and nothing here calls Show(): Dart
+  // asks for it over the channel when the user does.
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(560, 500);
   if (!window.Create(L"Orthant", origin, size)) {

@@ -10,7 +10,8 @@ enum FocusRingStyle {
 
   /// Windows (WinUI's focus visual): a 2 px outer stroke in
   /// [PlatformTokens.focusOuter] and a 1 px inner one in
-  /// [PlatformTokens.focusInner], filling the 3 px just outside the control.
+  /// [PlatformTokens.focusInner], filling a 3 px band (`FocusRingPainter`
+  /// says where: just outside the control at the usual inset of 3).
   doubleStroke,
 }
 
@@ -65,7 +66,9 @@ class PlatformTokens extends ThemeExtension<PlatformTokens> {
 
   /// Text and glyphs that act as links. macOS draws them in its link colour
   /// (`NSColor.linkColor`), which does not follow the accent and reads better
-  /// than it in dark mode; on Windows a link is the accent.
+  /// than it in dark mode; Windows in WinUI's link text, one shade of the
+  /// accent past its fill (`AccentColors.linkLight`, `linkDark`), at least
+  /// 4.5:1 on the window and on a card ([PlatformTokens.of]).
   final Color link;
 
   final Color keycapFill;
@@ -134,13 +137,14 @@ class PlatformTokens extends ThemeExtension<PlatformTokens> {
   );
 
   /// macOS's palette, with Windows' own accent (the default blue's shades,
-  /// until the user's is read), what it draws on it, its links (the accent),
-  /// its focus ring and its UI font for the keycaps. The focus colours are
-  /// WinUI's `FocusStrokeColorOuter` and `FocusStrokeColorInner`.
+  /// until the user's is read), what it draws on it, its links (WinUI's link
+  /// text in that blue), its focus ring and its UI font for the keycaps. The
+  /// focus colours are WinUI's `FocusStrokeColorOuter` and
+  /// `FocusStrokeColorInner`.
   static final windowsLight = macLight.copyWith(
     accent: const Color(0xFF0067C0),
     onAccent: const Color(0xFFFFFFFF),
-    link: const Color(0xFF0067C0),
+    link: const Color(0xFF003E92),
     focusRing: FocusRingStyle.doubleStroke,
     focusOuter: const Color(0xE4000000),
     focusInner: const Color(0xB3FFFFFF),
@@ -150,7 +154,7 @@ class PlatformTokens extends ThemeExtension<PlatformTokens> {
   static final windowsDark = macDark.copyWith(
     accent: const Color(0xFF4CC2FF),
     onAccent: const Color(0xFF000000),
-    link: const Color(0xFF4CC2FF),
+    link: const Color(0xFF99EBFF),
     focusRing: FocusRingStyle.doubleStroke,
     focusOuter: const Color(0xFFFFFFFF),
     focusInner: const Color(0xB3000000),
@@ -171,10 +175,36 @@ class PlatformTokens extends ThemeExtension<PlatformTokens> {
         : (dark ? macDark : macLight);
     if (accent == null) return base;
     final shade = Color(dark ? accent.dark : accent.light);
-    // A link is the accent on Windows and never is on macOS.
-    return platform == TargetPlatform.windows
-        ? base.copyWith(accent: shade, link: shade)
-        : base.copyWith(accent: shade);
+    // A link follows the accent on Windows and never does on macOS.
+    if (platform != TargetPlatform.windows) return base.copyWith(accent: shade);
+    final link = dark ? accent.linkDark : accent.linkLight;
+    return base.copyWith(
+      accent: shade,
+      link: _readable(link == null ? shade : Color(link),
+          [base.windowBackground, base.contentBackground]),
+    );
+  }
+
+  /// [color], or as little darker (or lighter, on dark grounds) as reads at
+  /// 4.5:1 on every one of [grounds]. WinUI's link text is chosen against
+  /// WinUI's own backgrounds, and this window's are a shade further: yellow
+  /// gold's #9B5D00 reads 4.78:1 on WinUI's #F3F3F3 and 4.495:1 on #ECECEE
+  /// (measured palettes; every other one passes as it is).
+  static Color _readable(Color color, List<Color> grounds) {
+    double ratio(Color a, Color b) {
+      final (x, y) = (a.computeLuminance(), b.computeLuminance());
+      return (x > y ? x + 0.05 : y + 0.05) / (x > y ? y + 0.05 : x + 0.05);
+    }
+
+    bool reads(Color c) => grounds.every((g) => ratio(c, g) >= 4.5);
+    final towards = grounds.first.computeLuminance() > 0.5
+        ? const Color(0xFF000000)
+        : const Color(0xFFFFFFFF);
+    var c = color;
+    for (var step = 1; step <= 50 && !reads(c); step++) {
+      c = Color.lerp(color, towards, step / 50)!;
+    }
+    return c;
   }
 
   @override
@@ -231,8 +261,8 @@ class PlatformTokens extends ThemeExtension<PlatformTokens> {
     // The accent is not blended at all: a new one is drawn from the first
     // frame. Blended, the window's first open of a session faded from the
     // default blue to the user's accent over the theme's animation, as did
-    // every open after an accent change. A link is the accent on Windows, so
-    // it snaps with it; on macOS it snaps too, switching with the appearance
+    // every open after an accent change. A link follows the accent on Windows,
+    // so it snaps with it; on macOS it snaps too, switching with the appearance
     // where the colours around it blend.
     return PlatformTokens(
       windowBackground: c(windowBackground, other.windowBackground),

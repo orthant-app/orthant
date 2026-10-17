@@ -6,6 +6,7 @@
 
 #include <memory>
 
+#include "config_window.h"
 #include "win32_window.h"
 #include "window_channel.h"
 #include "windows_overlay_set.h"
@@ -37,6 +38,10 @@ class FlutterWindow : public Win32Window {
 
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
+
+  // This window's frame rules and its first paint. Created first, while the
+  // window has no Flutter view and placing it costs nothing.
+  std::unique_ptr<ConfigWindow> config_;
 
   // The overlay: one panel per monitor, each with its own engine, and the
   // source of every display's DPI. Created before the channel that reads it

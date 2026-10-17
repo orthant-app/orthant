@@ -104,22 +104,43 @@ class AppVersion {
 /// and #A550A7 in dark (measured on macOS 26). Windows fills an accent control
 /// with a darker shade of the accent in its light theme and a lighter one in
 /// its dark theme (`windows_accent.dart`).
+///
+/// [linkLight] and [linkDark] are the colour of link text, where the OS draws
+/// its links from the accent: Windows' WinUI (`AccentTextFillColorPrimary`),
+/// one shade past the fill each way. Null on macOS, whose link colour never
+/// follows the accent.
 class AccentColors {
-  const AccentColors({required this.light, required this.dark});
+  const AccentColors({
+    required this.light,
+    required this.dark,
+    this.linkLight,
+    this.linkDark,
+  });
 
   final int light;
   final int dark;
+  final int? linkLight;
+  final int? linkDark;
 
   @override
   bool operator ==(Object other) =>
-      other is AccentColors && other.light == light && other.dark == dark;
+      other is AccentColors &&
+      other.light == light &&
+      other.dark == dark &&
+      other.linkLight == linkLight &&
+      other.linkDark == linkDark;
 
   @override
-  int get hashCode => Object.hash(light, dark);
+  int get hashCode => Object.hash(light, dark, linkLight, linkDark);
 
+  /// The fills in the form the acceptance harness reads from the app's log,
+  /// closing bracket included; the links after it.
   @override
   String toString() => 'AccentColors(light: 0x${light.toRadixString(16)}, '
-      'dark: 0x${dark.toRadixString(16)})';
+      'dark: 0x${dark.toRadixString(16)})'
+      '${linkLight == null && linkDark == null ? '' : ', links (light: '
+          '0x${linkLight?.toRadixString(16)}, '
+          'dark: 0x${linkDark?.toRadixString(16)})'}';
 }
 
 /// Platform-agnostic window control. Native handles never cross this seam —

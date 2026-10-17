@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 
 import '../shortcuts/bindings.dart';
@@ -27,12 +28,19 @@ class RecordingField extends StatefulWidget {
     super.key,
     required this.onCombo,
     required this.onCancel,
+    this.onRefused,
     this.pending,
     this.verticalPadding = 3,
   });
 
   final void Function(KeyChord) onCombo;
   final VoidCallback onCancel;
+
+  /// A key this platform cannot use was pressed with a modifier held
+  /// ([refusalFor]), and why, for the host to show. The field keeps listening
+  /// and has already spoken it, so a screen reader hears it wherever the host
+  /// puts it.
+  final void Function(String)? onRefused;
 
   /// A combination already pressed that something else owns.
   ///
@@ -90,7 +98,14 @@ class _RecordingFieldState extends State<RecordingField> {
       return KeyEventResult.handled;
     }
     final chord = chordFromKeyEvent(event);
-    if (chord != null) widget.onCombo(chord);
+    if (chord != null) {
+      widget.onCombo(chord);
+    } else if (refusalFor(event) case final why?) {
+      // Without a word, the refusal read as a field that was not listening.
+      SemanticsService.sendAnnouncement(
+          View.of(context), why, TextDirection.ltr);
+      widget.onRefused?.call(why);
+    }
     return KeyEventResult.handled; // never let keys leak to the app
   }
 

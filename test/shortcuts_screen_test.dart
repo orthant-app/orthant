@@ -1345,6 +1345,45 @@ void main() {
       expect(find.byType(RegionPickerSheet), findsNothing);
     });
 
+    testWidgets('a click just above or below the sheet dismisses it',
+        (tester) async {
+      // The sheet scrolls in a short window, with a 12 pt margin above and
+      // below. Inside the scroll view that margin is part of the viewport, and
+      // a Scrollable hit-tests as opaque over all of it, so a click there
+      // never reached the route's barrier. In a window tall enough for the
+      // sheet the margin is just more outside.
+      await tester.pumpWidget(host());
+
+      Future<Rect> open() async {
+        await tester.tap(find.byKey(const ValueKey('add-region')));
+        await tester.pumpAndSettle();
+        expect(find.byType(RegionPickerSheet), findsOneWidget);
+        final sheet = tester.getRect(find
+            .descendant(
+              of: find.byType(RegionPickerSheet),
+              matching: find.byType(Material),
+            )
+            .first);
+        expect(sheet.top - 6, greaterThan(0),
+            reason: 'the window is too short for the sheet');
+        expect(sheet.bottom + 6, lessThan(1100),
+            reason: 'the window is too short for the sheet');
+        return sheet;
+      }
+
+      var sheet = await open();
+      await tester.tapAt(Offset(sheet.center.dx, sheet.top - 6));
+      await tester.pumpAndSettle();
+      expect(find.byType(RegionPickerSheet), findsNothing,
+          reason: 'a click above the sheet did not reach the barrier');
+
+      sheet = await open();
+      await tester.tapAt(Offset(sheet.center.dx, sheet.bottom + 6));
+      await tester.pumpAndSettle();
+      expect(find.byType(RegionPickerSheet), findsNothing,
+          reason: 'a click below the sheet did not reach the barrier');
+    });
+
 
     testWidgets('the recorder inside the dialog actually receives keys',
         (tester) async {

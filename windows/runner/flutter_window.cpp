@@ -104,6 +104,21 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+  // The view starts at the primary monitor's DPI and learns another only from
+  // WM_DPICHANGED_BEFOREPARENT, which Windows sends a child only when its
+  // parent's DPI changes. This window was placed on its monitor before the
+  // view existed, so nothing would send it, and on a monitor at another scale
+  // the content drew at the primary's (measured: 1.6x too large on a 125 %
+  // monitor beside a 200 % primary). Have the view read its DPI now that it is
+  // parented; a WM_SIZE at the size it already has then makes the engine send
+  // its metrics at that scale.
+  const HWND view = flutter_controller_->view()->GetNativeWindow();
+  SendMessage(view, WM_DPICHANGED_BEFOREPARENT, 0, 0);
+  RECT bounds{};
+  GetClientRect(view, &bounds);
+  SendMessage(view, WM_SIZE, SIZE_RESTORED,
+              MAKELPARAM(bounds.right - bounds.left,
+                         bounds.bottom - bounds.top));
 
   // A commit is forwarded to Dart, which owns the captured window; the
   // channel exists by the time a panel can commit.

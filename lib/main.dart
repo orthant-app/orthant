@@ -65,6 +65,9 @@ Future<void> main() async {
   // template and a black glyph vanishes on a dark one.
   if (Platform.isWindows) {
     await trayManager.setIcon('assets/tray_icon.ico');
+    // The tray plugin never initialises its tooltip, so without one the hover
+    // label is leftover memory; macOS needs none and keeps none.
+    await trayManager.setToolTip('Orthant');
   } else {
     await trayManager.setIcon('assets/tray_icon.png', isTemplate: true);
   }

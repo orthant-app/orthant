@@ -82,6 +82,7 @@ class OrthantCoordinator extends ChangeNotifier {
     CommandQueue? commands,
     this.pollPeriod = const Duration(milliseconds: 1500),
     this.debugPlacementItems = false,
+    this.permissionGate = true,
   }) : _bindingsStore = bindingsStore ?? BindingsStore(),
        _settingsStore = settingsStore ?? SettingsStore(),
        _commands = commands ?? CommandQueue() {
@@ -110,6 +111,13 @@ class OrthantCoordinator extends ChangeNotifier {
   /// release.
   final bool debugPlacementItems;
 
+  /// Whether the platform has a permission a first launch asks for: macOS's
+  /// Accessibility grant. Where it does, a launch that finds the grant before
+  /// anything was ever shown is a reinstall and opens nothing. Windows has
+  /// none, so every first launch is genuine and opens the ready screen, the
+  /// one screen that names the grid's chord (`main.dart` passes false there).
+  final bool permissionGate;
+
   Timer? _poll;
 
   // ---------------------------------------------------------------- state
@@ -132,12 +140,15 @@ class OrthantCoordinator extends ChangeNotifier {
   }
 
   /// The user's accent as the OS draws with it, or null for the platform's
-  /// default. Neither OS tells an app when it changes, so it is read at launch
-  /// and again each time the window is about to show ([_show]): a change made
-  /// in System Settings or Windows' Settings shows the next time the window
-  /// opens. Read at launch too, though nothing is drawn then, so that the
-  /// window's first open finds the accent it already has: a change at that
-  /// moment would put the old one in the frame that reveals the window.
+  /// default. Both OSes announce a change (macOS posts
+  /// `NSSystemColorsDidChangeNotification`, Windows sends `WM_SETTINGCHANGE`),
+  /// but neither reaches Dart without native forwarding this app does not
+  /// have, so it is read at launch and again each time the window is about to
+  /// show ([_show]): a change made in System Settings or Windows' Settings
+  /// shows the next time the window opens. Read at launch too, though nothing
+  /// is drawn then, so that the window's first open finds the accent it
+  /// already has: a change at that moment would put the old one in the frame
+  /// that reveals the window.
   AccentColors? _accent;
   AccentColors? get accent => _accent;
 
@@ -159,7 +170,14 @@ class OrthantCoordinator extends ChangeNotifier {
   ///
   /// Notifies even when [screen] is already up, so a pane switch on an open
   /// window (`openSettings` with another tab) is drawn.
+  ///
+  /// Anything that replaces the ready screen retires it, as Done does: the
+  /// tray's Settings... over a first launch's ready screen (to turn on launch
+  /// at login, say) would otherwise leave it to come back at the next launch.
   Future<void> _show(AppScreen screen) async {
+    if (_screen == AppScreen.ready && screen != AppScreen.ready) {
+      await _settingsStore.markOnboarded();
+    }
     await refreshAccent();
     _screen = screen;
     notifyListeners();
@@ -237,7 +255,7 @@ class OrthantCoordinator extends ChangeNotifier {
     if (permissions.granted) {
       _unavailable = await hotkeys.apply(_bindings);
       if (!await _settingsStore.hasOnboarded() &&
-          await _settingsStore.hasStartedOnboarding()) {
+          (!permissionGate || await _settingsStore.hasStartedOnboarding())) {
         // Onboarding was shown, never finished, and the grant is here now: they
         // read that window, went to System Settings and granted — with Orthant
         // quit in between, which is an ordinary way to do it. Marking onboarding
@@ -576,8 +594,17 @@ class OrthantCoordinator extends ChangeNotifier {
   /// the next rebind or relaunch. Re-applying is idempotent, so it costs nothing
   /// to do it on every close rather than track whether a recording was in
   /// flight.
+  ///
+  /// Closing the ready screen retires it, as Done does: it was seen, and on
+  /// Windows, where a first launch shows it, a window closed unread would
+  /// otherwise come back at every launch, every login included. Closing
+  /// onboarding does not: the ready screen is still owed after the grant.
   Future<void> onConfigWindowClosed() async {
+    final wasReady = _screen == AppScreen.ready;
+    // Emptied before anything is awaited, so a show landing in the await
+    // cannot have its screen overwritten on a visible window.
     _set(AppScreen.none);
+    if (wasReady) await _settingsStore.markOnboarded();
     if (permissions.granted) _unavailable = await hotkeys.apply(_bindings);
     notifyListeners();
   }
@@ -585,12 +612,12 @@ class OrthantCoordinator extends ChangeNotifier {
   /// Show the settings window.
   ///
   /// The screen is set before the window shows and before the status is read,
-  /// deliberately ([_show]; only the accent is read ahead of it, while the
-  /// window is still down). Fetching the login status first meant the window
-  /// could be on screen with the screen state still at its previous value for
-  /// a whole channel round trip — and `SMAppService.mainApp.status` is not
-  /// fast. When that previous value was `none`, the visible window rendered
-  /// `SizedBox.shrink()`: an empty panel. The status arrives a moment later
+  /// deliberately ([_show]; only the accent is read ahead of them). Fetching
+  /// the login status first meant the window could be on screen with the
+  /// screen state still at its previous value for a whole channel round trip,
+  /// and `SMAppService.mainApp.status` is not fast. When that previous value
+  /// was `none`, the visible window rendered `SizedBox.shrink()`: an empty
+  /// panel. The status arrives a moment later
   /// and re-renders the one row that needs it, which is what a status read
   /// should cost.
   Future<void> openSettings({SettingsTab tab = SettingsTab.general}) async {
@@ -604,7 +631,7 @@ class OrthantCoordinator extends ChangeNotifier {
     notifyListeners();
     if (!kReleaseMode) {
       debugPrint('[orthant] openSettings: '
-          'showConfigWindow ${shown.difference(t0).inMilliseconds} ms, '
+          'accent and show ${shown.difference(t0).inMilliseconds} ms, '
           'loginItemStatus ${statused.difference(shown).inMilliseconds} ms');
     }
   }

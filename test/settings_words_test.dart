@@ -1,9 +1,13 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/key_chord.dart';
 import 'package:orthant/core/window_controller.dart';
 import 'package:orthant/permission/ready_screen.dart';
+import 'package:orthant/settings/key_capture.dart';
 import 'package:orthant/settings/keycap.dart';
 import 'package:orthant/settings/general_pane.dart';
 import 'package:orthant/settings/platform_theme.dart';
@@ -211,6 +215,171 @@ void main() {
       semantics.dispose();
     }, variant: windows);
 
+    Future<void> chord(WidgetTester tester, List<LogicalKeyboardKey> held,
+        LogicalKeyboardKey key) async {
+      for (final k in held) {
+        await tester.sendKeyDownEvent(k);
+      }
+      await tester.sendKeyEvent(key);
+      for (final k in held.reversed) {
+        await tester.sendKeyUpEvent(k);
+      }
+      await tester.pump();
+    }
+
+    const ctrl = [LogicalKeyboardKey.controlLeft];
+    const winCtrlShift = [
+      LogicalKeyboardKey.metaLeft,
+      LogicalKeyboardKey.controlLeft,
+      LogicalKeyboardKey.shiftLeft,
+    ];
+
+    /// Shown under the listening row, beside its recorder: not in the footer,
+    /// where it would compete with a question or an Undo.
+    void expectBesideRecorder(WidgetTester tester) {
+      final field = tester.getRect(find.byType(RecordingField));
+      final why = tester.getRect(find.text(keypadRefusal));
+      expect(why.top - field.bottom, inInclusiveRange(0, 24),
+          reason: 'directly under the field that refused it');
+      // Where the sentence's own glyphs end: its box spans the row either way.
+      final text =
+          tester.renderObject<RenderParagraph>(find.text(keypadRefusal));
+      final glyphs = text.getBoxesForSelection(
+          TextSelection(baseOffset: 0, extentOffset: keypadRefusal.length));
+      final end = glyphs.map((b) => b.right).reduce(math.max);
+      expect(text.localToGlobal(Offset(end, 0)).dx, closeTo(field.right, 16),
+          reason: 'under the recorder, not the row\'s name');
+    }
+
+    testWidgets('the shortcuts pane says why a keypad digit is refused',
+        (tester) async {
+      await pumpHost(tester, shortcuts());
+      await listen(tester);
+      await chord(tester, ctrl, LogicalKeyboardKey.numpad1);
+      expect(find.text(keypadRefusal), findsOneWidget);
+      expectBesideRecorder(tester);
+      expect(find.byType(RecordingField), findsOneWidget,
+          reason: 'still listening for a combination it can use');
+    }, variant: windows);
+
+    testWidgets('a refusal stays beside the recorder, and the footer keeps '
+        'its question and its Undo', (tester) async {
+      // With a way back, so that a taken chord offers an Undo.
+      await pumpHost(
+          tester,
+          ShortcutsScreen(
+            bindings: runningDefaults(),
+            onRebound: (_) {},
+            onRestoreBindings: (_) {},
+          ));
+      await listen(tester);
+      // Right half's chord on Left half: the footer asks.
+      await chord(tester, winCtrlShift, LogicalKeyboardKey.arrowRight);
+      expect(find.text('Use it here'), findsOneWidget);
+      await chord(tester, ctrl, LogicalKeyboardKey.numpad1);
+      expect(find.text('Use it here'), findsOneWidget,
+          reason: 'the question, and its button, are still up');
+      expect(find.text(keypadRefusal), findsOneWidget,
+          reason: 'and the refusal is still seen, beside the recorder');
+      expectBesideRecorder(tester);
+      // Taken: the footer offers the way back, for ten seconds.
+      await chord(tester, winCtrlShift, LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(find.text('Undo'), findsOneWidget);
+      await listen(tester);
+      await chord(tester, ctrl, LogicalKeyboardKey.numpad1);
+      expect(find.text('Undo'), findsOneWidget,
+          reason: 'a multi-row change keeps its way back');
+      expect(find.text(keypadRefusal), findsOneWidget);
+      expectBesideRecorder(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump(const Duration(seconds: 11));
+    }, variant: windows);
+
+    testWidgets('the refusal goes at the next usable chord, and with the '
+        'recording', (tester) async {
+      await pumpHost(tester, shortcuts());
+      await listen(tester);
+      await chord(tester, ctrl, LogicalKeyboardKey.numpad1);
+      expect(find.text(keypadRefusal), findsOneWidget);
+      // A chord it can use, though taken: the row goes on listening, and the
+      // refusal no longer describes the last key pressed.
+      await chord(tester, winCtrlShift, LogicalKeyboardKey.arrowRight);
+      expect(find.text('Use it here'), findsOneWidget);
+      expect(find.text(keypadRefusal), findsNothing);
+      await chord(tester, ctrl, LogicalKeyboardKey.numpad1);
+      expect(find.text(keypadRefusal), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byType(RecordingField), findsNothing);
+      expect(find.text(keypadRefusal), findsNothing);
+      // Nor does it follow the recording to another row.
+      await listen(tester);
+      await chord(tester, ctrl, LogicalKeyboardKey.numpad1);
+      await tester.tap(find.text('Right half'));
+      await tester.pumpAndSettle();
+      expect(find.byType(RecordingField), findsOneWidget);
+      expect(find.text(keypadRefusal), findsNothing);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      await listen(tester);
+      expect(find.text(keypadRefusal), findsNothing,
+          reason: 'a new recording starts with nothing refused');
+    }, variant: windows);
+
+    testWidgets('a refusal leaves the recorder showing what is still held',
+        (tester) async {
+      await pumpHost(tester, shortcuts());
+      await listen(tester);
+      String hearing() => tester
+          .widget<Text>(find.descendant(
+              of: find.byType(RecordingField), matching: find.byType(Text)))
+          .data!;
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
+      final held = hearing();
+      // The keypad digit stays down too: the line appearing must not rebuild
+      // the field, which would forget the Ctrl it is showing.
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.numpad1);
+      await tester.pump();
+      expect(find.text(keypadRefusal), findsOneWidget);
+      expect(hearing(), held, reason: 'Ctrl is still down');
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.numpad1);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
+    }, variant: windows);
+
+    testWidgets('a screen reader can find the refusal again', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pumpHost(tester, shortcuts());
+      await listen(tester);
+      await chord(tester, ctrl, LogicalKeyboardKey.numpad1);
+      // Its own node, not folded into the row's label, which is replaced.
+      expect(find.bySemanticsLabel(keypadRefusal), findsOneWidget);
+      semantics.dispose();
+    }, variant: windows);
+
+    testWidgets('the picker says why a keypad digit is refused',
+        (tester) async {
+      await pumpHost(tester, picker());
+      await tester.tap(find.byKey(const ValueKey('region-record')));
+      await tester.pumpAndSettle();
+      expect(find.byType(RecordingField), findsOneWidget);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.numpad1);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
+      expect(find.text(keypadRefusal), findsOneWidget);
+      expect(find.byType(RecordingField), findsOneWidget);
+      // A chord it can use ends the recording, and the refusal with it.
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(find.byType(RecordingField), findsNothing);
+      expect(find.text(keypadRefusal), findsNothing);
+    }, variant: windows);
+
     testWidgets('a row tells a screen reader its chord in Windows\' words',
         (tester) async {
       final semantics = tester.ensureSemantics();
@@ -414,6 +583,40 @@ void main() {
     expect((left.left + right.right) / 2,
         closeTo(cardAroundChords(tester).center.dx, 0.01),
         reason: 'centred in the card');
+  }, variant: windows);
+
+  testWidgets('on Windows a chord wider than its card shrinks to fit it',
+      (tester) async {
+    // Every modifier and the longest key name: in the test font, which draws
+    // each character a font size wide, far wider than a card at 560.
+    final summon = Binding(
+        const BuiltIn(ShortcutCommand.showGrid),
+        KeyChord(
+          physical: usPhysicalFor(LogicalKeyboardKey.backspace.keyId)!,
+          logical: LogicalKeyboardKey.backspace.keyId,
+          modifiers: Modifiers.ctrl |
+              Modifiers.alt |
+              Modifiers.shift |
+              Modifiers.meta,
+        ));
+    await pumpHost(
+        tester,
+        ReadyScreen(
+          bindings: withRebind(runningDefaults(), summon),
+          unavailable: const {},
+          onDone: () {},
+          onOpenShortcuts: () {},
+        ));
+    expect(tester.takeException(), isNull, reason: 'no overflow');
+    final chord = tester.getRect(find.byType(KeycapRow).first);
+    final card = tester.getRect(find
+        .ancestor(
+            of: find.byType(KeycapRow).first, matching: find.byType(Container))
+        .first);
+    expect(chord.left, greaterThanOrEqualTo(card.left));
+    expect(chord.right, lessThanOrEqualTo(card.right));
+    expect(chord.width, lessThan(tester.getSize(find.byType(KeycapRow).first).width),
+        reason: 'scaled down, not clipped');
   }, variant: windows);
 
   testWidgets('on macOS two chords rebound to four modifiers share a line, '

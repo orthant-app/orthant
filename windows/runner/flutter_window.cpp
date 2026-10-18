@@ -54,6 +54,33 @@ bool FlutterWindow::OnCreate() {
   if (!Win32Window::OnCreate()) {
     return false;
   }
+  // Placed before the view exists: the saved frame or a centred first open,
+  // at the size the view is then created at, so nothing resizes it later.
+  config_ = std::make_unique<ConfigWindow>(
+      GetHandle(),
+      [this](uint64_t generation) {
+        if (!flutter_controller_ || !flutter_controller_->engine()) {
+          return false;
+        }
+        const HWND hwnd = GetHandle();
+        // Delivered by message, not acted on here: the engine's wrapper
+        // empties its slot after the callback returns, so one registered from
+        // inside it would be lost (as the overlay's panels found).
+        flutter_controller_->engine()->SetNextFrameCallback(
+            [hwnd, generation]() {
+              PostMessageW(hwnd, ConfigWindow::FramePresentedMessage(),
+                           static_cast<WPARAM>(generation), 0);
+            });
+        // A frame to present, if the one the screen drew is already up.
+        flutter_controller_->ForceRedraw();
+        return true;
+      },
+      [this]() {
+        // An overlay engine attaching holds this thread for over a second
+        // (measured: the first launch's reveal waited 1.6 s behind one), and
+        // the window is what the user is looking at.
+        if (overlay_set_) overlay_set_->HoldAttaches();
+      });
   // Before any engine, so that none of their first requests gets through.
   g_focus_guard = SetWindowsHookExW(WH_CBT, FocusGuard, nullptr,
                                     GetCurrentThreadId());
@@ -77,6 +104,21 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+  // The view starts at the primary monitor's DPI and learns another only from
+  // WM_DPICHANGED_BEFOREPARENT, which Windows sends a child only when its
+  // parent's DPI changes. This window was placed on its monitor before the
+  // view existed, so nothing would send it, and on a monitor at another scale
+  // the content drew at the primary's (measured: 1.6x too large on a 125 %
+  // monitor beside a 200 % primary). Have the view read its DPI now that it is
+  // parented; a WM_SIZE at the size it already has then makes the engine send
+  // its metrics at that scale.
+  const HWND view = flutter_controller_->view()->GetNativeWindow();
+  SendMessage(view, WM_DPICHANGED_BEFOREPARENT, 0, 0);
+  RECT bounds{};
+  GetClientRect(view, &bounds);
+  SendMessage(view, WM_SIZE, SIZE_RESTORED,
+              MAKELPARAM(bounds.right - bounds.left,
+                         bounds.bottom - bounds.top));
 
   // A commit is forwarded to Dart, which owns the captured window; the
   // channel exists by the time a panel can commit.
@@ -96,7 +138,7 @@ bool FlutterWindow::OnCreate() {
       });
   window_channel_ = std::make_unique<WindowChannel>(
       flutter_controller_->engine()->messenger(), GetHandle(),
-      overlay_set_.get());
+      overlay_set_.get(), config_.get());
   if (!SetWindowSubclass(flutter_controller_->view()->GetNativeWindow(),
                          ViewProc, kViewSubclass,
                          reinterpret_cast<DWORD_PTR>(this))) {
@@ -110,9 +152,8 @@ bool FlutterWindow::OnCreate() {
   }
 
   // The template shows the window on the engine's first frame. Orthant is a
-  // tray app: the window stays hidden until Dart asks for it over the channel
-  // (spec §5.5), so there is no first-frame reveal here. W5 adds the
-  // reveal-on-first-frame with a deadline for the first *show*.
+  // tray app: the window stays hidden until Dart asks for it over the channel,
+  // and every show is revealed on its screen's first frame (ConfigWindow).
   return true;
 }
 
@@ -126,6 +167,7 @@ void FlutterWindow::OnDestroy() {
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
+  config_ = nullptr;
   if (g_focus_guard) {
     UnhookWindowsHookEx(g_focus_guard);
     g_focus_guard = nullptr;
@@ -142,6 +184,14 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   // the deadline for starting the engines.
   if (overlay_set_ && overlay_set_->HandleHostMessage(message, wparam)) {
     return 0;
+  }
+  // The frame's limits and edges, a user's move or resize ending, and the
+  // reveal's deadline.
+  if (config_) {
+    LRESULT result = 0;
+    if (config_->HandleMessage(message, wparam, lparam, &result)) {
+      return result;
+    }
   }
 
   switch (message) {
@@ -175,10 +225,14 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       }
       break;
     case WM_CLOSE:
-      // Closing the settings window hides it. A tray app outlives its
-      // window; Quit is the tray item (spec §5.5). Handled ahead of the
+      // Closing the settings window hides it, its frame kept. A tray app
+      // outlives its window; Quit is the tray item. Handled ahead of the
       // Flutter delegation so no plugin can turn this into a DestroyWindow.
-      ShowWindow(hwnd, SW_HIDE);
+      if (config_) {
+        config_->Hide();
+      } else {
+        ShowWindow(hwnd, SW_HIDE);
+      }
       if (window_channel_) {
         window_channel_->NotifyConfigWindowClosed();
       }
@@ -209,6 +263,15 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       // follow a scale change by about 200 ms, without a WM_DISPLAYCHANGE.
       if (wparam == SPI_SETWORKAREA && overlay_set_) {
         overlay_set_->OnDisplayChange("SPI_SETWORKAREA");
+      }
+      // The apps' theme switched between light and dark. The content follows
+      // through Flutter; the title bar is the OS's and follows only when told
+      // (measured: it stayed light, reopened or not, while the content went
+      // dark).
+      if (lparam &&
+          wcscmp(reinterpret_cast<const wchar_t*>(lparam),
+                 L"ImmersiveColorSet") == 0) {
+        UpdateTheme(hwnd);
       }
       break;
   }

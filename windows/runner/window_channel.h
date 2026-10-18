@@ -10,6 +10,7 @@
 #include <optional>
 #include <vector>
 
+#include "config_window.h"
 #include "windows_overlay_set.h"
 
 // The Windows half of `app.orthant/window` (lib/core/channel.dart). The
@@ -33,7 +34,7 @@
 class WindowChannel {
  public:
   WindowChannel(flutter::BinaryMessenger* messenger, HWND config_window,
-                WindowsOverlaySet* overlays);
+                WindowsOverlaySet* overlays, ConfigWindow* config);
   // Destroying a MethodChannel does not unregister its handler with the
   // messenger, and the registered handler captures `this`. Also unregisters
   // every hotkey this channel registered.
@@ -79,6 +80,8 @@ class WindowChannel {
   HWND config_window_;
   // Owned by FlutterWindow, which destroys this channel first.
   WindowsOverlaySet* overlays_;
+  // The settings window's show, hide and reveal; owned by FlutterWindow too.
+  ConfigWindow* config_;
   // The ids registered on config_window_, so a replacement or the destructor
   // can unregister exactly them; the overlay's grabs (kFirstGrabId up) are
   // not here.

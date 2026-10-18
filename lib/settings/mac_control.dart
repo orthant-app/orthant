@@ -186,14 +186,14 @@ class _MacControlState extends State<MacControl> {
 }
 
 /// A focused control's ring, in the platform's style
-/// ([PlatformTokens.focusRing]), drawn just outside the control: [inset] is how
-/// far its outer edge sits from the control's, [radius] the control's own
-/// corner radius.
+/// ([PlatformTokens.focusRing]), placed by [inset], a distance out from the
+/// control's edge; [radius] is the control's own corner radius.
 ///
 /// macOS's halo is the accent at half strength, 3 pt wide and centred [inset]
 /// out. Windows' is WinUI's focus visual: a 2 px outer stroke and a 1 px inner
-/// one filling the 3 px band that ends [inset] out, so at the usual inset of 3
-/// it meets the control's edge.
+/// one filling the 3 px band whose outer edge is [inset] out, so at the usual
+/// inset of 3 it meets the control's edge, and at less it overlaps the
+/// control.
 class FocusRingPainter extends CustomPainter {
   FocusRingPainter({
     required this.tokens,

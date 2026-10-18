@@ -5,6 +5,7 @@ import 'package:flutter/services.dart' show PhysicalKeyboardKey;
 
 import '../core/key_words.dart';
 import '../settings/keycap.dart';
+import '../settings/first_frame_report.dart';
 import '../settings/mac_control.dart';
 import '../settings/platform_theme.dart';
 import '../settings/region_glyph.dart';
@@ -94,133 +95,151 @@ class ReadyScreen extends StatelessWidget {
     final left = _bindingFor(const BuiltIn(ShortcutCommand.leftHalf));
     final right = _bindingFor(const BuiltIn(ShortcutCommand.rightHalf));
 
-    return Scaffold(
-      backgroundColor: t.windowBackground,
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(34, 34, 34, 22),
-        child: Column(
-          children: [
-            Text(
-              'Orthant is ready',
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -0.3,
-                color: t.labelPrimary,
-              ),
+    // Scrolls in a window shorter than itself, its two buttons below the
+    // fold rather than cut off: on Windows the window's floor gives way to a
+    // short screen's work area (a 768-pixel screen at 200 % leaves about 300
+    // points). Taller, it fills the window exactly as before.
+    final content = Padding(
+      padding: const EdgeInsets.fromLTRB(34, 34, 34, 22),
+      child: Column(
+        children: [
+          Text(
+            'Orthant is ready',
+            style: TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.3,
+              color: t.labelPrimary,
             ),
-            const SizedBox(height: 5),
-            Text(
-              'Two ways to put a window where you want it.',
-              style: TextStyle(fontSize: 12.5, color: t.labelSecondary),
-            ),
-            const SizedBox(height: 24),
-            // Centred and content-sized, not stretched: the cards hold three
-            // short lines each, and letting them fill a 500 pt window left
-            // most of each one empty.
-            Expanded(
-              child: Center(
-                child: IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: _Card(
-                          tokens: t,
-                          art: const SizedBox(
-                            height: 34,
-                            child: Center(child: RegionGlyph(command: null)),
-                          ),
-                          chords: [
-                            _chord(t, summon, unsetLabel: 'No shortcut set'),
-                          ],
-                          // The arrows are named here because this card is the
-                          // only place the grid is ever explained, and a
-                          // keyboard feature nobody is told about is one nobody
-                          // finds — least of all on a grid that arrives under
-                          // the pointer.
-                          caption:
-                              'Opens the grid. Drag across it to pick any '
-                              'block: thirds, two-thirds, anything. Or use '
-                              'the arrow keys, ${KeyWords.current.shiftName} '
-                              'to extend, ${keySymbol(_enter)} to place.',
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'Two ways to put a window where you want it.',
+            style: TextStyle(fontSize: 12.5, color: t.labelSecondary),
+          ),
+          const SizedBox(height: 24),
+          // Centred and content-sized, not stretched: the cards hold three
+          // short lines each, and letting them fill a 500 pt window left
+          // most of each one empty.
+          Expanded(
+            child: Center(
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: _Card(
+                        tokens: t,
+                        art: const SizedBox(
+                          height: 34,
+                          child: Center(child: RegionGlyph(command: null)),
                         ),
+                        chords: [
+                          _chord(t, summon, unsetLabel: 'No shortcut set'),
+                        ],
+                        // The arrows are named here because this card is
+                        // the only place the grid is ever explained, and a
+                        // keyboard feature nobody is told about is one
+                        // nobody finds — least of all on a grid that
+                        // arrives under the pointer.
+                        caption:
+                            'Opens the grid. Drag across it to pick any '
+                            'block: thirds, two-thirds, anything. Or use '
+                            'the arrow keys, ${KeyWords.current.shiftName} '
+                            'to extend, ${keySymbol(_enter)} to place.',
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _Card(
-                          tokens: t,
-                          art: SizedBox(
-                            height: 34,
-                            child: Center(
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: const [
-                                  RegionGlyph(command: RegionCommand.leftHalf),
-                                  SizedBox(width: 6),
-                                  RegionGlyph(command: RegionCommand.rightHalf),
-                                  SizedBox(width: 6),
-                                  // A shape none of the eleven can make. The
-                                  // only place onboarding *shows* what "your
-                                  // own region" means rather than saying it —
-                                  // and a picture survives being skim-read.
-                                  RegionGlyph(custom: _twoThirds),
-                                ],
-                              ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _Card(
+                        tokens: t,
+                        art: SizedBox(
+                          height: 34,
+                          child: Center(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                RegionGlyph(
+                                    command: RegionCommand.leftHalf),
+                                SizedBox(width: 6),
+                                RegionGlyph(
+                                    command: RegionCommand.rightHalf),
+                                SizedBox(width: 6),
+                                // A shape none of the eleven can make. The
+                                // only place onboarding *shows* what "your
+                                // own region" means rather than saying it —
+                                // and a picture survives being skim-read.
+                                RegionGlyph(custom: _twoThirds),
+                              ],
                             ),
                           ),
-                          chords: [_chord(t, left), _chord(t, right)],
-                          // The last clause is the only place anything tells
-                          // a new user that the eleven defaults are not the
-                          // whole vocabulary. A feature nobody is told about is
-                          // one nobody finds — the same hole the grid itself
-                          // fell into before this screen existed.
-                          caption:
-                              'Snaps straight to a half, a quarter, or full '
-                              'screen. No aiming, and you can add shapes of '
-                              'your own, like the third one.',
                         ),
+                        chords: [_chord(t, left), _chord(t, right)],
+                        // The last clause is the only place anything tells
+                        // a new user that the eleven defaults are not the
+                        // whole vocabulary. A feature nobody is told about
+                        // is one nobody finds — the same hole the grid
+                        // itself fell into before this screen existed.
+                        caption:
+                            'Snaps straight to a half, a quarter, or full '
+                            'screen. No aiming, and you can add shapes of '
+                            'your own, like the third one.',
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                MacControl(
-                  onPressed: onOpenShortcuts,
-                  focusRingRadius: 4,
-                  inset: 2,
-                  child: Text(
-                    'Change these shortcuts…',
-                    style: TextStyle(fontSize: 12.5, color: t.link),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              MacControl(
+                onPressed: onOpenShortcuts,
+                focusRingRadius: 4,
+                inset: 2,
+                child: Text(
+                  'Change these shortcuts…',
+                  style: TextStyle(fontSize: 12.5, color: t.link),
+                ),
+              ),
+              FilledButton(
+                onPressed: onDone,
+                style: FilledButton.styleFrom(
+                  backgroundColor: t.accent,
+                  foregroundColor: t.onAccent,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                FilledButton(
-                  onPressed: onDone,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: t.accent,
-                    foregroundColor: t.onAccent,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(7),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  child: const Text('Done'),
-                ),
-              ],
+                child: const Text('Done'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    return FirstFrameReport(
+      name: 'ready',
+      onMacOS: false,
+      child: Scaffold(
+        backgroundColor: t.windowBackground,
+        body: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(child: content),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -244,7 +263,8 @@ class _Card extends StatelessWidget {
   /// are (the row they replace ran past the card). Windows names its keys
   /// (Win, Ctrl, Shift), so its default chords are wider than a card, and
   /// scaled to fit they would draw far smaller than the first card's: there
-  /// the second goes beneath the first, at full size.
+  /// the second goes beneath the first, at full size, and only a chord wider
+  /// than the card on its own is scaled down, to the card's width.
   final List<Widget> chords;
   final String caption;
 
@@ -268,7 +288,10 @@ class _Card extends StatelessWidget {
               crossAxisAlignment: WrapCrossAlignment.center,
               spacing: 8,
               runSpacing: 6,
-              children: chords,
+              children: [
+                for (final chord in chords)
+                  FittedBox(fit: BoxFit.scaleDown, child: chord),
+              ],
             )
           else
             FittedBox(

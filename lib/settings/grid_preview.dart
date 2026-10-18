@@ -16,6 +16,7 @@ class GridPreview extends StatelessWidget {
     required this.cols,
     required this.rows,
     required this.gap,
+    required this.unit,
   });
 
   final int cols;
@@ -24,6 +25,9 @@ class GridPreview extends StatelessWidget {
   /// Points of gap, already resolved from the on/off toggle — zero when gaps
   /// are off, so the picture matches what a placement would actually do.
   final double gap;
+
+  /// What [gap] is counted in, as the pane's own stepper shows it.
+  final String unit;
 
   /// 16:10, so the miniature reads as a display rather than a square of cells.
   static const Size size = Size(176, 110);
@@ -68,7 +72,7 @@ class GridPreview extends StatelessWidget {
               // `gapForPlacement` measures the block, "up to" is now literally
               // what a user gets: bigger selections keep more of it.
               gap > 0
-                  ? '$cols × $rows · up to ${gap.toInt()} pt gaps'
+                  ? '$cols × $rows · up to ${gap.toInt()} $unit gaps'
                   : '$cols × $rows',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 10.5, color: t.labelTertiary),

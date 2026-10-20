@@ -2,7 +2,8 @@ import 'dart:ffi';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/foundation.dart'
+    show debugPrint, kReleaseMode, visibleForTesting;
 import 'package:win32/win32.dart';
 
 import 'png.dart';
@@ -37,9 +38,11 @@ Uint8List? readAppIconPng(String exePath) {
     } finally {
       DestroyIcon(icon);
     }
-  } catch (_) {
+  } catch (e) {
     // A display nicety: any failure is "no icon", and the chip shows the
-    // app's name alone, as it always could.
+    // app's name alone, as it always could. Debug and Profile builds say why,
+    // so a read that broke is not mistaken for an app with no icon.
+    if (!kReleaseMode) debugPrint('[orthant] icon: read failed ($e)');
     return null;
   } finally {
     calloc.free(info);

@@ -64,6 +64,11 @@ class WindowChannel {
   // said so), so a punctuation key's printed symbol may have changed with it.
   void NotifyKeyboardLayoutChanged(const char* why);
 
+  // Setup asked the app to quit before it replaces or removes the files this
+  // process runs from (FlutterWindow's OrthantQuitRequest). Dart quits as the
+  // tray's Quit does, so the tray icon goes with the process.
+  void NotifyQuitRequested();
+
  private:
   void HandleMethodCall(
       const flutter::MethodCall<flutter::EncodableValue>& call,

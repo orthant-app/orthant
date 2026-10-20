@@ -31,9 +31,9 @@ late final OrthantCoordinator app;
 
 /// Quits on Windows. Windows keeps a dead icon in the tray until the pointer
 /// sweeps it if the process exits without removing it, so destroy() is
-/// awaited ahead of exit(0). The tray's Quit, and the updater once it has
-/// started an update's installer, which replaces the files this process runs
-/// from.
+/// awaited ahead of exit(0). The tray's Quit; the updater once it has started
+/// an update's installer, which replaces the files this process runs from;
+/// and Setup itself, asking before it installs or uninstalls.
 void quitOnWindows() =>
     unawaited(trayManager.destroy().whenComplete(() => exit(0)));
 
@@ -54,6 +54,8 @@ Future<void> main() async {
     onOverlayCommit: (id, rect) => app.overlayCommit(id, rect),
     onOverlaySaveRegion: (id, rect, block) =>
         app.overlaySaveRegion(id, rect, block),
+    // Only Windows sends it: Setup, before it replaces the app's files.
+    onQuitRequested: quitOnWindows,
   );
   app = OrthantCoordinator(
     wc: wc,

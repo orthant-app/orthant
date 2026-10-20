@@ -43,6 +43,14 @@ LRESULT CALLBACK FocusGuard(int code, WPARAM wparam, LPARAM lparam) {
   return CallNextHookEx(g_focus_guard, code, wparam, lparam);
 }
 
+// Setup's request to quit, registered by name (windows/installer/orthant.iss
+// broadcasts it before it replaces or removes the files this process runs
+// from); 0 if it could not be registered.
+UINT QuitRequestMessage() {
+  static const UINT message = RegisterWindowMessageW(L"OrthantQuitRequest");
+  return message;
+}
+
 }  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
@@ -81,6 +89,14 @@ bool FlutterWindow::OnCreate() {
         // the window is what the user is looking at.
         if (overlay_set_) overlay_set_->HoldAttaches();
       });
+  // A per-user Setup asks at the user's integrity level; an Orthant run
+  // elevated would drop the request (UIPI) and Setup could neither ask it
+  // nor end it. Quitting is the user's own choice, so letting this one
+  // message through opens nothing up.
+  if (QuitRequestMessage() != 0) {
+    ChangeWindowMessageFilterEx(GetHandle(), QuitRequestMessage(),
+                                MSGFLT_ALLOW, nullptr);
+  }
   // Before any engine, so that none of their first requests gets through.
   g_focus_guard = SetWindowsHookExW(WH_CBT, FocusGuard, nullptr,
                                     GetCurrentThreadId());
@@ -192,6 +208,17 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     if (config_->HandleMessage(message, wparam, lparam, &result)) {
       return result;
     }
+  }
+
+  // Setup, before it replaces or removes the files this process runs from
+  // (windows/installer/orthant.iss): broadcast to every top-level window, so
+  // the overlay's panels receive it too and pass it by. The Restart Manager
+  // cannot be relied on for this: on Windows on ARM it also lists the x64
+  // emulator's translation cache, which a per-user Setup may not close, and
+  // then closes nothing (measured).
+  if (QuitRequestMessage() != 0 && message == QuitRequestMessage()) {
+    if (window_channel_) window_channel_->NotifyQuitRequested();
+    return 0;
   }
 
   switch (message) {

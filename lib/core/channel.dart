@@ -43,6 +43,11 @@ const String kSetAppIcon = 'setAppIcon';
 // runner may start the overlay's engines.
 const String kStartOverlay = 'startOverlay';
 
+// Windows only: an installer or uninstaller asked the running app to quit,
+// before it replaces or removes the files the app runs from (the runner's
+// OrthantQuitRequest message; windows/installer/orthant.iss).
+const String kQuitRequested = 'onQuitRequested';
+
 // Windows only: `{running}`, the command queue's burst of commands starting
 // (true) and ending (false). The runner starts no overlay engine attach in
 // between, up to a ceiling of its own.

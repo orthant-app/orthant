@@ -87,6 +87,61 @@ if(PLUGIN_BUNDLED_LIBRARIES)
     COMPONENT Runtime)
 endif()
 
+# WinSparkle, the updater, which the app opens over FFI from the directory
+# it runs in. The release zip is pinned by its SHA-256 (the digest GitHub
+# records for the asset) and fetched once per build directory; a download
+# whose hash differs fails the configure step rather than shipping it.
+set(WINSPARKLE_VERSION "0.9.4")
+set(WINSPARKLE_SHA256
+  "6037df37fc263bd1650a1c4949681a9d40ffe991d01f35892a406cb5d103c976")
+if(FLUTTER_TARGET_PLATFORM STREQUAL "windows-arm64")
+  set(WINSPARKLE_ARCH "ARM64")
+else()
+  set(WINSPARKLE_ARCH "x64")
+endif()
+set(WINSPARKLE_DIR "${CMAKE_BINARY_DIR}/winsparkle-${WINSPARKLE_VERSION}")
+set(WINSPARKLE_DLL
+  "${WINSPARKLE_DIR}/WinSparkle-${WINSPARKLE_VERSION}/${WINSPARKLE_ARCH}/Release/WinSparkle.dll")
+if(NOT EXISTS "${WINSPARKLE_DLL}")
+  file(DOWNLOAD
+    "https://github.com/vslavik/winsparkle/releases/download/v${WINSPARKLE_VERSION}/WinSparkle-${WINSPARKLE_VERSION}.zip"
+    "${WINSPARKLE_DIR}/WinSparkle-${WINSPARKLE_VERSION}.zip"
+    EXPECTED_HASH SHA256=${WINSPARKLE_SHA256}
+    TLS_VERIFY ON
+    SHOW_PROGRESS)
+  file(ARCHIVE_EXTRACT
+    INPUT "${WINSPARKLE_DIR}/WinSparkle-${WINSPARKLE_VERSION}.zip"
+    DESTINATION "${WINSPARKLE_DIR}"
+    PATTERNS "WinSparkle-${WINSPARKLE_VERSION}/${WINSPARKLE_ARCH}/Release/WinSparkle.dll")
+endif()
+install(FILES "${WINSPARKLE_DLL}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+  COMPONENT Runtime)
+
+# The Visual C++ runtime the runner and its plugins link against, beside the
+# executable: a per-user install cannot run Microsoft's runtime installer,
+# which needs administrator rights, and a machine without the runtime could
+# not start the app. The copies come from the compiler's own redistributable
+# folder, so they match what the binaries were built with; configuring fails
+# if any of the three is not there.
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP TRUE)
+include(InstallRequiredSystemLibraries)
+set(VC_RUNTIME_DLLS "")
+foreach(lib ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS})
+  get_filename_component(name "${lib}" NAME)
+  string(TOLOWER "${name}" name)
+  if(name MATCHES "^(msvcp140|vcruntime140|vcruntime140_1)\\.dll$")
+    list(APPEND VC_RUNTIME_DLLS "${lib}")
+  endif()
+endforeach()
+list(LENGTH VC_RUNTIME_DLLS VC_RUNTIME_COUNT)
+if(NOT VC_RUNTIME_COUNT EQUAL 3)
+  message(FATAL_ERROR "The Visual C++ runtime (msvcp140.dll, vcruntime140.dll, "
+    "vcruntime140_1.dll) was not found beside the compiler; found: "
+    "${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS}")
+endif()
+install(FILES ${VC_RUNTIME_DLLS} DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+  COMPONENT Runtime)
+
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/windows/")
 install(DIRECTORY "${NATIVE_ASSETS_DIR}"

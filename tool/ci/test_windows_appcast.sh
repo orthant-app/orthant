@@ -106,6 +106,10 @@ assert_fails 'refuses a release name that is not a version' gen "$TMP_DIR/c.xml"
 sed 's#<sparkle:minimumSystemVersion>#<sparkle:releaseNotesLink>x</sparkle:releaseNotesLink><sparkle:minimumSystemVersion>#' "$TMP_DIR/a.xml" >"$TMP_DIR/unknown.xml"
 assert_fails 'refuses history holding what it would drop' gen "$TMP_DIR/c.xml" "$TMP_DIR/unknown.xml" Orthant-1.2.0-beta.1-setup.exe 1.2.0-beta.1 9 "$URL2" "$LINE2"
 assert_fails 'refuses a history that names no file' gen "$TMP_DIR/c.xml" "$TMP_DIR/missing.xml" Orthant-1.2.0-beta.1-setup.exe 1.2.0-beta.1 9 "$URL2" "$LINE2"
+# gen never passes an empty value, so this calls the script itself: an unset
+# variable must not read as a first release.
+assert_fails 'refuses an empty history' python3 "$GEN" --out "$TMP_DIR/c.xml" --history '' --installer "$TMP_DIR/Orthant-1.2.0-beta.1-setup.exe" \
+  --release-name 1.2.0-beta.1 --build 9 --url "$URL2" --sign-line "$LINE2" --date 'Sat, 17 Oct 2026 12:00:00 GMT'
 sed 's#<enclosure #<enclosure sparkle:dsaSignature="x" #' "$TMP_DIR/a.xml" >"$TMP_DIR/unknown-attr.xml"
 assert_fails 'refuses history whose enclosure holds what it would drop' gen "$TMP_DIR/c.xml" "$TMP_DIR/unknown-attr.xml" Orthant-1.2.0-beta.1-setup.exe 1.2.0-beta.1 9 "$URL2" "$LINE2"
 sed 's#</enclosure>##; s#\(<enclosure [^>]*\)/>#\1/><enclosure url="x" length="1" type="t" sparkle:edSignature="'"$SIG"'"/>#' "$TMP_DIR/a.xml" >"$TMP_DIR/two-enclosures.xml"

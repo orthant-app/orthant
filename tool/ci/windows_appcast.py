@@ -53,7 +53,7 @@ def fail(why):
 
 def read_history(path):
     """Every item of an earlier feed, as the fields this script writes."""
-    if not path:
+    if path is None:
         return []
     if not os.path.exists(path):
         fail(f'no history at {path}: a first release passes no --history')

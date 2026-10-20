@@ -10,6 +10,57 @@ final _invoke = RegExp(
     r'''invoke(?:List|Map)?Method(?:<[^(]*>)?\(\s*(k\w+|'[^']+'|"[^"]+")''');
 final _handled = RegExp(r'''call\.method == (k\w+|'[^']+'|"[^"]+")''');
 
+/// The runner's grab table (`kGrabs` in `windows_overlay_set.cpp`), one record
+/// per line of it. Every line that is not blank or a comment must be an entry
+/// this reads, whatever its spacing, an id in decimal or hexadecimal, and a
+/// modifier single or combined: a line it cannot read fails the test, rather
+/// than dropping out of what the checks see.
+List<({int id, int modifiers, int vk})> _grabTable(String cpp) {
+  const vks = {
+    'VK_ESCAPE': 0x1B,
+    'VK_RETURN': 0x0D,
+    'VK_LEFT': 0x25,
+    'VK_UP': 0x26,
+    'VK_RIGHT': 0x27,
+    'VK_DOWN': 0x28,
+  };
+  const mods = {
+    '0': 0,
+    'MOD_ALT': 1,
+    'MOD_CONTROL': 2,
+    'MOD_SHIFT': 4,
+    'MOD_WIN': 8,
+  };
+  final table = RegExp(r'constexpr Grab kGrabs\[\] = \{(.*?)\n\};', dotAll: true)
+      .firstMatch(cpp)!
+      .group(1)!;
+  final entry = RegExp(r'''^\{\s*(0[xX][0-9A-Fa-f]+|\d+)\s*,\s*([\w|\s]+?)\s*,'''
+      r'''\s*('[^']'|\w+)\s*,\s*(?:true|false)\s*,\s*"[^"]*"\s*\},?$''');
+  return [
+    for (final raw in table.split('\n'))
+      if (raw.trim() case final line when line.isNotEmpty && !line.startsWith('//'))
+        () {
+          final m = entry.firstMatch(line) ??
+              fail('kGrabs has a line this test cannot read: $line');
+          final id = m.group(1)!;
+          final key = m.group(3)!;
+          return (
+            id: id.toLowerCase().startsWith('0x')
+                ? int.parse(id.substring(2), radix: 16)
+                : int.parse(id),
+            modifiers: m.group(2)!.split('|').fold(0, (all, name) {
+              return all |
+                  (mods[name.trim()] ??
+                      fail('kGrabs names an unknown modifier: $line'));
+            }),
+            vk: key.startsWith("'")
+                ? key.codeUnitAt(1)
+                : vks[key] ?? fail('kGrabs names an unknown key: $line'),
+          );
+        }(),
+  ];
+}
+
 /// Every method Dart can send on `app.orthant/window` from code that runs on
 /// Windows must be answered by `windows/runner/window_channel.cpp`, and every
 /// callback the runner sends must be handled by Dart (Windows design §5.1). A
@@ -334,10 +385,12 @@ void main() {
         .firstMatch(header)!
         .group(1)!);
     expect(dartMax + 1, firstGrab);
-    final grabIds = RegExp(r'\{(\d+), \w+, ')
-        .allMatches(overlayCpp)
-        .map((m) => int.parse(m.group(1)!));
-    expect(grabIds.every((id) => id >= firstGrab && id <= 0xBFFF), isTrue);
+    // Every entry of the table, whatever its spacing or modifier: a pattern
+    // that read only some let the rest through at any id.
+    final grabs = _grabTable(overlayCpp);
+    expect(grabs, isNotEmpty);
+    expect(grabs.every((g) => g.id >= firstGrab && g.id <= 0xBFFF), isTrue,
+        reason: 'ids: ${grabs.map((g) => g.id).join(', ')}');
   });
 
   // The grid's key grabs are one table in C++ (kGrabs) and one in Dart
@@ -345,30 +398,11 @@ void main() {
   // added to one and not the other is either a dead grid key or a refusal of
   // a chord the grid never takes.
   test('the grid grabs exactly the chords Dart refuses as shortcuts', () {
-    const vks = {
-      'VK_ESCAPE': 0x1B,
-      'VK_RETURN': 0x0D,
-      'VK_LEFT': 0x25,
-      'VK_UP': 0x26,
-      'VK_RIGHT': 0x27,
-      'VK_DOWN': 0x28,
-    };
-    const mods = {'0': 0, 'MOD_CONTROL': 2, 'MOD_SHIFT': 4};
-    final table = RegExp(r'constexpr Grab kGrabs\[\] = \{(.*?)\n\};',
-            dotAll: true)
-        .firstMatch(overlayCpp)!
-        .group(1)!;
-    final grabs = {
-      for (final m in RegExp(r'''\{\d+, (\w+), ('\w'|\w+), (?:true|false), "''')
-          .allMatches(table))
-        (
-          mods[m.group(1)]!,
-          m.group(2)!.startsWith("'")
-              ? m.group(2)!.codeUnitAt(1)
-              : vks[m.group(2)]!,
-        ),
-    };
-    expect(grabs, hasLength(11), reason: 'the sweep must see the whole table');
-    expect(grabs, {for (final g in windowsOverlayGrabs) (g.modifiers, g.vk)});
+    final grabs = _grabTable(overlayCpp);
+    final chords = {for (final g in grabs) (g.modifiers, g.vk)};
+    // One chord per entry: a duplicate would collapse into the set unseen.
+    expect(chords, hasLength(grabs.length),
+        reason: 'the table must hold each chord once');
+    expect(chords, {for (final g in windowsOverlayGrabs) (g.modifiers, g.vk)});
   });
 }

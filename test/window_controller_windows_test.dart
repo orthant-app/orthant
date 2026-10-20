@@ -8,9 +8,69 @@ import 'package:orthant/core/geometry.dart';
 import 'package:orthant/core/window_controller.dart';
 import 'package:orthant/core/window_controller_windows.dart';
 import 'package:orthant/core/windows_login_item.dart';
+import 'package:orthant/core/windows_updater.dart';
 import 'package:orthant/core/windows_window_ops.dart';
 
 import 'support/fake_win32.dart';
+
+/// WinSparkle as a record of calls.
+class _Sparkle implements SparkleApi {
+  final calls = <String>[];
+
+  @override
+  void setRegistryPath(String path) {}
+  @override
+  void setAppcastUrl(String url) {}
+  @override
+  bool setEdDsaPublicKey(String key) => true;
+  @override
+  void setAppDetails(String company, String app, String version) {}
+  @override
+  void setAppBuildVersion(String build) {}
+  @override
+  void setAutomaticCheck(bool on) => calls.add('automatic $on');
+  @override
+  void setShutdownRequestCallback(void Function() onRequest) {}
+  @override
+  void setSkippedCallback(void Function() onSkipped) {}
+  @override
+  void setNotFoundCallback(void Function() onNotFound) {}
+  @override
+  void init() => calls.add('init');
+  @override
+  void checkWithUi() => calls.add('check');
+}
+
+/// The update settings; `throws` makes every read and write throw, as a
+/// broken registry would, and `throwsOnSet` only the setting's change.
+class _Store implements UpdateStore {
+  bool? automatic = true;
+  bool throws = false;
+  bool throwsOnSet = false;
+
+  @override
+  bool? readAutomaticChecks() {
+    if (throws) throw StateError('broken');
+    return automatic;
+  }
+
+  @override
+  void writeAutomaticChecks(bool on) {
+    if (throws || throwsOnSet) throw StateError('broken');
+    automatic = on;
+  }
+
+  @override
+  int? readLastCheck() => DateTime.now().millisecondsSinceEpoch ~/ 1000;
+  @override
+  void writeLastCheck(int seconds) {}
+  @override
+  AvailableUpdate? readFound() => null;
+  @override
+  void writeFound(AvailableUpdate? found) {}
+  @override
+  String? readSkipped() => null;
+}
 
 class _ThrowingDesktop extends FakeDesktop {
   @override
@@ -222,14 +282,75 @@ void main() {
     });
   });
 
-  test('the remaining stubs answer safely and never reach native', () async {
+  test('with no updater started, the update calls answer safely and never '
+      'reach the channel', () async {
     final c = wc();
     expect(await c.automaticUpdateChecks(), isFalse);
     expect(await c.setAutomaticUpdateChecks(true), isFalse);
     await c.checkForUpdates();
     expect(calls, isEmpty,
-        reason: 'a stub that reaches native hits a handler that does not '
-            'exist yet and throws MissingPluginException');
+        reason: 'the updater is FFI; the runner has no handler for these');
+  });
+
+  group('updates', () {
+    ({WindowsWindowController c, _Sparkle api, _Store store}) started() {
+      final api = _Sparkle();
+      final store = _Store();
+      final updater = WindowsUpdater(api, store,
+          (url) => Future.error(StateError('no feed in this test')),
+          feedUrl: 'f',
+          publicKey: 'k',
+          system: () => (major: 10, minor: 0, build: 22631, servicePack: 0))
+        ..start(build: '8', display: '1.1.0', onShutdownRequested: () {});
+      api.calls.clear();
+      return (
+        c: WindowsWindowController.forTest(
+            readVersion: () => (short: '1.1.0', build: '8'),
+            desktop: NoWindows(),
+            placer: NoWindows(),
+            updater: updater),
+        api: api,
+        store: store,
+      );
+    }
+
+    test('Check for Updates opens WinSparkle\'s window', () async {
+      final t = started();
+      await t.c.checkForUpdates();
+      expect(t.api.calls, ['check']);
+      expect(calls, isEmpty);
+    });
+
+    test('the setting is what is stored after the change', () async {
+      final t = started();
+      expect(await t.c.automaticUpdateChecks(), isTrue);
+      expect(await t.c.setAutomaticUpdateChecks(false), isFalse);
+      expect(await t.c.automaticUpdateChecks(), isFalse);
+    });
+
+    test('a broken store is answered as nothing changed, never thrown into '
+        'the pane', () async {
+      final t = started();
+      // A change that fails reads back as what is still stored: on.
+      t.store.throwsOnSet = true;
+      expect(await t.c.setAutomaticUpdateChecks(false), isTrue);
+      // Nothing readable at all: off.
+      t.store.throws = true;
+      expect(await t.c.automaticUpdateChecks(), isFalse);
+      expect(await t.c.setAutomaticUpdateChecks(false), isFalse);
+      await t.c.checkForUpdates();
+    });
+  });
+
+  test('a release build names itself by its tag', () async {
+    final c = WindowsWindowController.forTest(
+        readVersion: () => (short: '1.1.0', build: '8'),
+        desktop: NoWindows(),
+        placer: NoWindows(),
+        releaseName: '1.1.0-beta.1');
+    final v = await c.appVersion();
+    expect(v.display, '1.1.0-beta.1');
+    expect(v.buildNumber, '8');
   });
 
   group('keyboard labels', () {

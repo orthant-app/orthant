@@ -29,9 +29,17 @@ void overlayMain() => runOverlayApp();
 /// this file now lives on it — see [OrthantCoordinator] for why.
 late final OrthantCoordinator app;
 
+/// Quits on Windows. Windows keeps a dead icon in the tray until the pointer
+/// sweeps it if the process exits without removing it, so destroy() is
+/// awaited ahead of exit(0). The tray's Quit, and the updater once it has
+/// started an update's installer, which replaces the files this process runs
+/// from.
+void quitOnWindows() =>
+    unawaited(trayManager.destroy().whenComplete(() => exit(0)));
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final wc = createWindowController();
+  final wc = createWindowController(onUpdaterShutdown: quitOnWindows);
 
   // The callbacks close over `app`, which is assigned immediately below: the
   // registrar needs the coordinator and the coordinator needs the registrar, and
@@ -155,14 +163,12 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
       case 'updates':
         await app.wc.checkForUpdates();
       case 'quit':
-        // Windows keeps a dead icon in the tray until the pointer sweeps it if
-        // the process exits without removing it, so it needs destroy() awaited
-        // ahead of exit(0). macOS never had that ghost-icon problem and takes
-        // the direct exit(0) that shipped in 1.0.3 unchanged: waiting on a
-        // platform-channel reply here would let a wedged platform thread make
-        // Quit do nothing, on the one platform with real users today.
+        // macOS never had Windows' ghost-icon problem ([quitOnWindows]) and
+        // takes the direct exit(0) that shipped in 1.0.3 unchanged: waiting on
+        // a platform-channel reply here would let a wedged platform thread
+        // make Quit do nothing, on the one platform with real users today.
         if (Platform.isWindows) {
-          unawaited(trayManager.destroy().whenComplete(() => exit(0)));
+          quitOnWindows();
         } else {
           exit(0);
         }

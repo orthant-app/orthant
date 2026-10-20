@@ -1,4 +1,4 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show Timer, unawaited;
 import 'dart:io' show Platform;
 import 'dart:isolate' show Isolate;
 
@@ -14,6 +14,7 @@ import 'windows_capture.dart';
 import 'windows_keys.dart';
 import 'windows_login_item.dart';
 import 'windows_placement.dart';
+import 'windows_updater.dart';
 import 'windows_version_resource.dart';
 import 'windows_win32_ops.dart';
 import 'windows_window_ops.dart';
@@ -44,16 +45,49 @@ class WindowsWindowController implements WindowController {
       this._readAccentPalette,
       this._startup,
       this._exePath,
-      this._openStartupApps);
+      this._openStartupApps,
+      this._updater,
+      this._releaseName);
 
   /// The one way to obtain the controller in production.
   ///
-  /// W6 initialises WinSparkle here, before returning, so the updater runs
-  /// from `main()` and never waits for Settings to open. macOS shipped three
-  /// releases that never checked for updates on their own because its updater
-  /// was a lazy static nothing read until the settings window did (spec §5.6).
-  static WindowsWindowController start() {
+  /// The updater starts here, before the controller is handed back, so it
+  /// runs from `main()` and never waits for Settings to open: macOS shipped
+  /// three releases that never checked for updates on their own because its
+  /// updater was a lazy static nothing read until the settings window did.
+  /// [onUpdaterShutdown] is how WinSparkle, having started an update's
+  /// installer, asks the app to quit.
+  static WindowsWindowController start({void Function()? onUpdaterShutdown}) {
     final win32 = FfiWin32WindowOps();
+    final updater = WindowsUpdater(
+        FfiSparkleApi(), const RegistryUpdateStore(), winInetGet,
+        feedUrl: kUpdateFeedUrl,
+        publicKey: kUpdatePublicKey,
+        system: runningWindows,
+        log: _log);
+    final version = readFixedFileVersion();
+    try {
+      updater.start(
+          build: version?.build ?? '',
+          display: kReleaseName.isNotEmpty
+              ? kReleaseName
+              : version?.short ?? '',
+          onShutdownRequested: onUpdaterShutdown ?? () {});
+    } catch (e) {
+      // A missing or broken WinSparkle.dll costs updates, never the launch:
+      // the tray comes up after this.
+      _log('updater: not started: threw ($e)');
+    }
+    // Orthant's own scheduled checks (WindowsUpdater.check): at launch, then
+    // every kUpdateRetrySeconds for the life of the process, each made only
+    // when one is due.
+    void scheduled() => updater.check().catchError(
+        (Object e) => _log('updater: the scheduled check threw ($e)'));
+    scheduled();
+    if (kUpdateRetrySeconds > 0) {
+      Timer.periodic(
+          const Duration(seconds: kUpdateRetrySeconds), (_) => scheduled());
+    }
     return WindowsWindowController._(
         readFixedFileVersion,
         win32,
@@ -64,7 +98,9 @@ class WindowsWindowController implements WindowController {
         readAccentPalette,
         const FfiStartupRegistry(),
         () => Platform.resolvedExecutable,
-        openStartupAppsSettings);
+        openStartupAppsSettings,
+        updater,
+        kReleaseName);
   }
 
   /// [readAppIconPng] blocks, so it runs on an isolate of its own.
@@ -85,6 +121,8 @@ class WindowsWindowController implements WindowController {
     StartupRegistry? startup,
     String Function()? exePath,
     bool Function()? openStartupApps,
+    WindowsUpdater? updater,
+    String releaseName = '',
   }) =>
       WindowsWindowController._(
           readVersion,
@@ -96,7 +134,18 @@ class WindowsWindowController implements WindowController {
           readAccentPalette ?? () => null,
           startup ?? const _NoStartup(),
           exePath ?? () => r'C:\Orthant\Orthant.exe',
-          openStartupApps ?? () => false);
+          openStartupApps ?? () => false,
+          updater ??
+              WindowsUpdater(const _NoSparkle(), const _NoStore(), _noFeed,
+                  feedUrl: '',
+                  publicKey: '',
+                  system: () => (
+                        major: 10,
+                        minor: 0,
+                        build: 0,
+                        servicePack: 0
+                      )),
+          releaseName);
 
   final VersionReader _readVersion;
   final Win32Desktop _desktop;
@@ -122,6 +171,12 @@ class WindowsWindowController implements WindowController {
 
   /// Opens Settings' Startup apps page ([openStartupAppsSettings]).
   final bool Function() _openStartupApps;
+
+  /// WinSparkle, started by [start] or never ([WindowsUpdater]).
+  final WindowsUpdater _updater;
+
+  /// The tag's own name in a release build ([kReleaseName]), else empty.
+  final String _releaseName;
 
   /// Icons by executable path, null for an app that has none to read. Read
   /// once per app per run: an executable's icon does not change while it
@@ -194,12 +249,15 @@ class WindowsWindowController implements WindowController {
       _channel.invokeMethod<void>(kHideConfigWindow);
 
   // Read from the exe's version resource, which CMake fills from pubspec.yaml,
-  // never from a Dart constant: those drift from what shipped. A release name
-  // (the tag's own name, W6) is not stamped yet, so it is empty.
+  // never from a Dart constant: those drift from what shipped. The release
+  // name is the tag's own name, given to a release build at build time, and
+  // empty in any other build.
   @override
   Future<AppVersion> appVersion() async {
     final v = _readVersion();
-    return v == null ? const AppVersion('', '') : AppVersion(v.short, v.build);
+    return v == null
+        ? const AppVersion('', '')
+        : AppVersion(v.short, v.build, releaseName: _releaseName);
   }
 
   /// The capture a shortcut makes. It first ends a grid still open: that grid
@@ -598,14 +656,86 @@ class WindowsWindowController implements WindowController {
     }
   }
 
-  // W6: WinSparkle over FFI (§5.6).
+  // Updates: WinSparkle over FFI, started by [start]. A throw from it is
+  // logged and answered as nothing changed, never thrown into the pane.
   @override
-  Future<bool> automaticUpdateChecks() async => false;
+  Future<bool> automaticUpdateChecks() async {
+    try {
+      return _updater.automaticChecks;
+    } catch (e) {
+      _log('updater: setting unreadable ($e)');
+      return false;
+    }
+  }
+
   @override
-  Future<bool> setAutomaticUpdateChecks(bool enabled) async => false;
+  Future<bool> setAutomaticUpdateChecks(bool enabled) async {
+    try {
+      return _updater.setAutomaticChecks(enabled);
+    } catch (e) {
+      _log('updater: setting not changed ($e)');
+      return automaticUpdateChecks();
+    }
+  }
+
   @override
-  Future<void> checkForUpdates() async {}
+  Future<void> checkForUpdates() async {
+    try {
+      _updater.checkNow();
+    } catch (e) {
+      _log('updater: check threw ($e)');
+    }
+  }
 }
+
+/// No WinSparkle at all, for a suite that names none: it never starts.
+class _NoSparkle implements SparkleApi {
+  const _NoSparkle();
+  @override
+  void setRegistryPath(String path) {}
+  @override
+  void setAppcastUrl(String url) {}
+  @override
+  bool setEdDsaPublicKey(String key) => false;
+  @override
+  void setAppDetails(String company, String app, String version) {}
+  @override
+  void setAppBuildVersion(String build) {}
+  @override
+  void setAutomaticCheck(bool on) {}
+  @override
+  void setShutdownRequestCallback(void Function() onRequest) {}
+  @override
+  void setSkippedCallback(void Function() onSkipped) {}
+  @override
+  void setNotFoundCallback(void Function() onNotFound) {}
+  @override
+  void init() {}
+  @override
+  void checkWithUi() {}
+}
+
+/// Nothing stored, with [_NoSparkle].
+class _NoStore implements UpdateStore {
+  const _NoStore();
+  @override
+  bool? readAutomaticChecks() => null;
+  @override
+  void writeAutomaticChecks(bool on) {}
+  @override
+  int? readLastCheck() => null;
+  @override
+  void writeLastCheck(int seconds) {}
+  @override
+  AvailableUpdate? readFound() => null;
+  @override
+  void writeFound(AvailableUpdate? found) {}
+  @override
+  String? readSkipped() => null;
+}
+
+Future<FeedResponse> _noFeed(String url) =>
+    Future.error(StateError('no feed in a suite'));
 
 /// No startup entry, for a test that does not name one.
 class _NoStartup implements StartupRegistry {

@@ -96,6 +96,26 @@ class AppVersion {
       'AppVersion($shortVersion, $buildNumber, releaseName: $releaseName)';
 }
 
+/// An update a check found and nobody has acted on yet: the name it shows
+/// (`1.0.4`, `1.1.0-beta.1`) and the build number it is compared by, as
+/// Sparkle compares `CFBundleVersion`.
+class AvailableUpdate {
+  const AvailableUpdate(this.name, this.build);
+
+  final String name;
+  final int build;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AvailableUpdate && other.name == name && other.build == build;
+
+  @override
+  int get hashCode => Object.hash(name, build);
+
+  @override
+  String toString() => '$name ($build)';
+}
+
 /// The user's accent colour as the OS draws its own controls with it, once
 /// for a light appearance and once for a dark one, each 0xAARRGGBB.
 ///

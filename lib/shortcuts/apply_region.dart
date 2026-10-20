@@ -27,17 +27,11 @@ import 'region_commands.dart';
 /// is purely fractional, so "left two-thirds" means two-thirds of whichever
 /// display the window is already on. [gap] is device-independent; the chosen
 /// display's scale converts it (`gapForPlacement`).
-///
-/// [displayOffset] moves the placement that many displays along the reported
-/// order, wrapping; 0, which every shortcut uses, keeps it on the window's own
-/// display. Only Windows' W1 debug item passes 1, to cross a DPI boundary on
-/// purpose (Windows design §9, W1). It does not apply to the cursor fallback.
 Future<bool> applyRegion(
   WindowController wc,
   CommandRef ref, {
   List<CustomRegion> regions = const [],
   double gap = 0,
-  int displayOffset = 0,
 }) async {
   final captured = await wc.captureFrontmost();
   if (captured == null) return false;
@@ -50,8 +44,7 @@ Future<bool> applyRegion(
         ? cursor
         : null;
   } else {
-    display =
-        displays[(displays.indexOf(own) + displayOffset) % displays.length];
+    display = own;
   }
   if (display == null) return false;
   final rect = rectFor(ref, display.frame,

@@ -9,9 +9,10 @@ import 'package:orthant/settings/settings_window.dart';
 import 'package:orthant/shortcuts/bindings.dart';
 
 /// Native shows the config window hidden and reveals it on the screen's first
-/// frame, or on a deadline when none is reported. Every screen the window
-/// shows reports it, once: the ready screen too, since it is the first window
-/// a Windows user ever sees.
+/// frame, or on a deadline when none is reported. On Windows every screen the
+/// window shows reports it, once: the ready screen too, since it is the first
+/// window a Windows user ever sees. On macOS only the settings window does;
+/// the ready and onboarding screens leave their reveal to the deadline.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const channel = MethodChannel(kOrthantChannel);
@@ -65,6 +66,16 @@ void main() {
     await tester.pump();
     expect(calls, ['configFirstFrame'], reason: 'a rebuild is not a new screen');
   });
+
+  testWidgets('on Windows the ready screen reports its first frame, once',
+      (tester) async {
+    await tester.pumpWidget(app(ready()));
+    await tester.pump();
+    expect(calls, ['configFirstFrame']);
+    await tester.pumpWidget(app(ready()));
+    await tester.pump();
+    expect(calls, ['configFirstFrame'], reason: 'a rebuild is not a new screen');
+  }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
 
   testWidgets('the settings window reports its first frame, once',
       (tester) async {

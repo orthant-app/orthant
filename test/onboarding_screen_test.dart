@@ -105,6 +105,22 @@ void main() {
     expect(calls, isEmpty);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
+  testWidgets('on Windows it reports its first frame', (tester) async {
+    final calls = <String>[];
+    const channel = MethodChannel(kOrthantChannel);
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call.method);
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+    await tester.pumpWidget(MaterialApp(
+        home: OnboardingScreen(controller: PermissionController(_FakeWc()))));
+    await tester.pump();
+    expect(calls, ['configFirstFrame']);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
+
   testWidgets('shows explainer and the button opens settings', (tester) async {
     final wc = _FakeWc();
     final c = PermissionController(wc);

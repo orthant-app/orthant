@@ -10,9 +10,10 @@ import '../core/channel.dart';
 /// Native shows the window hidden (transparent on macOS, cloaked on Windows)
 /// and reveals it on this, so a screen appears already painted rather than as
 /// an empty window filling in. Every screen the window shows wraps itself in
-/// one: a screen that did not would be revealed only by native's deadline,
-/// which is what the ready and onboarding screens were until they did. That
-/// deadline also means failing to send this costs the effect, not the window.
+/// one, and on Windows every one reports. On macOS the ready and onboarding
+/// screens do not ([onMacOS]): native's deadline reveals them there, as it did
+/// when only the settings window reported. That deadline also means failing
+/// to send this costs the effect, not the window.
 ///
 /// Once per screen: a rebuild of the same screen is not a new one.
 class FirstFrameReport extends StatefulWidget {

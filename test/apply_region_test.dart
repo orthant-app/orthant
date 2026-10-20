@@ -157,26 +157,6 @@ void main() {
     );
   });
 
-  test('displayOffset moves to the next display, wrapping, with its scale',
-      () async {
-    const a = Display(WinRect(0, 0, 1920, 1040), 1);
-    const b = Display(WinRect(1920, 0, 2880, 1560), 1.5);
-    final wc = _FakeWc()
-      ..screens = const [a, b]
-      ..toCapture = const CapturedWindow('X', WinRect(100, 100, 800, 600));
-    await applyRegion(wc, const BuiltIn(ShortcutCommand.leftHalf),
-        gap: 16, displayOffset: 1);
-    expect(wc.applied,
-        gridBlock(b.frame, cols: 2, rows: 2, c0: 0, c1: 0, r0: 0, r1: 1, gap: 24));
-
-    wc.toCapture = const CapturedWindow('X', WinRect(2000, 100, 800, 600));
-    await applyRegion(wc, const BuiltIn(ShortcutCommand.leftHalf),
-        gap: 16, displayOffset: 1);
-    expect(wc.applied,
-        gridBlock(a.frame, cols: 2, rows: 2, c0: 0, c1: 0, r0: 0, r1: 1, gap: 16),
-        reason: 'from the last display, the next one is the first');
-  });
-
   group('custom regions', () {
     const leftTwoThirds = CustomRegion(
       id: 'r1',

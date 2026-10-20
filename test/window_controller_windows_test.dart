@@ -64,10 +64,11 @@ class _Store implements UpdateStore {
   int? readLastCheck() => DateTime.now().millisecondsSinceEpoch ~/ 1000;
   @override
   void writeLastCheck(int seconds) {}
+  AvailableUpdate? found;
   @override
-  AvailableUpdate? readFound() => null;
+  AvailableUpdate? readFound() => found;
   @override
-  void writeFound(AvailableUpdate? found) {}
+  void writeFound(AvailableUpdate? update) => found = update;
   @override
   String? readSkipped() => null;
 }
@@ -293,9 +294,10 @@ void main() {
   });
 
   group('updates', () {
-    ({WindowsWindowController c, _Sparkle api, _Store store}) started() {
+    ({WindowsWindowController c, _Sparkle api, _Store store}) started(
+        {AvailableUpdate? found}) {
       final api = _Sparkle();
-      final store = _Store();
+      final store = _Store()..found = found;
       final updater = WindowsUpdater(api, store,
           (url) => Future.error(StateError('no feed in this test')),
           feedUrl: 'f',
@@ -319,6 +321,13 @@ void main() {
       await t.c.checkForUpdates();
       expect(t.api.calls, ['check']);
       expect(calls, isEmpty);
+    });
+
+    test('what a check found reaches the seam, as the updater holds it',
+        () async {
+      final t = started(found: const AvailableUpdate('1.0.4', 9));
+      expect(t.c.availableUpdate.value, const AvailableUpdate('1.0.4', 9));
+      expect(started().c.availableUpdate.value, isNull);
     });
 
     test('the setting is what is stored after the change', () async {

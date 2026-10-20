@@ -3,7 +3,7 @@ import 'dart:io' show Platform;
 import 'dart:isolate' show Isolate;
 
 import 'package:flutter/foundation.dart'
-    show debugPrint, kReleaseMode, visibleForTesting;
+    show ValueListenable, debugPrint, kReleaseMode, visibleForTesting;
 import 'package:flutter/services.dart';
 import 'channel.dart';
 import 'geometry.dart';
@@ -686,6 +686,9 @@ class WindowsWindowController implements WindowController {
       _log('updater: check threw ($e)');
     }
   }
+
+  @override
+  ValueListenable<AvailableUpdate?> get availableUpdate => _updater.found;
 }
 
 /// No WinSparkle at all, for a suite that names none: it never starts.

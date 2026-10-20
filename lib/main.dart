@@ -72,8 +72,9 @@ Future<void> main() async {
   if (Platform.isWindows) {
     await trayManager.setIcon('assets/tray_icon.ico');
     // The tray plugin never initialises its tooltip, so without one the hover
-    // label is leftover memory; macOS needs none and keeps none.
-    await trayManager.setToolTip('Orthant');
+    // label is leftover memory; macOS needs none and keeps none. _syncTray
+    // keeps it current.
+    await trayManager.setToolTip(app.trayToolTip);
   } else {
     await trayManager.setIcon('assets/tray_icon.png', isTemplate: true);
   }
@@ -94,13 +95,16 @@ Future<void> main() async {
 /// type/submenu — `sublabel` is silently dropped and it never sets
 /// NSMenuItem.keyEquivalent, so a real right-aligned key equivalent is not
 /// reachable without forking a pinned package. Inline is what is left.
-Future<void> _syncTray() => trayManager.setContextMenu(Menu(items: [
-      for (final e in app.trayMenu)
-        if (e.isSeparator)
-          MenuItem.separator()
-        else
-          MenuItem(key: e.key, label: e.label, disabled: e.disabled),
-    ]));
+Future<void> _syncTray() async {
+  await trayManager.setContextMenu(Menu(items: [
+    for (final e in app.trayMenu)
+      if (e.isSeparator)
+        MenuItem.separator()
+      else
+        MenuItem(key: e.key, label: e.label, disabled: e.disabled),
+  ]));
+  if (Platform.isWindows) await trayManager.setToolTip(app.trayToolTip);
+}
 
 class OrthantApp extends StatefulWidget {
   const OrthantApp({super.key});
@@ -160,7 +164,7 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
         await app.openSettings();
       case 'about':
         await app.openSettings(tab: SettingsTab.about);
-      case 'updates':
+      case 'updates' || 'install-update':
         await app.wc.checkForUpdates();
       case 'quit':
         // macOS never had Windows' ghost-icon problem ([quitOnWindows]) and
@@ -221,6 +225,7 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
               onPendingConsumed: app.consumePendingRegion,
               version: app.appVersion,
               onCheckForUpdates: app.wc.checkForUpdates,
+              availableUpdate: app.availableUpdate?.name,
               automaticChecks: app.autoUpdateChecks,
               onAutomaticChecksChanged: app.setAutoUpdateChecks,
             ),

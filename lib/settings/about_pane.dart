@@ -33,6 +33,7 @@ class AboutPane extends StatelessWidget {
     super.key,
     required this.version,
     this.onCheckForUpdates,
+    this.availableUpdate,
     this.automaticChecks = true,
     this.onAutomaticChecksChanged,
     this.scrollController,
@@ -46,6 +47,11 @@ class AboutPane extends StatelessWidget {
   /// Null disables the button. The same call the tray's *Check for Updates…*
   /// makes; two entry points, one updater session.
   final VoidCallback? onCheckForUpdates;
+
+  /// The name of an update a check found and nobody has acted on (Windows,
+  /// where nothing else shows it), or null. Shown above Check for Updates,
+  /// with a button that opens the updater's offer, as that one does.
+  final String? availableUpdate;
 
   /// Whether the updater checks on its own schedule. Owned by the updater, not
   /// by us — this is a render of what it reported, not a stored preference.
@@ -120,6 +126,19 @@ class AboutPane extends StatelessWidget {
                       // The Shortcuts pane already paid for that confusion once.
                       'Version ${version.display}',
                       style: TextStyle(fontSize: 13, color: t.labelSecondary),
+                    ),
+                  ],
+                  if (availableUpdate case final name?) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      'Orthant $name is available.',
+                      style: TextStyle(fontSize: 13, color: t.labelPrimary),
+                    ),
+                    const SizedBox(height: 8),
+                    MacPushButton(
+                      label: 'Update…',
+                      tokens: t,
+                      onPressed: onCheckForUpdates,
                     ),
                   ],
                   const SizedBox(height: 20),

@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
+
 import 'geometry.dart';
 
 /// A window captured natively; [frame] is its current frame in top-left space.
@@ -307,4 +309,13 @@ abstract class WindowController {
   /// Fire-and-forget: the updater owns the whole flow from here, including its
   /// own UI, and there is no answer Dart could act on.
   Future<void> checkForUpdates();
+
+  /// The update a check found that is still to be installed; null for none.
+  ///
+  /// Windows only: WinSparkle opens its offer in front of whatever the user
+  /// is doing whenever a check of its own finds one, so Orthant checks there
+  /// itself and shows a find in the tray and the About pane, whose items open
+  /// that offer ([checkForUpdates]). On macOS Sparkle shows its own window,
+  /// and this stays null.
+  ValueListenable<AvailableUpdate?> get availableUpdate;
 }

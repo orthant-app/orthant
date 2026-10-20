@@ -81,7 +81,6 @@ class OrthantCoordinator extends ChangeNotifier {
     SettingsStore? settingsStore,
     CommandQueue? commands,
     this.pollPeriod = const Duration(milliseconds: 1500),
-    this.debugPlacementItems = false,
     this.permissionGate = true,
   }) : _bindingsStore = bindingsStore ?? BindingsStore(),
        _settingsStore = settingsStore ?? SettingsStore(),
@@ -104,12 +103,6 @@ class OrthantCoordinator extends ChangeNotifier {
   /// How often to re-check permission *while waiting on the user in System
   /// Settings*. Injectable so a test is not obliged to wait on real time.
   final Duration pollPeriod;
-
-  /// Whether the tray offers W1's two debug placements. True only on Windows
-  /// in Debug and Profile builds (`main.dart`): they exist to drive the W1
-  /// acceptance until W2's hotkeys do, and never appear on macOS or in a
-  /// release.
-  final bool debugPlacementItems;
 
   /// Whether the platform has a permission a first launch asks for: macOS's
   /// Accessibility grant. Where it does, a launch that finds the grant before
@@ -464,20 +457,6 @@ class OrthantCoordinator extends ChangeNotifier {
     await recoverIfPermissionLost();
   });
 
-  /// W1's debug placement: exactly the left-half shortcut, from the tray.
-  Future<void> debugSnapLeft() =>
-      runCommand(const BuiltIn(ShortcutCommand.leftHalf));
-
-  /// The left half of the *next* display: the one way a left-half snap crosses
-  /// a DPI boundary on purpose, which is what proves placement's correction
-  /// pass on Windows (spec §9, W1). Queued like every other placement.
-  Future<void> debugSnapLeftOnNextDisplay() => _commands.add(() async {
-        await applyRegion(wc, const BuiltIn(ShortcutCommand.leftHalf),
-            regions: _regions,
-            gap: _settings.effectiveGap,
-            displayOffset: 1);
-      });
-
   /// Windows: the grid's commit, back from the runner.
   ///
   /// Through the command queue, serialised with the direct shortcuts over the
@@ -542,11 +521,6 @@ class OrthantCoordinator extends ChangeNotifier {
     // reachable even from a build that cannot say what version it is.
     const TrayEntry('about', 'About Orthant'),
     const TrayEntry('updates', 'Check for Updates…'),
-    if (debugPlacementItems) ...[
-      const TrayEntry.separator(),
-      const TrayEntry('debugSnapLeft', 'Snap Left Half (debug)'),
-      const TrayEntry('debugSnapNext', 'Snap Left Half on Next Display (debug)'),
-    ],
     const TrayEntry.separator(),
     const TrayEntry('quit', 'Quit Orthant'),
   ];

@@ -157,9 +157,10 @@ class OrthantCoordinator extends ChangeNotifier {
   /// Every show of the config window: the accent read first, then [screen]
   /// set and the window shown in the same turn, with nothing between them.
   /// Setting the screen schedules the frame that reveals the window
-  /// (`configFirstFrame`), and macOS counts that frame only once the show has
-  /// armed it; a channel round trip between the two could let the frame land
-  /// first, and the window would then wait out its fallback.
+  /// (`configFirstFrame`, which every screen reports on Windows and the
+  /// settings window on macOS), and macOS counts that frame only once the show
+  /// has armed it; a channel round trip between the two could let the frame
+  /// land first, and the window would then wait out its fallback.
   ///
   /// Notifies even when [screen] is already up, so a pane switch on an open
   /// window (`openSettings` with another tab) is drawn.

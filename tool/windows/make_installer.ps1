@@ -5,7 +5,8 @@
 #       [-Bundle build\windows\x64\runner\Release] [-OutDir build\dist]
 #       [-SignTool '<command with $f for the file>']
 #
-# Run from the repository's root, after `flutter build windows --release`.
+# Run from the repository's root, after `flutter build windows --release`
+# (a prerelease name needs `--dart-define=ORTHANT_RELEASE_NAME=<that name>`).
 # The release name is the tag's own name (1.1.0, 1.1.0-beta.1); its base must
 # be pubspec.yaml's version, and the bundle's executable must carry that
 # version and build number, so an installer is never made from another
@@ -31,6 +32,7 @@ $build = $m[0].Groups[2].Value
 
 if ($ReleaseName -notmatch '^(\d+\.\d+\.\d+)(-[0-9A-Za-z.-]+)?$') { Fail "release name '$ReleaseName' is not a version" }
 if ($Matches[1] -cne $version) { Fail "release name '$ReleaseName' is not pubspec.yaml's version $version" }
+$prerelease = $Matches[2]
 
 $exe = Join-Path $Bundle 'Orthant.exe'
 if (-not (Test-Path $exe)) { Fail "no executable at ${exe}: build the release first" }
@@ -38,6 +40,21 @@ $info = (Get-Item $exe).VersionInfo
 $exeVersion = '{0}.{1}.{2}' -f $info.FileMajorPart, $info.FileMinorPart, $info.FileBuildPart
 if ($exeVersion -cne $version -or [string]$info.FilePrivatePart -cne $build) {
   Fail ("the bundle's executable is {0} ({1}), not {2} ({3}): build this version first" -f $exeVersion, $info.FilePrivatePart, $version, $build)
+}
+# A prerelease name reaches the app only through ORTHANT_RELEASE_NAME: built
+# without it the app calls itself by its three numbers while the installer and
+# the feed say beta. A plain version needs nothing (the version resource's
+# numbers are that name). The name is looked for in app.so as a whole name, so
+# an app built as 1.1.0-beta.10 does not satisfy a requested 1.1.0-beta.1.
+if ($prerelease) {
+  $so = Join-Path $Bundle 'data\app.so'
+  if (-not (Test-Path $so)) { Fail "no ${so}: build the release first" }
+  # .NET resolves a relative path against the process's directory, which is
+  # not PowerShell's location when this script is run in-process.
+  $so = (Resolve-Path $so).Path
+  $text = [Text.Encoding]::GetEncoding(28591).GetString([IO.File]::ReadAllBytes($so))
+  $whole = '(?<=\x00)' + [regex]::Escape($ReleaseName) + '(?![0-9A-Za-z.+-])'
+  if (-not [regex]::IsMatch($text, $whole)) { Fail "app.so does not hold '$ReleaseName': build with --dart-define=ORTHANT_RELEASE_NAME=$ReleaseName" }
 }
 if (-not (Test-Path (Join-Path $Bundle 'WinSparkle.dll'))) { Fail "no WinSparkle.dll in ${Bundle}: the updater would not start" }
 # The Visual C++ runtime the runner and its plugins link against (CMake puts

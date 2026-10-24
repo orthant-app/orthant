@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
+
 import 'geometry.dart';
 
 /// A window captured natively; [frame] is its current frame in top-left space.
@@ -94,6 +96,26 @@ class AppVersion {
   @override
   String toString() =>
       'AppVersion($shortVersion, $buildNumber, releaseName: $releaseName)';
+}
+
+/// An update a check found and nobody has acted on yet: the name it shows
+/// (`1.0.4`, `1.1.0-beta.1`) and the build number it is compared by, as
+/// Sparkle compares `CFBundleVersion`.
+class AvailableUpdate {
+  const AvailableUpdate(this.name, this.build);
+
+  final String name;
+  final int build;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AvailableUpdate && other.name == name && other.build == build;
+
+  @override
+  int get hashCode => Object.hash(name, build);
+
+  @override
+  String toString() => '$name ($build)';
 }
 
 /// The user's accent colour as the OS draws its own controls with it, once
@@ -287,4 +309,13 @@ abstract class WindowController {
   /// Fire-and-forget: the updater owns the whole flow from here, including its
   /// own UI, and there is no answer Dart could act on.
   Future<void> checkForUpdates();
+
+  /// The update a check found that is still to be installed; null for none.
+  ///
+  /// Windows only: WinSparkle opens its offer in front of whatever the user
+  /// is doing whenever a check of its own finds one, so Orthant checks there
+  /// itself and shows a find in the tray and the About pane, whose items open
+  /// that offer ([checkForUpdates]). On macOS Sparkle shows its own window,
+  /// and this stays null.
+  ValueListenable<AvailableUpdate?> get availableUpdate;
 }

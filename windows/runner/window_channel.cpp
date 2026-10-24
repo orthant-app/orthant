@@ -151,6 +151,14 @@ void WindowChannel::NotifyKeyboardLayoutChanged(const char* why) {
   channel_->InvokeMethod("onKeyboardLayoutChanged", nullptr);
 }
 
+void WindowChannel::NotifyQuitRequested() {
+#ifdef ORTHANT_DEV_BUILD
+  // The acceptance parses this line: change it only together with it.
+  std::cout << "[orthant] quit requested (OrthantQuitRequest)" << std::endl;
+#endif
+  channel_->InvokeMethod("onQuitRequested", nullptr);
+}
+
 std::optional<flutter::EncodableList> WindowChannel::ReplaceHotkeys(
     const flutter::EncodableValue* arguments) {
   // The previous set goes first, whatever the payload holds: a payload Dart

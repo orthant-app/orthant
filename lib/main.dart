@@ -29,9 +29,17 @@ void overlayMain() => runOverlayApp();
 /// this file now lives on it — see [OrthantCoordinator] for why.
 late final OrthantCoordinator app;
 
+/// Quits on Windows. Windows keeps a dead icon in the tray until the pointer
+/// sweeps it if the process exits without removing it, so destroy() is
+/// awaited ahead of exit(0). The tray's Quit; the updater once it has started
+/// an update's installer, which replaces the files this process runs from;
+/// and Setup itself, asking before it installs or uninstalls.
+void quitOnWindows() =>
+    unawaited(trayManager.destroy().whenComplete(() => exit(0)));
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final wc = createWindowController();
+  final wc = createWindowController(onUpdaterShutdown: quitOnWindows);
 
   // The callbacks close over `app`, which is assigned immediately below: the
   // registrar needs the coordinator and the coordinator needs the registrar, and
@@ -46,6 +54,8 @@ Future<void> main() async {
     onOverlayCommit: (id, rect) => app.overlayCommit(id, rect),
     onOverlaySaveRegion: (id, rect, block) =>
         app.overlaySaveRegion(id, rect, block),
+    // Only Windows sends it: Setup, before it replaces the app's files.
+    onQuitRequested: quitOnWindows,
   );
   app = OrthantCoordinator(
     wc: wc,
@@ -64,8 +74,9 @@ Future<void> main() async {
   if (Platform.isWindows) {
     await trayManager.setIcon('assets/tray_icon.ico');
     // The tray plugin never initialises its tooltip, so without one the hover
-    // label is leftover memory; macOS needs none and keeps none.
-    await trayManager.setToolTip('Orthant');
+    // label is leftover memory; macOS needs none and keeps none. _syncTray
+    // keeps it current.
+    await trayManager.setToolTip(app.trayToolTip);
   } else {
     await trayManager.setIcon('assets/tray_icon.png', isTemplate: true);
   }
@@ -86,13 +97,16 @@ Future<void> main() async {
 /// type/submenu — `sublabel` is silently dropped and it never sets
 /// NSMenuItem.keyEquivalent, so a real right-aligned key equivalent is not
 /// reachable without forking a pinned package. Inline is what is left.
-Future<void> _syncTray() => trayManager.setContextMenu(Menu(items: [
-      for (final e in app.trayMenu)
-        if (e.isSeparator)
-          MenuItem.separator()
-        else
-          MenuItem(key: e.key, label: e.label, disabled: e.disabled),
-    ]));
+Future<void> _syncTray() async {
+  await trayManager.setContextMenu(Menu(items: [
+    for (final e in app.trayMenu)
+      if (e.isSeparator)
+        MenuItem.separator()
+      else
+        MenuItem(key: e.key, label: e.label, disabled: e.disabled),
+  ]));
+  if (Platform.isWindows) await trayManager.setToolTip(app.trayToolTip);
+}
 
 class OrthantApp extends StatefulWidget {
   const OrthantApp({super.key});
@@ -152,17 +166,15 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
         await app.openSettings();
       case 'about':
         await app.openSettings(tab: SettingsTab.about);
-      case 'updates':
+      case 'updates' || 'install-update':
         await app.wc.checkForUpdates();
       case 'quit':
-        // Windows keeps a dead icon in the tray until the pointer sweeps it if
-        // the process exits without removing it, so it needs destroy() awaited
-        // ahead of exit(0). macOS never had that ghost-icon problem and takes
-        // the direct exit(0) that shipped in 1.0.3 unchanged: waiting on a
-        // platform-channel reply here would let a wedged platform thread make
-        // Quit do nothing, on the one platform with real users today.
+        // macOS never had Windows' ghost-icon problem ([quitOnWindows]) and
+        // takes the direct exit(0) that shipped in 1.0.3 unchanged: waiting on
+        // a platform-channel reply here would let a wedged platform thread
+        // make Quit do nothing, on the one platform with real users today.
         if (Platform.isWindows) {
-          unawaited(trayManager.destroy().whenComplete(() => exit(0)));
+          quitOnWindows();
         } else {
           exit(0);
         }
@@ -215,6 +227,7 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
               onPendingConsumed: app.consumePendingRegion,
               version: app.appVersion,
               onCheckForUpdates: app.wc.checkForUpdates,
+              availableUpdate: app.availableUpdate?.name,
               automaticChecks: app.autoUpdateChecks,
               onAutomaticChecksChanged: app.setAutoUpdateChecks,
             ),

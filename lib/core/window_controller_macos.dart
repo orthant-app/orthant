@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueListenable, ValueNotifier;
 import 'package:flutter/services.dart';
 import 'carbon_keys.dart';
 import 'channel.dart';
@@ -200,6 +201,11 @@ class MacosWindowController implements WindowController {
   @override
   Future<void> checkForUpdates() =>
       _channel.invokeMethod<void>(kCheckForUpdates);
+
+  /// Sparkle shows what it finds in a window of its own.
+  @override
+  ValueListenable<AvailableUpdate?> get availableUpdate => _noUpdate;
+  static final _noUpdate = ValueNotifier<AvailableUpdate?>(null);
 
   /// Anything we do not recognise — a newer macOS status, a null reply, a value
   /// that is not even a string — is [LoginItemStatus.unavailable].

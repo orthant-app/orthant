@@ -19,6 +19,21 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
+  test("an installer's request to quit reaches the app, shortcuts or not", () async {
+    // Setup broadcasts it before it replaces the files the app runs from
+    // (windows/installer/orthant.iss); a first run that has registered no
+    // shortcut must quit too.
+    var quits = 0;
+    HotkeyService(onCommand: (_) {}, onQuitRequested: () => quits++);
+    await messenger.handlePlatformMessage(
+      kOrthantChannel,
+      const StandardMethodCodec()
+          .encodeMethodCall(const MethodCall('onQuitRequested')),
+      (_) {},
+    );
+    expect(quits, 1);
+  });
+
   test('layout notifications arrive before Accessibility enables shortcuts', () async {
     var changes = 0;
     HotkeyService(onCommand: (_) {}, onKeyboardLayoutChanged: () => changes++);

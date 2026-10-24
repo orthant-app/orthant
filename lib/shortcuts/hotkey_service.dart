@@ -47,6 +47,7 @@ class HotkeyService implements HotkeyRegistrar {
     this.onKeyboardLayoutChanged,
     this.onOverlayCommit,
     this.onOverlaySaveRegion,
+    this.onQuitRequested,
   }) {
     // Layout changes and window closes also matter before permission is granted.
     _channel.setMethodCallHandler(_handle);
@@ -89,6 +90,11 @@ class HotkeyService implements HotkeyRegistrar {
   /// the [block] as a shortcut.
   final void Function(int sessionId, WinRect rect, Map<Object?, Object?> block)?
       onOverlaySaveRegion;
+
+  /// Windows: Setup asking the app to quit before it replaces or removes its
+  /// files. Here, like [onPlacementFailed], because a MethodChannel has room
+  /// for exactly one handler.
+  final void Function()? onQuitRequested;
 
   static const MethodChannel _channel = MethodChannel(kOrthantChannel);
 
@@ -243,6 +249,8 @@ class HotkeyService implements HotkeyRegistrar {
       }
     } else if (call.method == kKeyboardLayoutChanged) {
       onKeyboardLayoutChanged?.call();
+    } else if (call.method == kQuitRequested) {
+      onQuitRequested?.call();
     }
     return null;
   }

@@ -88,6 +88,8 @@ class OrthantCoordinator extends ChangeNotifier {
     // The platform hears when a burst of window commands starts and when the
     // last of it is done: Windows attaches no overlay engine in between.
     _commands.onBusy = (busy) => unawaited(wc.setCommandsRunning(busy));
+    // A find changes the tray and the About pane.
+    wc.availableUpdate.addListener(notifyListeners);
   }
 
   final WindowController wc;
@@ -521,10 +523,25 @@ class OrthantCoordinator extends ChangeNotifier {
     // the old row: this menu is Orthant's only front door, so About must be
     // reachable even from a build that cannot say what version it is.
     const TrayEntry('about', 'About Orthant'),
+    // What a check found, here rather than in a window that takes the
+    // foreground unasked; choosing it opens the updater's offer (Windows).
+    if (availableUpdate case final update?)
+      TrayEntry('install-update', 'Update to Orthant ${update.name}…'),
     const TrayEntry('updates', 'Check for Updates…'),
     const TrayEntry.separator(),
     const TrayEntry('quit', 'Quit Orthant'),
   ];
+
+  /// The update a check found that is still to be installed
+  /// ([WindowController.availableUpdate]); null for none, always on macOS.
+  AvailableUpdate? get availableUpdate => wc.availableUpdate.value;
+
+  /// The tray icon's tooltip: the app's name, and the update when there is
+  /// one, so a hover says so without opening anything.
+  String get trayToolTip => switch (availableUpdate) {
+    final update? => 'Orthant: update ${update.name} available',
+    null => 'Orthant',
+  };
 
   /// "Open Grid", with the summon's combo beside it when there is one to show:
   /// inline on macOS, in the menu's accelerator column on Windows
@@ -866,6 +883,7 @@ class OrthantCoordinator extends ChangeNotifier {
   void dispose() {
     _poll?.cancel();
     permissions.removeListener(_onPermissionNotified);
+    wc.availableUpdate.removeListener(notifyListeners);
     super.dispose();
   }
 }

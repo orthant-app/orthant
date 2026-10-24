@@ -49,6 +49,11 @@ dependencies:
   win32: 6.4.0
   ffi: 2.2.0
 
+  # The Windows update feed, read as an XML document so that a malformed or
+  # truncated one is refused rather than half read. Pinned exactly, at the
+  # version Flutter's own tools pin.
+  xml: 6.6.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

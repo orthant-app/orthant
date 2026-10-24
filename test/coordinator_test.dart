@@ -163,6 +163,8 @@ class _FakeWc implements WindowController {
       calls.add('openLoginItemsSettings');
   @override
   Future<void> checkForUpdates() async => calls.add('checkForUpdates');
+  @override
+  final _Counted<AvailableUpdate?> availableUpdate = _Counted(null);
 }
 
 class _FakeRegistrar implements HotkeyRegistrar {
@@ -179,6 +181,24 @@ class _FakeRegistrar implements HotkeyRegistrar {
 
   @override
   Future<void> unregisterAll() async => unregisterAllCount++;
+}
+
+/// A notifier that counts who is listening, so a test can see a listener
+/// that was never removed.
+class _Counted<T> extends ValueNotifier<T> {
+  _Counted(super.value);
+  int listeners = 0;
+  @override
+  void addListener(VoidCallback listener) {
+    listeners++;
+    super.addListener(listener);
+  }
+
+  @override
+  void removeListener(VoidCallback listener) {
+    listeners--;
+    super.removeListener(listener);
+  }
 }
 
 typedef _Harness = ({OrthantCoordinator app, _FakeWc wc, _FakeRegistrar keys});
@@ -460,6 +480,39 @@ void main() {
         keys.indexOf('about') + 1,
         reason: 'About sits directly above Check for Updates',
       );
+    });
+
+    test('an update a check found is offered directly above Check for '
+        'Updates, with a tooltip that says so; when it goes, both do', () async {
+      final t = build(granted: true);
+      await t.app.start();
+      var notified = 0;
+      t.app.addListener(() => notified++);
+      expect(t.app.trayMenu.map((e) => e.key), isNot(contains('install-update')));
+      expect(t.app.trayToolTip, 'Orthant');
+
+      t.wc.availableUpdate.value = const AvailableUpdate('1.0.4', 8);
+      expect(notified, 1, reason: 'the tray is rebuilt on a notification');
+      final keys = t.app.trayMenu.map((e) => e.key).toList();
+      final item = t.app.trayMenu.firstWhere((e) => e.key == 'install-update');
+      expect(item.label, 'Update to Orthant 1.0.4…');
+      expect(item.disabled, isFalse);
+      expect(keys.indexOf('updates'), keys.indexOf('install-update') + 1);
+      expect(t.app.trayToolTip, 'Orthant: update 1.0.4 available');
+
+      t.wc.availableUpdate.value = null;
+      expect(t.app.trayMenu.map((e) => e.key), isNot(contains('install-update')));
+      expect(t.app.trayToolTip, 'Orthant');
+    });
+
+    test('the coordinator stops listening for a find when it is gone',
+        () async {
+      final t = build(granted: true);
+      await t.app.start();
+      expect(t.wc.availableUpdate.listeners, 1);
+      built.remove(t.app);
+      t.app.dispose();
+      expect(t.wc.availableUpdate.listeners, 0);
     });
 
     test('About is offered even when the platform cannot say what version it '

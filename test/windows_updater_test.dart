@@ -180,6 +180,7 @@ void main() {
       final t = make();
       t.store.automatic = choice;
       start(t.updater);
+      expect(t.api.calls, contains('automatic false'));
       expect(t.api.calls.indexOf('automatic false'),
           lessThan(t.api.calls.indexOf('init')));
       expect(t.api.calls, isNot(contains('automatic true')));

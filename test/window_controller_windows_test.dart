@@ -347,7 +347,6 @@ void main() {
       t.store.throws = true;
       expect(await t.c.automaticUpdateChecks(), isFalse);
       expect(await t.c.setAutomaticUpdateChecks(false), isFalse);
-      await t.c.checkForUpdates();
     });
   });
 

@@ -482,7 +482,9 @@ publish() {
       # non-empty and would publish a blank release body.
       grep -q '[^[:space:]]' "$notes_file" ||
         workflow_error "changelog entry has no body: $notes_source" || return 1
-      create_args=(release create "$tag" --draft --verify-tag --notes-file "$notes_file")
+      # --title is the tag, exactly (v1.0.1, v1.1.0-beta.2), as the releases
+      # before 1.0.2 had it. Without it the release's `name` is null.
+      create_args=(release create "$tag" --title "$tag" --draft --verify-tag --notes-file "$notes_file")
       if [[ "$prerelease" == true ]]; then
         create_args+=(--prerelease --latest=false)
       fi
@@ -543,7 +545,10 @@ publish() {
   fi
   rm -rf "$temporary" || return 1
 
-  edit_args=(release edit "$tag" --draft=false "--prerelease=$prerelease")
+  # The title is set here as well as at creation: a draft left by an earlier
+  # run, or made by hand without one, skips the create above and would
+  # otherwise be published with a null name.
+  edit_args=(release edit "$tag" --title "$tag" --draft=false "--prerelease=$prerelease")
   if [[ "$prerelease" == true ]]; then
     edit_args+=(--latest=false)
   fi

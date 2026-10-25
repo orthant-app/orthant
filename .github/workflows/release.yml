@@ -43,6 +43,153 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: tool/ci/release_workflow.sh check-settled orthant-app/orthant
 
+  # The Windows release, built and Authenticode-signed beside the macOS job
+  # and admitted by the same approval. Its installer goes to the macOS job,
+  # which makes the Ed25519 signature every installed copy checks before it
+  # runs an update (Sparkle's sign_update is a macOS tool) and writes the
+  # Windows feed. Nothing here prints who signed: SignTool runs quietly, its
+  # output and the signatures' subjects go only to diagnostics, which travel
+  # encrypted with the installer.
+  build-windows:
+    needs: validate
+    runs-on: windows-latest
+    timeout-minutes: 60
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Resolve Flutter cache paths
+        id: flutter-meta
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: 3.47.2
+          channel: stable
+          dry-run: true
+
+      - name: Restore Flutter SDK
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.flutter-meta.outputs.CACHE-PATH }}
+          key: flutter-${{ runner.os }}-${{ runner.arch }}-3.47.2
+
+      - name: Restore pub cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.flutter-meta.outputs.PUB-CACHE-PATH }}
+          key: pub-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: pub-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: 3.47.2
+          channel: stable
+
+      - name: Check the signing secrets
+        shell: powershell
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARTIFACT_SIGNING_ENDPOINT: ${{ secrets.ARTIFACT_SIGNING_ENDPOINT }}
+          ARTIFACT_SIGNING_ACCOUNT: ${{ secrets.ARTIFACT_SIGNING_ACCOUNT }}
+          ARTIFACT_SIGNING_PROFILE: ${{ secrets.ARTIFACT_SIGNING_PROFILE }}
+          DRYRUN_ARTIFACT_KEY: ${{ secrets.DRYRUN_ARTIFACT_KEY }}
+        run: |
+          foreach ($name in 'AZURE_CLIENT_ID', 'AZURE_TENANT_ID', 'AZURE_SUBSCRIPTION_ID', 'ARTIFACT_SIGNING_ENDPOINT', 'ARTIFACT_SIGNING_ACCOUNT', 'ARTIFACT_SIGNING_PROFILE', 'DRYRUN_ARTIFACT_KEY') {
+            $value = [Environment]::GetEnvironmentVariable($name)
+            if (-not $value) { Write-Error 'A required release secret is empty.'; exit 1 }
+            if ($name -ne 'DRYRUN_ARTIFACT_KEY') { "::add-mask::$value" }
+          }
+
+      - name: Build the release
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          MODE: ${{ needs.validate.outputs.mode }}
+        run: |
+          $feed = if ($env:MODE -eq 'beta') { 'https://updates.orthant.app/appcast-win-beta.xml' } else { 'https://updates.orthant.app/appcast-win.xml' }
+          flutter build windows --release "--dart-define=ORTHANT_RELEASE_NAME=$env:VERSION" "--dart-define=ORTHANT_UPDATE_FEED=$feed"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          "WINDOWS_FEED=$feed" >> $env:GITHUB_ENV
+
+      - name: Check the build is this release's
+        shell: powershell
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: .\tool\windows\check_release_build.ps1 -ReleaseName $env:VERSION -Feed $env:WINDOWS_FEED
+
+      - name: Set up signing
+        shell: powershell
+        env:
+          ARTIFACT_SIGNING_ENDPOINT: ${{ secrets.ARTIFACT_SIGNING_ENDPOINT }}
+          ARTIFACT_SIGNING_ACCOUNT: ${{ secrets.ARTIFACT_SIGNING_ACCOUNT }}
+          ARTIFACT_SIGNING_PROFILE: ${{ secrets.ARTIFACT_SIGNING_PROFILE }}
+        run: >-
+          .\tool\windows\signing_setup.ps1 -Dir "$env:RUNNER_TEMP\signing"
+          -Endpoint $env:ARTIFACT_SIGNING_ENDPOINT -Account $env:ARTIFACT_SIGNING_ACCOUNT
+          -CertificateProfile $env:ARTIFACT_SIGNING_PROFILE
+          -CorrelationId "orthant-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+
+      - name: Sign in to Azure
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign the app, then make and sign its installer
+        shell: powershell
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          $log = "$env:RUNNER_TEMP\windows-diagnostics.log"
+          $sign = @('/q', '/fd', 'SHA256', '/tr', 'http://timestamp.acs.microsoft.com', '/td', 'SHA256', '/dlib', $env:SIGNING_DLIB, '/dmdf', $env:SIGNING_METADATA)
+          & .\tool\windows\sign_files.ps1 -SignTool $env:SIGNTOOL -SignArgs $sign -Bundle build\windows\x64\runner\Release -Log $log
+          $inno = & .\tool\windows\sign_files.ps1 -SignTool $env:SIGNTOOL -SignArgs $sign -Log $log -InnoCommand
+          & .\tool\windows\make_installer.ps1 -ReleaseName $env:VERSION -SignTool $inno
+          & .\tool\windows\check_signatures.ps1 -Path build\windows\x64\runner\Release, "build\dist\Orthant-$env:VERSION-setup.exe" -Log $log
+
+      - name: Encrypt the Windows release for the macOS job
+        if: always()
+        shell: bash
+        env:
+          DRYRUN_ARTIFACT_KEY: ${{ secrets.DRYRUN_ARTIFACT_KEY }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          umask 077
+          cd "$RUNNER_TEMP"
+          rm -rf windows-out && mkdir windows-out
+          # The diagnostics travel whatever happened; the installer only from a
+          # job that has succeeded, since one can exist and still have failed
+          # its signature check.
+          installer="$GITHUB_WORKSPACE/build/dist/Orthant-$VERSION-setup.exe"
+          if [[ "$JOB_STATUS" == success && -f "$installer" ]]; then
+            cp "$installer" windows-out/
+          fi
+          [[ -f windows-diagnostics.log ]] && cp windows-diagnostics.log windows-out/
+          tar -cf windows.tar windows-out
+          # The flags spelled out, not left to defaults: the macOS job decrypts
+          # with whatever OpenSSL its image carries.
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 10000 -md sha256 \
+            -pass env:DRYRUN_ARTIFACT_KEY -in windows.tar -out windows.tar.enc
+          rm -f windows.tar
+
+      - name: Upload the Windows release
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: orthant-windows-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/windows.tar.enc
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+
   package:
     needs: validate
     runs-on: macos-26
@@ -50,8 +197,11 @@ jobs:
     environment: release
     permissions:
       contents: write
+      # To see the Windows job's artifact and state while both run.
+      actions: read
     outputs:
       sha256: ${{ steps.digest.outputs.sha256 }}
+      windows_sha256: ${{ steps.digest.outputs.windows_sha256 }}
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -218,6 +368,53 @@ jobs:
           fi
           tool/release.sh "$VERSION"
 
+      # The Windows job runs beside this one, so that one approval admits
+      # both; its installer is needed only from here on.
+      - name: Wait for the Windows release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          tool/ci/release_workflow.sh await-artifact orthant-app/orthant
+          "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" build-windows
+          "orthant-windows-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+
+      - name: Fetch the Windows release
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: orthant-windows-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/windows-in
+
+      - name: Sign the Windows installer for updates and write its feed
+        id: windows
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          MODE: ${{ needs.validate.outputs.mode }}
+          DRYRUN_ARTIFACT_KEY: ${{ secrets.DRYRUN_ARTIFACT_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 10000 -md sha256 \
+            -pass env:DRYRUN_ARTIFACT_KEY \
+            -in "$RUNNER_TEMP/windows-in/windows.tar.enc" -out "$RUNNER_TEMP/windows.tar"
+          tar -xf "$RUNNER_TEMP/windows.tar" -C "$RUNNER_TEMP"
+          rm -f "$RUNNER_TEMP/windows.tar"
+          if [[ -f "$RUNNER_TEMP/windows-out/windows-diagnostics.log" ]]; then
+            cat "$RUNNER_TEMP/windows-out/windows-diagnostics.log" \
+              >>"$RUNNER_TEMP/release-diagnostics.log"
+          fi
+          # The Windows job uploads its artifact whatever happens, so that its
+          # diagnostics are kept; one with no installer is a Windows job that
+          # failed.
+          [[ -f "$RUNNER_TEMP/windows-out/Orthant-$VERSION-setup.exe" ]] || {
+            printf 'The Windows job produced no installer; its diagnostics travel encrypted in its artifact.\n' >&2
+            exit 1
+          }
+          mv "$RUNNER_TEMP/windows-out/Orthant-$VERSION-setup.exe" build/dist/
+          SPARKLE_BIN="$PWD/build/spm/artifacts/sparkle/Sparkle/bin" \
+            SPARKLE_ED_KEY_FILE="$RUNNER_TEMP/sparkle_ed_key" \
+            tool/ci/release_workflow.sh windows-feed "$MODE" "$VERSION" build/dist
+
       - name: Assemble Pages artifact
         if: needs.validate.outputs.publish == 'true'
         run: >-
@@ -243,6 +440,9 @@ jobs:
           digest="$(shasum -a 256 "build/dist/Orthant-$VERSION.dmg" | awk '{print $1}')"
           [[ "$digest" =~ ^[0-9a-f]{64}$ ]]
           printf 'sha256=%s\n' "$digest" >>"$GITHUB_OUTPUT"
+          windows="$(shasum -a 256 "build/dist/Orthant-$VERSION-setup.exe" | awk '{print $1}')"
+          [[ "$windows" =~ ^[0-9a-f]{64}$ ]]
+          printf 'windows_sha256=%s\n' "$windows" >>"$GITHUB_OUTPUT"
 
       - name: Encrypt dry-run artifacts
         if: always() && needs.validate.outputs.publish != 'true'
@@ -257,15 +457,20 @@ jobs:
             exit 1
           }
           dmg="build/dist/Orthant-${{ needs.validate.outputs.version }}.dmg"
+          installer="build/dist/Orthant-${{ needs.validate.outputs.version }}-setup.exe"
           appcast=build/dist/appcast.xml
+          windows_appcast=build/dist/appcast-win.xml
           if [[ '${{ needs.validate.outputs.mode }}' == beta ]]; then
             appcast=build/dist/appcast-beta.xml
+            windows_appcast=build/dist/appcast-win-beta.xml
           fi
           diagnostics="$RUNNER_TEMP/release-diagnostics.log"
 
           paths=()
           [[ -f "$dmg" ]] && paths+=("$dmg")
           [[ -f "$appcast" ]] && paths+=("$appcast")
+          [[ -f "$installer" ]] && paths+=("$installer")
+          [[ -f "$windows_appcast" ]] && paths+=("$windows_appcast")
           shopt -s nullglob
           deltas=(build/dist/*.delta)
           shopt -u nullglob
@@ -281,6 +486,18 @@ jobs:
             }
             [[ -f "$appcast" ]] || {
               printf 'Dry run succeeded without the selected appcast.\n' >&2
+              exit 1
+            }
+          fi
+          # Without the Windows half, the archive keeps what there is: the
+          # Windows job's own diagnostics are in its artifact.
+          if [[ '${{ steps.windows.outcome }}' == success ]]; then
+            [[ -f "$installer" ]] || {
+              printf 'Dry run succeeded without the Windows installer.\n' >&2
+              exit 1
+            }
+            [[ -f "$windows_appcast" ]] || {
+              printf 'Dry run succeeded without the Windows appcast.\n' >&2
               exit 1
             }
           fi
@@ -345,8 +562,10 @@ jobs:
             "$RUNNER_TEMP/sparkle_ed_key" \
             "$RUNNER_TEMP/release-diagnostics.log" \
             "$RUNNER_TEMP/dry-run.tar" \
+            "$RUNNER_TEMP/windows.tar" \
             macos/Runner/Configs/Local.xcconfig \
             tool/release.local || cleanup_status=1
+          rm -rf "$RUNNER_TEMP/windows-out" || cleanup_status=1
           exit "$cleanup_status"
 
   deploy-pages:
@@ -400,3 +619,45 @@ jobs:
           git -C tap config user.email 'o@owenou.com'
           git -C tap commit -m "orthant $VERSION"
           git -C tap push
+
+  # winget, stable releases only, as Homebrew: a pull request to
+  # microsoft/winget-pkgs from optimalone's fork, which wingetcreate makes and
+  # keeps in step. Microsoft validates and merges it, hours to days later, so
+  # it is not part of the release's own verification. Its token is a classic
+  # one (public_repo; the only kind winget-pkgs pull requests accept), kept in
+  # an environment of its own that only a v* tag's run may enter.
+  bump-winget:
+    needs: [validate, package, deploy-pages]
+    if: >-
+      needs.validate.outputs.publish == 'true' &&
+      needs.validate.outputs.prerelease == 'false'
+    runs-on: windows-latest
+    environment: winget
+    permissions:
+      contents: read
+    steps:
+      - name: Check out Orthant
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Write the winget manifest
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          SHA256: ${{ needs.package.outputs.windows_sha256 }}
+        run: >-
+          python tool/ci/winget_manifest.py --version "$VERSION" --sha256 "$SHA256"
+          --date "$(date -u +%Y-%m-%d)" --out "build/winget/$VERSION"
+
+      - name: Submit it to winget
+        shell: powershell
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          if (-not $env:WINGET_CREATE_GITHUB_TOKEN) { Write-Error 'No WINGET_TOKEN in the winget environment (RELEASING.md, winget).'; exit 1 }
+          $exe = "$env:RUNNER_TEMP\wingetcreate.exe"
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/microsoft/winget-create/releases/download/v1.12.13.0/wingetcreate.exe' -OutFile $exe
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash
+          if ($hash -ne '24042BD37915805615E6CF969AC57C6439124C3FE85823327F5F3FB24BD9FFEA') { Write-Error "wingetcreate.exe has SHA-256 $hash, not the pinned one"; exit 1 }
+          & $exe submit --no-open "build\winget\$env:VERSION"
+          exit $LASTEXITCODE

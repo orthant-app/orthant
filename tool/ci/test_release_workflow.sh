@@ -133,6 +133,8 @@ done
 case "$url" in
   */appcast.xml\?run=*) name=stable ;;
   */appcast-beta.xml\?run=*) name=beta ;;
+  */appcast-win.xml\?run=*) name=win_stable ;;
+  */appcast-win-beta.xml\?run=*) name=win_beta ;;
   https://github.com/orthant-app/orthant/releases/download/v1.0.0/Orthant-1.0.0.dmg|\
   https://github.com/orthant-app/orthant/releases/download/v1.0.1/Orthant-1.0.1.dmg|\
   https://github.com/orthant-app/orthant/releases/download/v1.0.2-beta.1/Orthant-1.0.2-beta.1.dmg) name=history ;;
@@ -153,6 +155,24 @@ cat >"$FAKE_BIN/gh" <<'EOF'
 printf 'gh' >>"$CALL_LOG"
 printf ' <%s>' "$@" >>"$CALL_LOG"
 printf '\n' >>"$CALL_LOG"
+if [[ "${1-}" == api && "${2-}" == *'/artifacts?name='* ]]; then
+  n=$(( $(cat "$FIXTURES/artifact_calls" 2>/dev/null || printf 0) + 1 ))
+  printf '%s\n' "$n" >"$FIXTURES/artifact_calls"
+  exit_code="$(<"$FIXTURES/artifact_api_exit")"
+  [[ "$exit_code" == 0 ]] || exit "$exit_code"
+  line="$(sed -n "${n}p" "$FIXTURES/artifact_counts")"
+  [[ -n "$line" ]] || line="$(tail -n 1 "$FIXTURES/artifact_counts")"
+  printf '%s\n' "$line"
+  exit 0
+fi
+if [[ "${1-}" == api && "${2-}" == */jobs ]]; then
+  n=$(( $(cat "$FIXTURES/job_calls" 2>/dev/null || printf 0) + 1 ))
+  printf '%s\n' "$n" >"$FIXTURES/job_calls"
+  line="$(sed -n "${n}p" "$FIXTURES/job_states")"
+  [[ -n "$line" ]] || line="$(tail -n 1 "$FIXTURES/job_states")"
+  printf '%s\n' "$line"
+  exit 0
+fi
 if [[ "${1-}" == api ]]; then
   response_path="$(/usr/sbin/lsof -a -p $$ -d 1 -Fn | sed -n 's/^n//p')"
   printf 'gh-api-stdout-mode <%s>\n' "$(stat -f '%Lp' "$response_path")" >>"$CALL_LOG"
@@ -286,9 +306,31 @@ ENTRY
   printf '404\n' >"$FIXTURES/curl_beta_status"
   printf '0\n' >"$FIXTURES/curl_beta_exit"
   : >"$FIXTURES/curl_beta_body"
+  printf '404\n' >"$FIXTURES/curl_win_stable_status"
+  printf '0\n' >"$FIXTURES/curl_win_stable_exit"
+  : >"$FIXTURES/curl_win_stable_body"
+  printf '404\n' >"$FIXTURES/curl_win_beta_status"
+  printf '0\n' >"$FIXTURES/curl_win_beta_exit"
+  : >"$FIXTURES/curl_win_beta_body"
+  printf '0\n' >"$FIXTURES/sign_exit"
+  printf '0\n' >"$FIXTURES/sign_verify_exit"
+  printf '%s\n' 'YSBzdGFuZC1pbiBmb3IgYW4gRWQyNTUxOSBzaWduYXR1cmUgb3ZlciB0aGUgV2luZG93cyBpbnN0YWxsZXIuLg==' >"$FIXTURES/sign_signature"
+  printf 'a key\n' >"$FIXTURES/sparkle_key"
+  printf '0\n' >"$FIXTURES/artifact_api_exit"
+  printf '0\n' >"$FIXTURES/artifact_counts"
+  printf 'in_progress \n' >"$FIXTURES/job_states"
+  rm -f "$FIXTURES/artifact_calls" "$FIXTURES/job_calls"
   printf '200\n' >"$FIXTURES/curl_history_status"
   printf '0\n' >"$FIXTURES/curl_history_exit"
   : >"$FIXTURES/curl_history_body"
+}
+
+# The Windows feeds an assembly needs beside the macOS ones: windows-feed
+# writes the mode's own, and restore brings back the other.
+write_windows_feeds() {
+  mkdir -p "$WORKSPACE/dist"
+  printf '<rss><channel><title>Windows</title></channel></rss>\n' >"$WORKSPACE/dist/appcast-win.xml"
+  printf '<rss><channel><title>Windows beta</title></channel></rss>\n' >"$WORKSPACE/dist/appcast-win-beta.xml"
 }
 
 run_workflow() {
@@ -528,20 +570,43 @@ assert_not_contains 'beta restore skips prior DMG download' 'gh <release> <downl
 reset_fixture
 mkdir -p "$WORKSPACE/dist"
 printf '<rss><channel><title>Stable</title></channel></rss>\n' >"$WORKSPACE/dist/appcast.xml"
+write_windows_feeds
 assert_ok 'stable Pages assembly succeeds' \
   run_workflow assemble-pages stable "$WORKSPACE/dist" "$WORKSPACE/site"
 assert_file_eq 'stable assembly creates stable feed' "$WORKSPACE/dist/appcast.xml" "$WORKSPACE/site/appcast.xml"
 assert_file_eq 'stable assembly creates identical beta feed' "$WORKSPACE/dist/appcast.xml" "$WORKSPACE/site/appcast-beta.xml"
+assert_file_eq 'stable assembly creates the Windows feed' "$WORKSPACE/dist/appcast-win.xml" "$WORKSPACE/site/appcast-win.xml"
+assert_file_eq 'stable assembly gives Windows beta users the same feed' "$WORKSPACE/dist/appcast-win.xml" "$WORKSPACE/site/appcast-win-beta.xml"
+
+reset_fixture
+mkdir -p "$WORKSPACE/dist"
+printf '<rss><channel><title>Stable</title></channel></rss>\n' >"$WORKSPACE/dist/appcast.xml"
+stderr="$(run_workflow assemble-pages stable "$WORKSPACE/dist" "$WORKSPACE/site" 2>&1 1>/dev/null)"
+status=$?
+assert_eq 'stable assembly refuses a release with no Windows feed' 1 "$status"
+assert_contains 'stable assembly names the missing Windows feed' 'stable Windows appcast is missing' "$stderr"
+
+reset_fixture
+mkdir -p "$WORKSPACE/dist"
+printf '<rss><channel><title>Beta</title></channel></rss>\n' >"$WORKSPACE/dist/appcast-beta.xml"
+printf '<rss><channel><title>Windows</title></channel></rss>\n' >"$WORKSPACE/dist/appcast-win.xml"
+stderr="$(run_workflow assemble-pages beta "$WORKSPACE/dist" "$WORKSPACE/site" 2>&1 1>/dev/null)"
+status=$?
+assert_eq 'beta assembly refuses a release with no Windows beta feed' 1 "$status"
+assert_contains 'beta assembly names the missing Windows beta feed' 'beta Windows appcast is missing' "$stderr"
 
 reset_fixture
 mkdir -p "$WORKSPACE/dist" "$WORKSPACE/site"
 printf '<rss><channel><title>Stable</title></channel></rss>\n' >"$WORKSPACE/dist/appcast.xml"
 printf '<rss><channel><title>Beta</title></channel></rss>\n' >"$WORKSPACE/dist/appcast-beta.xml"
 printf 'stale site\n' >"$WORKSPACE/site/stale"
+write_windows_feeds
 assert_ok 'beta Pages assembly preserves stable feed' \
   run_workflow assemble-pages beta "$WORKSPACE/dist" "$WORKSPACE/site"
 assert_file_eq 'beta assembly copies stable feed' "$WORKSPACE/dist/appcast.xml" "$WORKSPACE/site/appcast.xml"
 assert_file_eq 'beta assembly copies beta feed' "$WORKSPACE/dist/appcast-beta.xml" "$WORKSPACE/site/appcast-beta.xml"
+assert_file_eq 'beta assembly copies the Windows stable feed' "$WORKSPACE/dist/appcast-win.xml" "$WORKSPACE/site/appcast-win.xml"
+assert_file_eq 'beta assembly copies the Windows beta feed' "$WORKSPACE/dist/appcast-win-beta.xml" "$WORKSPACE/site/appcast-win-beta.xml"
 if [[ ! -e "$WORKSPACE/site/stale" ]]; then
   pass 'Pages assembly recreates site'
 else
@@ -551,12 +616,18 @@ fi
 reset_fixture
 mkdir -p "$WORKSPACE/dist"
 printf '<rss><channel><title>Beta</title></channel></rss>\n' >"$WORKSPACE/dist/appcast-beta.xml"
+printf '<rss><channel><title>Windows beta</title></channel></rss>\n' >"$WORKSPACE/dist/appcast-win-beta.xml"
 assert_ok 'first beta Pages assembly permits absent stable feed' \
   run_workflow assemble-pages beta "$WORKSPACE/dist" "$WORKSPACE/site"
 if [[ ! -e "$WORKSPACE/site/appcast.xml" ]]; then
   pass 'first beta leaves stable feed absent'
 else
   fail 'first beta leaves stable feed absent'
+fi
+if [[ ! -e "$WORKSPACE/site/appcast-win.xml" ]]; then
+  pass 'first beta leaves the Windows stable feed absent'
+else
+  fail 'first beta leaves the Windows stable feed absent'
 fi
 
 # A Pages deploy replaces the whole site, so CNAME must be re-emitted by EVERY
@@ -568,6 +639,7 @@ for cname_mode in stable dry-run beta; do
   mkdir -p "$WORKSPACE/dist"
   printf '<rss><channel><title>Stable</title></channel></rss>\n' >"$WORKSPACE/dist/appcast.xml"
   printf '<rss><channel><title>Beta</title></channel></rss>\n' >"$WORKSPACE/dist/appcast-beta.xml"
+  write_windows_feeds
   assert_ok "$cname_mode Pages assembly succeeds" \
     run_workflow assemble-pages "$cname_mode" "$WORKSPACE/dist" "$WORKSPACE/site"
   if [[ "$(cat "$WORKSPACE/site/CNAME" 2>/dev/null)" == 'updates.orthant.app' ]]; then
@@ -639,6 +711,7 @@ for history_mode in stable dry-run; do
   reset_fixture
   mkdir -p "$WORKSPACE/dist"
   write_history_feed "$WORKSPACE/dist/appcast.xml"
+  write_windows_feeds
   assert_ok "$history_mode assembly repairs generated and already-corrupt history" \
     run_workflow assemble-pages "$history_mode" "$WORKSPACE/dist" "$WORKSPACE/site"
   assert_ok "$history_mode historical DMGs use their own tags; current DMG and delta stay put" \
@@ -656,6 +729,7 @@ done
 reset_fixture
 mkdir -p "$WORKSPACE/dist"
 write_history_feed "$WORKSPACE/dist/appcast.xml"
+write_windows_feeds
 cat >"$WORKSPACE/dist/appcast-beta.xml" <<'FEED'
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0"><channel>
   <item><title>1.1.0 beta</title><sparkle:version>7</sparkle:version><sparkle:shortVersionString>1.1.0</sparkle:shortVersionString><sparkle:channel>beta</sparkle:channel>
@@ -693,6 +767,7 @@ for history_status in 404 503; do
   reset_fixture
   mkdir -p "$WORKSPACE/dist"
   write_history_feed "$WORKSPACE/dist/appcast.xml"
+  write_windows_feeds
   printf '%s\n' "$history_status" >"$FIXTURES/curl_history_status"
   assert_fails "historical asset HTTP $history_status prevents Pages assembly" \
     run_workflow assemble-pages stable "$WORKSPACE/dist" "$WORKSPACE/site"
@@ -700,6 +775,7 @@ done
 reset_fixture
 mkdir -p "$WORKSPACE/dist"
 write_history_feed "$WORKSPACE/dist/appcast.xml"
+write_windows_feeds
 printf '7\n' >"$FIXTURES/curl_history_exit"
 assert_fails 'historical asset transport failure prevents Pages assembly' \
   run_workflow assemble-pages stable "$WORKSPACE/dist" "$WORKSPACE/site"
@@ -707,13 +783,14 @@ assert_fails 'historical asset transport failure prevents Pages assembly' \
 reset_fixture
 mkdir -p "$WORKSPACE/dist"
 printf 'dmg\n' >"$WORKSPACE/dist/Orthant-1.0.0.dmg"
+printf 'exe\n' >"$WORKSPACE/dist/Orthant-1.0.0-setup.exe"
 assert_ok 'draft publication with no delta succeeds' \
   run_workflow publish orthant-app/orthant 1.0.0 false "$WORKSPACE/dist"
 calls="$(<"$CALL_LOG")"
 assert_contains 'new draft is created explicitly' \
   'gh <release> <create> <v1.0.0> <--draft> <--verify-tag> <--notes-file> <build/dist/release-notes.md> <--repo> <orthant-app/orthant>' "$calls"
-assert_contains 'single DMG is uploaded explicitly' \
-  "gh <release> <upload> <v1.0.0> <$WORKSPACE/dist/Orthant-1.0.0.dmg> <--clobber> <--repo> <orthant-app/orthant>" "$calls"
+assert_contains 'the DMG and the installer are uploaded explicitly' \
+  "gh <release> <upload> <v1.0.0> <$WORKSPACE/dist/Orthant-1.0.0.dmg> <$WORKSPACE/dist/Orthant-1.0.0-setup.exe> <--clobber> <--repo> <orthant-app/orthant>" "$calls"
 assert_contains 'release notes carry the changelog body' \
   'First stable release.' "$(<"$FIXTURES/actual_notes")"
 assert_not_contains 'release notes exclude the frontmatter delimiter' \
@@ -724,6 +801,7 @@ assert_not_contains 'release notes exclude the published flag' \
 reset_fixture
 mkdir -p "$WORKSPACE/dist"
 printf 'dmg\n' >"$WORKSPACE/dist/Orthant-1.1.0-beta.1.dmg"
+printf 'exe\n' >"$WORKSPACE/dist/Orthant-1.1.0-beta.1-setup.exe"
 printf 'delta a\n' >"$WORKSPACE/dist/a.delta"
 printf 'delta z\n' >"$WORKSPACE/dist/z.delta"
 printf '200\n' >"$FIXTURES/gh_api_status"
@@ -747,6 +825,16 @@ assert_eq 'missing asset causes no GitHub calls' '' "$(<"$CALL_LOG")"
 reset_fixture
 mkdir -p "$WORKSPACE/dist"
 printf 'dmg\n' >"$WORKSPACE/dist/Orthant-1.0.0.dmg"
+stderr="$(run_workflow publish orthant-app/orthant 1.0.0 false "$WORKSPACE/dist" 2>&1 1>/dev/null)"
+status=$?
+assert_eq 'publication requires the Windows installer' 1 "$status"
+assert_contains 'publication names the missing installer' 'Orthant-1.0.0-setup.exe' "$stderr"
+assert_eq 'a missing installer causes no GitHub calls' '' "$(<"$CALL_LOG")"
+
+reset_fixture
+mkdir -p "$WORKSPACE/dist"
+printf 'dmg\n' >"$WORKSPACE/dist/Orthant-1.0.0.dmg"
+printf 'exe\n' >"$WORKSPACE/dist/Orthant-1.0.0-setup.exe"
 printf '200\n' >"$FIXTURES/gh_api_status"
 printf '{"draft":false}\n' >"$FIXTURES/gh_api_body"
 assert_fails 'publication defensively rejects a public release' \
@@ -756,6 +844,7 @@ assert_not_contains 'public release rejection does not upload' '<upload>' "$(<"$
 reset_fixture
 mkdir -p "$WORKSPACE/dist"
 printf 'dmg\n' >"$WORKSPACE/dist/Orthant-1.0.0.dmg"
+printf 'exe\n' >"$WORKSPACE/dist/Orthant-1.0.0-setup.exe"
 printf '503\n' >"$FIXTURES/gh_api_status"
 assert_fails 'publication defensively rejects indeterminate API state' \
   run_workflow publish orthant-app/orthant 1.0.0 false "$WORKSPACE/dist"
@@ -764,6 +853,7 @@ assert_not_contains 'indeterminate release state does not create a draft' '<crea
 reset_fixture
 mkdir -p "$WORKSPACE/dist"
 printf 'dmg\n' >"$WORKSPACE/dist/Orthant-1.0.0.dmg"
+printf 'exe\n' >"$WORKSPACE/dist/Orthant-1.0.0-setup.exe"
 printf 'unexpected\n' >"$FIXTURES/upload_override"
 export GH_UPLOAD_OVERRIDE_FILE="$FIXTURES/upload_override"
 assert_fails 'sorted asset inequality prevents publication' \
@@ -774,6 +864,7 @@ assert_not_contains 'asset inequality leaves draft unpublished' '<edit>' "$(<"$C
 reset_fixture
 mkdir -p "$WORKSPACE/dist"
 printf 'dmg\n' >"$WORKSPACE/dist/Orthant-1.1.0-beta.1.dmg"
+printf 'exe\n' >"$WORKSPACE/dist/Orthant-1.1.0-beta.1-setup.exe"
 assert_ok 'exact asset equality publishes prerelease' \
   run_workflow publish orthant-app/orthant 1.1.0-beta.1 true "$WORKSPACE/dist"
 calls="$(<"$CALL_LOG")"
@@ -791,11 +882,300 @@ reset_fixture
 mkdir -p "$WORKSPACE/dist"
 rm -f "$WORKSPACE/site/src/content/changelog/1.1.0.md"
 printf 'dmg\n' >"$WORKSPACE/dist/Orthant-1.1.0-beta.1.dmg"
+printf 'exe\n' >"$WORKSPACE/dist/Orthant-1.1.0-beta.1-setup.exe"
 stderr="$(run_workflow publish orthant-app/orthant 1.1.0-beta.1 true "$WORKSPACE/dist" 2>&1 1>/dev/null)"
 status=$?
 assert_eq 'publish rejects a beta version with no BASE-version changelog entry' 1 "$status"
 assert_contains 'publish names the missing base-version entry for a beta version' \
   'changelog entry missing: site/src/content/changelog/1.1.0.md' "$stderr"
+
+# restore brings back the Windows feeds too: the history windows-feed writes
+# over, and the build numbers a release must top.
+reset_fixture
+mkdir -p "$WORKSPACE/dist"
+printf 'stale installer\n' >"$WORKSPACE/dist/Orthant-0.9.0-setup.exe"
+printf '200\n' >"$FIXTURES/curl_win_stable_status"
+printf 'windows stable feed bytes\n' >"$FIXTURES/curl_win_stable_body"
+printf '200\n' >"$FIXTURES/curl_win_beta_status"
+printf 'windows beta feed bytes\n' >"$FIXTURES/curl_win_beta_body"
+assert_ok 'restore fetches the Windows feeds' \
+  run_workflow restore beta orthant-app/orthant "$WORKSPACE/dist"
+assert_file_eq 'the Windows stable feed is restored byte for byte' "$FIXTURES/curl_win_stable_body" "$WORKSPACE/dist/appcast-win.xml"
+assert_file_eq 'the Windows beta feed is restored byte for byte' "$FIXTURES/curl_win_beta_body" "$WORKSPACE/dist/appcast-win-beta.xml"
+if [[ ! -e "$WORKSPACE/dist/Orthant-0.9.0-setup.exe" ]]; then
+  pass 'restore clears a stale installer'
+else
+  fail 'restore clears a stale installer'
+fi
+
+reset_fixture
+mkdir -p "$WORKSPACE/dist"
+printf 'stale\n' >"$WORKSPACE/dist/appcast-win.xml"
+assert_ok 'a Windows feed that is not there yet restores as absent' \
+  run_workflow restore stable orthant-app/orthant "$WORKSPACE/dist"
+if [[ ! -e "$WORKSPACE/dist/appcast-win.xml" ]]; then
+  pass 'a 404 Windows feed leaves no file'
+else
+  fail 'a 404 Windows feed leaves no file'
+fi
+
+reset_fixture
+printf '500\n' >"$FIXTURES/curl_win_beta_status"
+assert_fails 'a Windows feed answering 500 fails the restore' \
+  run_workflow restore beta orthant-app/orthant "$WORKSPACE/dist"
+
+# windows-feed: the installer Ed25519-signed with Sparkle's sign_update, the
+# signature verified, the mode's feed written. A fake sign_update logs its
+# calls and answers from the fixtures; windows_appcast.py is the real one.
+SPARKLE_FAKE="$TMP_DIR/sparkle-bin"
+mkdir -p "$SPARKLE_FAKE"
+cat >"$SPARKLE_FAKE/sign_update" <<'EOF'
+#!/usr/bin/env bash
+printf 'sign_update' >>"$CALL_LOG"
+printf ' <%s>' "$@" >>"$CALL_LOG"
+printf '\n' >>"$CALL_LOG"
+if [[ "${1-}" == --verify ]]; then
+  exit "$(<"$FIXTURES/sign_verify_exit")"
+fi
+exit_code="$(<"$FIXTURES/sign_exit")"
+[[ "$exit_code" == 0 ]] || exit "$exit_code"
+if [[ -f "$FIXTURES/sign_line" ]]; then
+  cat "$FIXTURES/sign_line"
+  exit 0
+fi
+file="${@: -1}"
+printf 'sparkle:edSignature="%s" length="%s"\n' \
+  "$(<"$FIXTURES/sign_signature")" "$(wc -c <"$file" | tr -d ' ')"
+EOF
+chmod +x "$SPARKLE_FAKE/sign_update"
+
+run_windows_feed() {
+  (cd "$WORKSPACE" && env \
+    PATH="$FAKE_BIN:/usr/bin:/bin" \
+    CALL_LOG="$CALL_LOG" \
+    FIXTURES="$FIXTURES" \
+    SPARKLE_BIN="$SPARKLE_FAKE" \
+    SPARKLE_ED_KEY_FILE="$FIXTURES/sparkle_key" \
+    bash "$WORKFLOW" windows-feed "$@")
+}
+
+# The items of a feed, as "version shortVersionString url edSignature" lines.
+feed_items() {
+  python3 - "$1" <<'PYTHON'
+import sys
+import xml.etree.ElementTree as ET
+S = '{http://www.andymatuschak.org/xml-namespaces/sparkle}'
+for item in ET.parse(sys.argv[1]).getroot().find('channel').findall('item'):
+    e = item.find('enclosure')
+    print(item.find(S + 'version').text, item.find(S + 'shortVersionString').text,
+          e.attrib['url'], e.attrib[S + 'edSignature'])
+PYTHON
+}
+
+windows_installer() {
+  mkdir -p "$WORKSPACE/dist"
+  printf 'installer %s\n' "$1" >"$WORKSPACE/dist/Orthant-$1-setup.exe"
+}
+
+reset_fixture
+printf 'version: 1.0.0+5\n' >"$WORKSPACE/pubspec.yaml"
+windows_installer 1.0.0
+assert_ok 'a first stable Windows feed is written' run_windows_feed stable 1.0.0 "$WORKSPACE/dist"
+assert_eq 'the first feed holds the installer, its build and its signature' \
+  "5 1.0.0 https://github.com/orthant-app/orthant/releases/download/v1.0.0/Orthant-1.0.0-setup.exe $(<"$FIXTURES/sign_signature")" \
+  "$(feed_items "$WORKSPACE/dist/appcast-win.xml")"
+calls="$(<"$CALL_LOG")"
+assert_contains 'the installer is signed with the release key' \
+  "sign_update <-f> <$FIXTURES/sparkle_key> <$WORKSPACE/dist/Orthant-1.0.0-setup.exe>" "$calls"
+assert_contains 'the signature is verified against the same key' \
+  "sign_update <--verify> <-f> <$FIXTURES/sparkle_key> <$WORKSPACE/dist/Orthant-1.0.0-setup.exe> <$(<"$FIXTURES/sign_signature")>" "$calls"
+assert_before 'it is signed before it is verified' 'sign_update <-f>' 'sign_update <--verify>' "$calls"
+
+printf 'version: 1.0.1+6\n' >"$WORKSPACE/pubspec.yaml"
+windows_installer 1.0.1
+assert_ok 'the next stable writes over the restored feed' run_windows_feed stable 1.0.1 "$WORKSPACE/dist"
+assert_eq 'the new item comes first, the earlier one is kept' \
+  "6 1.0.1 https://github.com/orthant-app/orthant/releases/download/v1.0.1/Orthant-1.0.1-setup.exe $(<"$FIXTURES/sign_signature")
+5 1.0.0 https://github.com/orthant-app/orthant/releases/download/v1.0.0/Orthant-1.0.0-setup.exe $(<"$FIXTURES/sign_signature")" \
+  "$(feed_items "$WORKSPACE/dist/appcast-win.xml")"
+
+cp "$WORKSPACE/dist/appcast-win.xml" "$FIXTURES/win_stable_before"
+printf 'version: 1.1.0+7\n' >"$WORKSPACE/pubspec.yaml"
+windows_installer 1.1.0-beta.1
+assert_ok 'a beta writes the Windows beta feed' run_windows_feed beta 1.1.0-beta.1 "$WORKSPACE/dist"
+assert_eq 'the beta feed names the beta installer' \
+  "7 1.1.0-beta.1 https://github.com/orthant-app/orthant/releases/download/v1.1.0-beta.1/Orthant-1.1.0-beta.1-setup.exe $(<"$FIXTURES/sign_signature")" \
+  "$(feed_items "$WORKSPACE/dist/appcast-win-beta.xml")"
+assert_file_eq 'a beta leaves the Windows stable feed as it was' "$FIXTURES/win_stable_before" "$WORKSPACE/dist/appcast-win.xml"
+
+reset_fixture
+printf 'version: 1.0.0+5\n' >"$WORKSPACE/pubspec.yaml"
+windows_installer 1.0.0
+assert_ok 'a dry run writes the stable Windows feed' run_windows_feed dry-run 1.0.0 "$WORKSPACE/dist"
+assert_ok 'the dry run feed exists' test -f "$WORKSPACE/dist/appcast-win.xml"
+
+# The macOS feeds as tool/release.sh leaves them: it held this build above
+# both before it built, then wrote it into the mode's one.
+for pair in 'stable 1.0.0 appcast.xml' 'beta 1.0.0-beta.1 appcast-beta.xml'; do
+  set -- $pair
+  reset_fixture
+  printf 'version: 1.0.0+5\n' >"$WORKSPACE/pubspec.yaml"
+  windows_installer "$2"
+  printf '<rss><channel><item><sparkle:version>5</sparkle:version></item></channel></rss>\n' >"$WORKSPACE/dist/$3"
+  assert_ok "this build already in $3, as tool/release.sh leaves it, is accepted" run_windows_feed "$1" "$2" "$WORKSPACE/dist"
+done
+
+for feed in appcast-win.xml appcast-win-beta.xml; do
+  reset_fixture
+  printf 'version: 1.0.0+5\n' >"$WORKSPACE/pubspec.yaml"
+  windows_installer 1.0.0
+  printf '<rss><channel><item><sparkle:version>5</sparkle:version></item></channel></rss>\n' >"$WORKSPACE/dist/$feed"
+  stderr="$(run_windows_feed stable 1.0.0 "$WORKSPACE/dist" 2>&1 1>/dev/null)"
+  status=$?
+  assert_eq "a build not above $feed's newest is refused" 1 "$status"
+  assert_contains "the refusal names the build and the newest ($feed)" 'build 5 is not above 5' "$stderr"
+  assert_not_contains "nothing is signed when the build is refused ($feed)" 'sign_update' "$(<"$CALL_LOG")"
+done
+
+reset_fixture
+printf 'version: 1.0.0+5\n' >"$WORKSPACE/pubspec.yaml"
+assert_fails 'a missing installer is refused' run_windows_feed stable 1.0.0 "$WORKSPACE/dist"
+assert_eq 'nothing is signed without an installer' '' "$(<"$CALL_LOG")"
+
+reset_fixture
+printf 'version: 1.0.0+5\n' >"$WORKSPACE/pubspec.yaml"
+windows_installer 1.0.0
+printf '1\n' >"$FIXTURES/sign_verify_exit"
+assert_fails 'a signature that does not verify is refused' run_windows_feed stable 1.0.0 "$WORKSPACE/dist"
+if [[ ! -e "$WORKSPACE/dist/appcast-win.xml" ]]; then
+  pass 'a signature that does not verify writes no feed'
+else
+  fail 'a signature that does not verify writes no feed'
+fi
+
+reset_fixture
+printf 'version: 1.0.0+5\n' >"$WORKSPACE/pubspec.yaml"
+windows_installer 1.0.0
+printf '1\n' >"$FIXTURES/sign_exit"
+assert_fails 'sign_update failing is refused' run_windows_feed stable 1.0.0 "$WORKSPACE/dist"
+assert_not_contains 'nothing is verified after a failed signing' '<--verify>' "$(<"$CALL_LOG")"
+
+reset_fixture
+printf 'version: 1.0.0+5\n' >"$WORKSPACE/pubspec.yaml"
+windows_installer 1.0.0
+printf 'Signing failed: no key\n' >"$FIXTURES/sign_line"
+assert_fails 'output that is not a sign_update line is refused' run_windows_feed stable 1.0.0 "$WORKSPACE/dist"
+assert_not_contains 'nothing is verified after an unreadable line' '<--verify>' "$(<"$CALL_LOG")"
+
+reset_fixture
+printf 'version: 1.1.0+7\n' >"$WORKSPACE/pubspec.yaml"
+windows_installer 1.1.0
+assert_fails 'a beta of a stable version is refused' run_windows_feed beta 1.1.0 "$WORKSPACE/dist"
+windows_installer 1.1.0-beta.1
+assert_fails 'a stable release of a pre-release version is refused' run_windows_feed stable 1.1.0-beta.1 "$WORKSPACE/dist"
+windows_installer 1.2.0
+assert_fails 'a version that is not pubspec.yaml'"'"'s is refused' run_windows_feed stable 1.2.0 "$WORKSPACE/dist"
+assert_eq 'none of those signs anything' '' "$(<"$CALL_LOG")"
+
+reset_fixture
+printf 'version: 1.0.0+5\n' >"$WORKSPACE/pubspec.yaml"
+windows_installer 1.0.0
+assert_fails 'a run with no signing key is refused' \
+  env SPARKLE_ED_KEY_FILE="$FIXTURES/no-such-key" bash -c 'cd "$1" && PATH="$2:/usr/bin:/bin" CALL_LOG="$3" FIXTURES="$4" SPARKLE_BIN="$5" bash "$6" windows-feed stable 1.0.0 "$1/dist"' _ \
+  "$WORKSPACE" "$FAKE_BIN" "$CALL_LOG" "$FIXTURES" "$SPARKLE_FAKE" "$WORKFLOW"
+assert_eq 'nothing is signed without a key' '' "$(<"$CALL_LOG")"
+
+# await-artifact: the macOS job waiting for the Windows job's installer, which
+# runs beside it. The fake gh answers the artifact listing and the job's state
+# from fixtures, one line per call, the last line repeated.
+run_await() {
+  (cd "$WORKSPACE" && env \
+    PATH="$FAKE_BIN:/usr/bin:/bin" \
+    CALL_LOG="$CALL_LOG" \
+    FIXTURES="$FIXTURES" \
+    AWAIT_ARTIFACT_POLL=0 \
+    AWAIT_ARTIFACT_TIMEOUT=5 \
+    "$@" \
+    bash "$WORKFLOW" await-artifact orthant-app/orthant 77 2 build-windows orthant-windows-77-2)
+}
+
+reset_fixture
+printf '1\n' >"$FIXTURES/artifact_counts"
+printf 'completed success\n' >"$FIXTURES/job_states"
+assert_ok 'an installer from a Windows job that succeeded is found at once' run_await
+calls="$(<"$CALL_LOG")"
+assert_contains 'the artifact is looked for by name in this run' \
+  'gh <api> <repos/orthant-app/orthant/actions/runs/77/artifacts?name=orthant-windows-77-2> <--jq> <.total_count>' "$calls"
+assert_contains 'the job is read from this attempt' \
+  'gh <api> <repos/orthant-app/orthant/actions/runs/77/attempts/2/jobs> <--paginate>' "$calls"
+assert_eq 'it looked once' 1 "$(<"$FIXTURES/artifact_calls")"
+
+reset_fixture
+printf '0\n0\n1\n' >"$FIXTURES/artifact_counts"
+printf 'in_progress \nin_progress \ncompleted success\n' >"$FIXTURES/job_states"
+assert_ok 'the wait goes on while the Windows job runs' run_await
+assert_eq 'it looked three times' 3 "$(<"$FIXTURES/artifact_calls")"
+
+# The artifact is uploaded whatever happens, so that a failed job's
+# diagnostics are kept: only the job's success makes its installer usable.
+reset_fixture
+printf '1\n' >"$FIXTURES/artifact_counts"
+printf 'in_progress \ncompleted success\n' >"$FIXTURES/job_states"
+assert_ok 'an artifact is used once its job has succeeded' run_await
+assert_eq 'it waited for the job to end' 2 "$(<"$FIXTURES/artifact_calls")"
+
+for conclusion in failure cancelled; do
+  reset_fixture
+  printf '1\n' >"$FIXTURES/artifact_counts"
+  printf 'completed %s\n' "$conclusion" >"$FIXTURES/job_states"
+  stderr="$(run_await 2>&1 1>/dev/null)"
+  status=$?
+  assert_eq "an artifact from a Windows job that ended in $conclusion is not used" 1 "$status"
+  assert_contains "the refusal names the job and its conclusion ($conclusion)" \
+    "build-windows did not succeed (completed $conclusion)" "$stderr"
+done
+
+reset_fixture
+printf '0\n' >"$FIXTURES/artifact_counts"
+printf 'completed failure\n' >"$FIXTURES/job_states"
+stderr="$(run_await 2>&1 1>/dev/null)"
+status=$?
+assert_eq 'a Windows job that failed ends the wait at once' 1 "$status"
+assert_contains 'the refusal names the job and its conclusion' \
+  'build-windows did not succeed (completed failure)' "$stderr"
+assert_eq 'it did not wait on after the failure' 1 "$(<"$FIXTURES/artifact_calls")"
+
+reset_fixture
+printf '0\n1\n' >"$FIXTURES/artifact_counts"
+printf 'completed success\n' >"$FIXTURES/job_states"
+assert_ok 'an upload that finished between the two questions is found' run_await
+
+reset_fixture
+printf '0\n' >"$FIXTURES/artifact_counts"
+printf 'completed success\n' >"$FIXTURES/job_states"
+assert_fails 'a Windows job that succeeded without the artifact fails the wait' run_await
+
+reset_fixture
+printf '0\n' >"$FIXTURES/artifact_counts"
+printf 'in_progress \n' >"$FIXTURES/job_states"
+stderr="$(run_await AWAIT_ARTIFACT_TIMEOUT=0 2>&1 1>/dev/null)"
+status=$?
+assert_eq 'the wait has a deadline' 1 "$status"
+assert_contains 'the deadline names what it waited for' 'no orthant-windows-77-2 after 0 s' "$stderr"
+
+reset_fixture
+printf '0\n' >"$FIXTURES/artifact_counts"
+: >"$FIXTURES/job_states"
+stderr="$(run_await 2>&1 1>/dev/null)"
+assert_contains 'a run with no such job is refused' 'this run has no job named build-windows' "$stderr"
+
+reset_fixture
+printf 'null\n' >"$FIXTURES/artifact_counts"
+assert_fails 'a listing that is not a count is refused' run_await
+
+reset_fixture
+printf '1\n' >"$FIXTURES/artifact_api_exit"
+assert_fails 'a listing that fails is refused' run_await
 
 # RELEASING.md is the tracked runbook, and a runbook that quietly stops matching
 # the pipeline is worse than none: it is followed confidently and is wrong. Pin

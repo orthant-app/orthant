@@ -1,4 +1,4 @@
-import { resolveDownloadUrl } from './appcast';
+import { resolveDownloadUrl, type Platform } from './appcast';
 
 // Workers-only default cache. @cloudflare/workers-types declares the same
 // global name as the DOM lib (which the project keeps for the hero's client
@@ -13,7 +13,13 @@ declare global {
   }
 }
 
-export const FEED_URL = 'https://updates.orthant.app/appcast.xml';
+/** Each platform's stable feed. The Windows one is a 404 until the first
+ *  Windows stable is published, which resolves like any other failure. */
+export const FEED_URLS: Record<Platform, string> = {
+  macos: 'https://updates.orthant.app/appcast.xml',
+  windows: 'https://updates.orthant.app/appcast-win.xml',
+};
+export const FEED_URL = FEED_URLS.macos;
 export const FALLBACK_URL = 'https://github.com/orthant-app/orthant/releases/latest';
 
 /** 300 s. The GitHub API's rate limit drove the original long-TTL design; the
@@ -21,7 +27,11 @@ export const FALLBACK_URL = 'https://github.com/orthant-app/orthant/releases/lat
  *  saves latency. A new release therefore takes up to 5 minutes to appear here
  *  — the post-release check must wait that out. */
 const TTL_SECONDS = 300;
-const CACHE_KEY = 'download-target';
+/** macOS keeps the key it has always had, so a deploy does not empty it. */
+const CACHE_KEYS: Record<Platform, string> = {
+  macos: 'download-target',
+  windows: 'download-target-windows',
+};
 
 /** 3 s to fetch the feed AND read its body, after which the fallback wins.
  *
@@ -43,11 +53,11 @@ const DEADLINE_MS = 3000;
 /** The feed's body, or null for every way it can fail to arrive usably —
  *  rejected, non-200, or too slow. All three take the same fallback, so the
  *  caller does not need to tell them apart. */
-async function fetchFeed(deps: Deps): Promise<string | null> {
+async function fetchFeed(deps: Deps, url: string): Promise<string | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DEADLINE_MS);
   try {
-    const res = await deps.fetch(FEED_URL, { signal: controller.signal });
+    const res = await deps.fetch(url, { signal: controller.signal });
     if (!res.ok) return null;
     return await res.text();
   } catch {
@@ -94,27 +104,81 @@ export const SECURITY_HEADERS: Record<string, string> = {
   'permissions-policy': 'camera=(), microphone=(), geolocation=()',
 };
 
-function redirect(location: string, cacheControl: string): Response {
-  return new Response(null, {
-    status: 302,
-    headers: { location, 'cache-control': cacheControl, ...SECURITY_HEADERS },
-  });
+function redirect(location: string, cacheControl: string, vary: boolean): Response {
+  const headers: Record<string, string> = { location, 'cache-control': cacheControl, ...SECURITY_HEADERS };
+  // The answer depends on who asks, so a cache that keeps it must keep one
+  // per platform.
+  if (vary) headers.vary = 'User-Agent, Sec-CH-UA-Platform';
+  return new Response(null, { status: 302, headers });
 }
 
-export async function handleDownload(deps: Deps): Promise<Response> {
-  const cached = await deps.cache.match(CACHE_KEY).catch(() => null);
-  if (cached) return redirect(cached, `public, max-age=${TTL_SECONDS}`);
+/** One platform's current artifact, from the cache or its feed; null when it
+ *  cannot be had. A failure is never cached: a transient bad feed must not
+ *  pin the download button to the fallback for the whole TTL. */
+async function resolveTarget(deps: Deps, platform: Platform): Promise<string | null> {
+  const key = CACHE_KEYS[platform];
+  const cached = await deps.cache.match(key).catch(() => null);
+  if (cached) return cached;
 
-  const xml = await fetchFeed(deps);
-  if (xml === null) return redirect(FALLBACK_URL, 'no-store');
+  const xml = await fetchFeed(deps, FEED_URLS[platform]);
+  if (xml === null) return null;
 
-  const target = resolveDownloadUrl(xml);
-  // A failure is never cached: a transient bad feed must not pin the download
-  // button to the fallback for the whole TTL.
-  if (target === null) return redirect(FALLBACK_URL, 'no-store');
+  const target = resolveDownloadUrl(xml, platform);
+  if (target === null) return null;
 
-  await deps.cache.put(CACHE_KEY, target).catch(() => {});
-  return redirect(target, `public, max-age=${TTL_SECONDS}`);
+  await deps.cache.put(key, target).catch(() => {});
+  return target;
+}
+
+/**
+ * A redirect to the first of `platforms` whose artifact can be had, or to the
+ * releases page when none can. Every candidate is resolved at once, so the
+ * deadline bounds the whole answer rather than each candidate in turn.
+ * `vary` marks an answer chosen from the request's headers. A later
+ * candidate's answer is never kept: the first's feed may have failed only for
+ * a moment.
+ */
+export async function handleDownload(
+  deps: Deps,
+  platforms: Platform[] = ['macos'],
+  vary = false,
+): Promise<Response> {
+  const targets = await Promise.all(platforms.map((p) => resolveTarget(deps, p)));
+  const i = targets.findIndex((t) => t !== null);
+  if (i < 0) return redirect(FALLBACK_URL, 'no-store', vary);
+  return redirect(targets[i] as string, i === 0 ? `public, max-age=${TTL_SECONDS}` : 'no-store', vary);
+}
+
+/**
+ * The platform a visitor's browser runs on: its `Sec-CH-UA-Platform` hint
+ * when it sends one (Chromium does, on every request), otherwise its
+ * User-Agent, where every Windows browser names "Windows NT". Anything else
+ * is offered macOS, as every visitor was before Windows shipped.
+ */
+export function platformOf(headers: Headers): Platform {
+  const hint = headers.get('sec-ch-ua-platform');
+  if (hint !== null) {
+    return hint.replace(/"/g, '').trim().toLowerCase() === 'windows' ? 'windows' : 'macos';
+  }
+  return /\bWindows NT\b/.test(headers.get('user-agent') ?? '') ? 'windows' : 'macos';
+}
+
+/**
+ * What a download path asks for: a platform it names, or, at /download, the
+ * visitor's own, with macOS's as the answer when theirs has no release yet
+ * (as every visitor was answered before Windows shipped). Null for a path
+ * that is not a download.
+ */
+export function downloadRoute(
+  pathname: string,
+  headers: Headers,
+): { platforms: Platform[]; vary: boolean } | null {
+  const m = /^\/download(?:\/(macos|windows))?\/?$/.exec(pathname);
+  if (m === null) return null;
+  if (m[1] !== undefined) return { platforms: [m[1] as Platform], vary: false };
+  return platformOf(headers) === 'windows'
+    ? { platforms: ['windows', 'macos'], vary: true }
+    : { platforms: ['macos'], vary: true };
 }
 
 /**
@@ -143,17 +207,18 @@ export function runtimeDeps(): Deps {
   return { fetch: globalThis.fetch.bind(globalThis), cache: runtimeCache() };
 }
 
-/** Adapts Workers' Cache API — which stores Responses, not strings — to CacheLike. */
+/** Adapts Workers' Cache API, which stores Responses rather than strings, to
+ *  CacheLike, one entry per key. */
 export function runtimeCache(): CacheLike {
-  const key = new Request(`https://orthant.app/__cache/${CACHE_KEY}`);
+  const request = (key: string) => new Request(`https://orthant.app/__cache/${key}`);
   return {
-    async match() {
-      const hit = await caches.default.match(key);
+    async match(key) {
+      const hit = await caches.default.match(request(key));
       return hit ? await hit.text() : null;
     },
-    async put(_k, value) {
+    async put(key, value) {
       await caches.default.put(
-        key,
+        request(key),
         new Response(value, { headers: { 'cache-control': `max-age=${TTL_SECONDS}` } }),
       );
     },

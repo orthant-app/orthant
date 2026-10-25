@@ -132,8 +132,9 @@ for (const path of PAGES) {
 }
 
 // The single most important control on the site, asked the way a visitor asks.
+// NAV's User-Agent names no platform, so /download answers it as a Mac.
 {
-  for (const path of ['/download', '/download/']) {
+  for (const path of ['/download', '/download/', '/download/macos']) {
     const res = await get(BASE + path);
     const loc = res.headers.get('location') || '';
     check(res.status === 302, `GET ${path} redirects`, `status ${res.status}`);
@@ -142,6 +143,68 @@ for (const path of PAGES) {
       `GET ${path} resolves a DMG rather than falling back`,
       loc || 'no location',
     );
+  }
+}
+
+/*
+ * Windows. Its feed is a 404 until the first Windows stable is published, and
+ * until then /download/windows falls back to the releases page and a Windows
+ * visitor at /download is offered the DMG, as before. Once the feed exists,
+ * both must resolve the installer, and the feed must be served exactly as the
+ * macOS one is (it is compiled into every Windows copy the same way).
+ *
+ * Whether Windows has shipped is asked of the release, not of the feed being
+ * checked: every stable since the first Windows one carries its installer
+ * beside its DMG, so a Windows feed that went missing after then fails here
+ * rather than passing as "not yet".
+ */
+{
+  const mac = await fetch('https://updates.orthant.app/appcast.xml', { signal: AbortSignal.timeout(20_000) });
+  const xml = mac.ok ? await mac.text() : '';
+  let newest = null;
+  for (const item of xml.match(/<item>[\s\S]*?<\/item>/g) ?? []) {
+    const build = /<sparkle:version>(\d+)<\/sparkle:version>/.exec(item);
+    const dmg = /<enclosure[^>]*\burl="([^"]+\.dmg)"/.exec(item);
+    if (build && dmg && (newest === null || Number(build[1]) > newest.build)) newest = { build: Number(build[1]), dmg: dmg[1] };
+  }
+  const installer = newest ? newest.dmg.replace(/\.dmg$/, '-setup.exe') : '';
+  const asset = installer
+    ? await fetch(installer, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(20_000) })
+    : null;
+  check(
+    asset !== null && (asset.status === 302 || asset.status === 404),
+    'the latest stable says whether it carries a Windows installer',
+    asset ? `${installer}: status ${asset.status}` : 'no DMG in appcast.xml',
+  );
+  const published = asset?.status === 302;
+  const feed = await fetch('https://updates.orthant.app/appcast-win.xml', {
+    signal: AbortSignal.timeout(20_000),
+  });
+  console.log(`  note  appcast-win.xml: status ${feed.status}${published ? '' : ' (no Windows stable yet)'}`);
+  if (published) {
+    check(feed.ok, 'Windows appcast reachable once Windows has shipped', `status ${feed.status}`);
+    check(
+      (feed.headers.get('server') || '').includes('GitHub'),
+      'Windows appcast served by GitHub Pages directly',
+      `server: ${feed.headers.get('server')}`,
+    );
+    check(!feed.headers.get('cf-ray'), 'Windows appcast is NOT behind the Cloudflare proxy', `cf-ray: ${feed.headers.get('cf-ray')}`);
+  } else {
+    check(feed.status === 404, 'Windows appcast is absent, not failing', `status ${feed.status}`);
+  }
+  const windowsVisitor = { ...NAV, 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) orthant-verify-live' };
+  const named = await get(`${BASE}/download/windows`);
+  const auto = await get(`${BASE}/download`, { headers: windowsVisitor });
+  const namedLoc = named.headers.get('location') || '';
+  const autoLoc = auto.headers.get('location') || '';
+  check(named.status === 302 && auto.status === 302, 'the Windows downloads redirect', `status ${named.status}, ${auto.status}`);
+  if (published) {
+    check(namedLoc.endsWith('-setup.exe'), 'GET /download/windows resolves the installer', namedLoc || 'no location');
+    check(autoLoc.endsWith('-setup.exe'), 'GET /download offers a Windows visitor the installer', autoLoc || 'no location');
+  } else {
+    check(namedLoc === 'https://github.com/orthant-app/orthant/releases/latest',
+      'GET /download/windows falls back while there is no Windows stable', namedLoc || 'no location');
+    check(autoLoc.endsWith('.dmg'), 'GET /download offers a Windows visitor the DMG, as before', autoLoc || 'no location');
   }
 }
 

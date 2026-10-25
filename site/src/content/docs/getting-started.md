@@ -11,7 +11,7 @@ order: 1
 brew install --cask orthant-app/tap/orthant
 ```
 
-Or [download the disk image](/download) and drag Orthant to Applications. Either way you
+Or [download the disk image](/download/macos) and drag Orthant to Applications. Either way you
 get the same build: signed with an Apple Developer ID and notarized by Apple, so it opens
 without a trip through System Settings. Orthant needs **macOS 13+**.
 

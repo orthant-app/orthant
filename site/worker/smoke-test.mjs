@@ -63,14 +63,26 @@ const EXPECTED_LOCATION_PREFIX = 'https://github.com/orthant-app/orthant/';
 // directly. Only `wrangler dev --remote` or a deployment reproduces it here.
 const FALLBACK_LOCATION = 'https://github.com/orthant-app/orthant/releases/latest';
 const FEED_URL = 'https://updates.orthant.app/appcast.xml';
+// A 404 until the first Windows stable is published, so /download/windows
+// falls back until then and that is not a failure. The Worker tells that 404
+// from any other failure of this feed (only a 404 offers a Windows visitor the
+// DMG), so the probe below reports which it saw.
+const WINDOWS_FEED_URL = 'https://updates.orthant.app/appcast-win.xml';
 
-async function feedIsReachable() {
+/** The feed's HTTP status, or null when the fetch itself failed. */
+async function feedStatus(url) {
   try {
-    const res = await fetch(FEED_URL, { signal: AbortSignal.timeout(10_000) });
-    return res.ok;
+    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    return res.status;
   } catch {
-    return false;
+    return null;
   }
+}
+
+const isOk = (status) => status !== null && status >= 200 && status < 300;
+
+async function feedIsReachable(url = FEED_URL) {
+  return isOk(await feedStatus(url));
 }
 
 if (!existsSync(path.join(SITE_DIR, 'dist', '_headers'))) {
@@ -145,8 +157,14 @@ const NAVIGATION_HEADERS = {
   'sec-fetch-dest': 'document',
 };
 
-async function checkDownloadPath(pathname, strict) {
-  const res = await fetch(BASE + pathname, { redirect: 'manual', headers: NAVIGATION_HEADERS });
+// A Windows visitor, as a Chromium browser on Windows identifies itself.
+const WINDOWS_VISITOR = {
+  'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) orthant-smoke-test',
+  'sec-ch-ua-platform': '"Windows"',
+};
+
+async function checkDownloadPath(pathname, strict, suffix, headers = {}, who = '') {
+  const res = await fetch(BASE + pathname, { redirect: 'manual', headers: { ...NAVIGATION_HEADERS, ...headers } });
   if (res.status !== 302) {
     throw new Error(`GET ${pathname}: expected 302, got ${res.status}`);
   }
@@ -162,7 +180,11 @@ async function checkDownloadPath(pathname, strict) {
         `It redirected to ${location} instead of a release asset, which means the feed fetch failed INSIDE the Worker.`,
     );
   }
-  console.log(`  ✓ GET ${pathname} -> 302 ${location}`);
+  // Resolving is not enough: the asset must be the platform's own.
+  if (strict && !location.endsWith(suffix)) {
+    throw new Error(`GET ${pathname}${who}: expected the ${suffix} asset, got ${location}`);
+  }
+  console.log(`  ✓ GET ${pathname}${who} -> 302 ${location}`);
 }
 
 function killChild() {
@@ -198,8 +220,34 @@ try {
   } else {
     console.log('  ⚠️  the appcast is NOT reachable from here; skipping the strict resolution check');
   }
-  await checkDownloadPath('/download', strict);
-  await checkDownloadPath('/download/', strict);
+  await checkDownloadPath('/download', strict, '.dmg');
+  await checkDownloadPath('/download/', strict, '.dmg');
+  await checkDownloadPath('/download/macos', strict, '.dmg');
+  const windowsStatus = await feedStatus(WINDOWS_FEED_URL);
+  const windowsStrict = isOk(windowsStatus);
+  const windowsAbsent = windowsStatus === 404;
+  if (windowsStrict) {
+    console.log('  the Windows feed is reachable from here, so /download/windows falling back is a FAILURE');
+  } else if (windowsAbsent) {
+    console.log('  the Windows feed is not published yet (404); /download/windows may fall back');
+  } else {
+    console.log(
+      `  ⚠️  the Windows feed failed from here (${windowsStatus ?? 'no response'}); /download/windows may fall back, ` +
+        'and a Windows visitor may be sent to the releases page, so its strict check is skipped',
+    );
+  }
+  await checkDownloadPath('/download/windows', windowsStrict, '-setup.exe');
+  // Until a Windows stable exists (its feed is a 404), a Windows visitor is
+  // offered the DMG. A Windows feed that failed some other way is not that: the
+  // Worker sends the visitor to the releases page, and may have met the same
+  // failure that was seen from here, so nothing strict is asserted then.
+  await checkDownloadPath(
+    '/download',
+    windowsStrict || (windowsAbsent && strict),
+    windowsStrict ? '-setup.exe' : '.dmg',
+    WINDOWS_VISITOR,
+    ' (a Windows visitor)',
+  );
 } catch (err) {
   failureMessage = err?.message ?? String(err);
 } finally {
@@ -212,6 +260,6 @@ if (failureMessage) {
 }
 
 console.log(
-  '\n✓ smoke test passed: the entry module boots under a real workerd runtime and /download + /download/ both redirect.',
+  '\n✓ smoke test passed: the entry module boots under a real workerd runtime and every /download route redirects.',
 );
 process.exit(0);

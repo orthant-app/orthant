@@ -1,7 +1,8 @@
 # Releasing Orthant
 
-The whole release is driven by pushing a `v*` tag. This is the checklist, in order,
-with what each step is protecting against.
+The whole release is driven by pushing a `v*` tag, and one tag ships both platforms: the
+macOS DMG and the Windows installer, from the same commit, under one approval. This is the
+checklist, in order, with what each step is protecting against.
 
 Publication is **irreversible**: releases are immutable, and a published build number
 can never be lowered. Everything before the tag push is cheap to fix; nothing after it
@@ -28,6 +29,26 @@ Two gitignored files hold the signing identity, so it never enters the repo:
 The release tooling exits with instructions if either is missing. You also need the
 Developer ID in the login keychain and a notarization profile.
 
+Windows needs no signing identity on your machine: it is built and signed in CI only.
+One check, the winget manifest's (step 4), runs on any Windows.
+
+## Before the first Windows release (once per repository)
+
+The Windows job signs with Azure Artifact Signing, signed in to Azure with OpenID Connect,
+so no signing key is stored anywhere. In the `release` environment, beside the macOS
+secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID` (the app
+registration, which holds the "Artifact Signing Certificate Profile Signer" role and
+whose federated credential trusts
+`repo:orthant-app@308256916/orthant@1350370232:environment:release`, the subject this
+repository presents because its OIDC subject is immutable and names owner and repository
+by numeric ID, so a credential written with the names never matches), and
+`ARTIFACT_SIGNING_ENDPOINT`, `ARTIFACT_SIGNING_ACCOUNT` and `ARTIFACT_SIGNING_PROFILE`.
+The Windows job fails before it builds if any is empty.
+
+winget: a `winget` environment, limited to `v*` tags, holding `WINGET_TOKEN`, a classic
+token with `public_repo` from the account whose fork of `microsoft/winget-pkgs` opens the
+pull requests. Microsoft's CLA is signed once, on the first pull request.
+
 **Run releases on an unlocked machine.** A locked screen seals the login keychain, and
 `notarytool` reports that as "No Keychain password item found", which reads like a
 missing credential rather than a locked one.
@@ -42,10 +63,11 @@ missing credential rather than a locked one.
   stables, in one sequence. A stable numbered below a published beta reads as older, and
   its users are never offered it.
 
-`N` must be greater than every `<sparkle:version>` in **both** live feeds
-(`appcast.xml` and `appcast-beta.xml`). `max_feed_version` in `tool/ci/release_lib.sh`
-enforces this, but check it locally first: a rejection after the tag is pushed is far
-more annoying than one before.
+`N` must be greater than every `<sparkle:version>` in **all four** live feeds
+(`appcast.xml`, `appcast-beta.xml`, `appcast-win.xml` and `appcast-win-beta.xml`): the
+two platforms share one counter. `max_feed_version` in `tool/ci/release_lib.sh` enforces
+this, but check it locally first: a rejection after the tag is pushed is far more
+annoying than one before.
 
 ## 2. Write the changelog entry, a hard precondition
 
@@ -96,7 +118,7 @@ git push origin main
 CI runs. The site deploys automatically (see step 8), but because the entry is
 `published: false` it does not yet advertise the new version.
 
-## 4. For a stable release: render the cask first
+## 4. For a stable release: render the cask and the winget manifest first
 
 `bump-cask` runs **after** the release is immutable, and the workflow does **not** run
 `brew style`, so a non-conforming cask ships silently rather than failing the job.
@@ -108,16 +130,28 @@ brew tap orthant-app/tap
 brew style --cask orthant
 ```
 
-Skip for pre-releases; `bump-cask` is stable-only.
+`bump-winget` is the same for Windows, and Microsoft's own validation reads its manifest
+after the release is immutable. Render it and validate it on Windows first (any 64 hex
+digits stand in for the installer's SHA-256, which does not exist yet):
+
+```sh
+python3 tool/ci/winget_manifest.py --version X.Y.Z --sha256 <64 hex digits> \
+  --date YYYY-MM-DD --out build/winget/X.Y.Z
+# on Windows:
+winget validate --manifest build\winget\X.Y.Z
+```
+
+Skip for pre-releases; `bump-cask` and `bump-winget` are stable-only.
 
 ## 5. Preflight, then tag
 
 Check locally, because publishing cannot be undone:
 
 - tag base version == pubspec marketing version;
-- build number greater than both live feeds;
+- build number greater than all four live feeds;
 - the tag commit is an ancestor of `origin/main`;
-- `site/src/content/changelog/<base>.md` exists with a body.
+- `site/src/content/changelog/<base>.md` exists with a body;
+- the Windows secrets are set (above), or the Windows job, and with it the release, fails.
 
 ```sh
 git tag -a vX.Y.Z -m "vX.Y.Z"        # or vX.Y.Z-beta.N
@@ -128,18 +162,38 @@ git push origin vX.Y.Z
 
 The `release` environment requires an individual approval before any job can read a
 secret. That approval is the reason keeping signing keys in CI was judged acceptable. It lives under
-Actions ▸ the running workflow ▸ Review deployments.
+Actions ▸ the running workflow ▸ Review deployments. The Windows job and the macOS job wait
+for it together, and one approval admits both; the macOS job then waits for the Windows
+installer, which it signs for updates.
 
 When it finishes, verify:
 
 - the DMG downloads and mounts;
 - `spctl -a -vv` on the mounted app reports `source=Notarized Developer ID`;
 - the appcast lists the new `<sparkle:version>`;
-- for a second-or-later stable, the feed carries a `.delta` and it is signed.
+- for a second-or-later stable, the feed carries a `.delta` and it is signed;
+- the installer, `Orthant-<version>-setup.exe`, downloads, and on Windows
+  `Get-AuthenticodeSignature` reports it `Valid` with a `TimeStamperCertificate`;
+- `appcast-win.xml` (or `appcast-win-beta.xml`) lists the new `<sparkle:version>` with an
+  `edSignature`;
+- for a stable, `bump-winget` opened a pull request to `microsoft/winget-pkgs`. Microsoft
+  validates and merges it, hours to days later; it is not part of this verification.
 
 **If a job fails after publication, use "Re-run failed jobs", never "Re-run all".** The
 first job deliberately rejects a tag whose release is already public rather than
 rebuild different signed bytes.
+
+**If a job fails before publication, use "Re-run all jobs".** The macOS job waits for the
+installer the Windows job uploads in the same attempt, so re-running only a failed macOS
+job waits for an upload that never comes, and fails. Re-running all asks for the one
+approval again. A failed Windows job leaves its diagnostics in its artifact,
+`orthant-windows-<run>-<attempt>`, kept for one day: download it from the run's summary and
+decrypt it with the release key:
+
+```sh
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 10000 -md sha256 \
+  -pass env:DRYRUN_ARTIFACT_KEY -in windows.tar.enc -out windows.tar
+```
 
 ## 7. Flip `published: true` in a separate commit
 
@@ -170,6 +224,7 @@ cd site && npm run verify:live
 ```
 
 That asserts the pages serve, `/download` **resolves a DMG rather than falling back**,
+`/download/windows` resolves the installer once a Windows stable exists,
 a real miss still 404s, the CSP is as declared, and the appcast is still served by
 GitHub Pages with no `cf-ray`.
 
@@ -207,3 +262,10 @@ publication revokes every existing user's grant, with no migration path.
 installed. It points at a domain the project owns so hosting can move without orphaning
 a client. `updates.orthant.app` must stay **DNS-only (grey cloud)**: proxying it breaks
 GitHub's certificate issuance. `npm run verify:live` checks this on every deploy.
+
+On Windows the feed is compiled in the same way (`appcast-win.xml`, or
+`appcast-win-beta.xml` in a beta), and so is the installer's `AppId`, by which Windows and
+winget know an installed copy; a new one would install a second Orthant beside the first.
+The winget identifier, `Orthant.Orthant`, is permanent once Microsoft merges it. The
+Authenticode signer is the one thing that can change without breaking an installed copy:
+nothing on Windows is keyed to it, though SmartScreen's reputation starts again.

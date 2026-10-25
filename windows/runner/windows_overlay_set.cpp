@@ -13,6 +13,8 @@
 #include <sstream>
 #include <utility>
 
+#include "overlay_rules.h"
+
 namespace {
 
 constexpr wchar_t kPanelClass[] = L"ORTHANT_OVERLAY_PANEL";
@@ -71,15 +73,6 @@ constexpr UINT kDpiChangedBeforeParent = 0x02E2;
 constexpr UINT kRevealDeadlineMs = 250;
 // A warm-up whose frame never comes must not leave a shown, cloaked panel.
 constexpr UINT kWarmDeadlineMs = 2000;
-// A hotkey summon reaching Show later than this after its press waited behind
-// something: this thread (an engine attaching takes over a second, measured),
-// or a placement ahead of it in Dart's command queue. Shown now, it would take
-// Esc, Enter and the arrows from whatever the user has moved on to. Each
-// summon carries its own press time, through Dart and back in showOverlay, so
-// two presses cannot share one, and nothing is left over to be mistaken for a
-// later summon's.
-constexpr double kStaleSummonMs = 1000;
-
 struct Grab {
   int id;
   UINT modifiers;
@@ -228,33 +221,6 @@ const flutter::EncodableValue* Field(const flutter::EncodableMap& map,
                                      const char* key) {
   const auto it = map.find(flutter::EncodableValue(key));
   return it == map.end() ? nullptr : &it->second;
-}
-
-std::optional<int64_t> IntOf(const flutter::EncodableValue* value) {
-  if (!value) return std::nullopt;
-  if (const auto* v = std::get_if<int32_t>(value)) return *v;
-  if (const auto* v = std::get_if<int64_t>(value)) return *v;
-  return std::nullopt;
-}
-
-std::optional<double> NumberOf(const flutter::EncodableValue* value) {
-  std::optional<double> number;
-  if (const auto* d = value ? std::get_if<double>(value) : nullptr) {
-    number = *d;
-  } else if (const auto i = IntOf(value)) {
-    number = static_cast<double>(*i);
-  }
-  if (number && !std::isfinite(*number)) return std::nullopt;
-  return number;
-}
-
-// The session a call names: {sessionId: n, ...}, or a bare n; -1 for neither.
-int64_t SessionOf(const flutter::EncodableValue* arguments) {
-  if (!arguments) return -1;
-  if (const auto* map = std::get_if<flutter::EncodableMap>(arguments)) {
-    return IntOf(Field(*map, "sessionId")).value_or(-1);
-  }
-  return IntOf(arguments).value_or(-1);
 }
 
 }  // namespace
@@ -873,12 +839,8 @@ bool WindowsOverlaySet::HandleHotkey(int id) {
 double WindowsOverlaySet::PressTick(LONG message_time) {
   // The press, not the dispatch: a WM_HOTKEY waits in the queue while this
   // thread is busy (an engine attaching takes over a second, measured), and
-  // that wait is what the stale check is for. A message time is the low 32
-  // bits of the same tick count, to its resolution.
-  const ULONGLONG now = GetTickCount64();
-  const DWORD queued =
-      static_cast<DWORD>(now) - static_cast<DWORD>(message_time);
-  return static_cast<double>(now - queued);
+  // that wait is what the stale check is for (PressTickAt).
+  return PressTickAt(GetTickCount64(), static_cast<uint32_t>(message_time));
 }
 
 void WindowsOverlaySet::SetGrid(int cols, int rows, double gap,
@@ -940,9 +902,7 @@ WindowsOverlaySet::ShowResult WindowsOverlaySet::Show(
   const double now = EpochMs();
   const double age =
       pressed_ms > 0 ? static_cast<double>(GetTickCount64()) - pressed_ms : 0;
-  // A press from the future is no press of ours (the tick is this machine's
-  // and monotonic): stale, not fresh.
-  if (pressed_ms > 0 && (age > kStaleSummonMs || age < 0)) {
+  if (IsStaleSummon(pressed_ms, age)) {
     DevLog("overlay summon refused: stale, " + Ms(age) +
            " ms after its hotkey");
     MessageBeep(MB_OK);
@@ -1084,24 +1044,17 @@ void WindowsOverlaySet::OnForeground(HWINEVENTHOOK hook, HWND hwnd) {
   // An event queued before an earlier session's hook was removed is not this
   // session's; no window at all is a switch still in progress.
   if (!session_ || hook != foreground_hook_ || !hwnd) return;
+  // Orthant's own windows are all made on this thread, where this hook runs
+  // (ClassifyForegroundMove says which moves end the session, and why).
   DWORD pid = 0;
   const DWORD thread = GetWindowThreadProcessId(hwnd, &pid);
-  // Orthant's own windows, all made on this thread, where this hook runs: a
-  // tray summon's foreground is the hidden window until its capture
-  // reactivates the target. A window from another thread of this process is
-  // the updater's (WinSparkle runs its windows on a thread of its own), and
-  // ends the session as another app's would: left up, the grid's grabbed
-  // Enter and arrows would act on the captured window while the user
-  // answers the updater.
-  if (pid == GetCurrentProcessId() && thread == GetCurrentThreadId()) return;
-  // The captured window's own process: a tray summon's capture activates
-  // that window after the panels show, and a dialog of the app's own may come
-  // forward. Neither is the user going elsewhere.
-  const bool shell = IsShellSurface(hwnd);
-  if (pid == session_->owner_pid && !shell) return;
+  const ForegroundMove move = ClassifyForegroundMove(
+      pid, thread, IsShellSurface(hwnd), GetCurrentProcessId(),
+      GetCurrentThreadId(), session_->owner_pid);
+  if (move == ForegroundMove::kStays) return;
   std::string to = "process " + std::to_string(pid);
-  if (shell) to = "shell";
-  else if (pid == GetCurrentProcessId()) to = "the updater";
+  if (move == ForegroundMove::kShell) to = "shell";
+  else if (move == ForegroundMove::kUpdater) to = "the updater";
   DevLog("overlay foreground moved: " + to);
   Dismiss("click-away");
 }

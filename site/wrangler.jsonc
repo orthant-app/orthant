@@ -31,7 +31,9 @@
     // So every header-less check of this route reported success while the
     // route was broken for its only real audience. Verified in both
     // directions after this change, with and without `Accept: text/html`.
-    "run_worker_first": ["/download", "/download/"],
+    // "/download/*" covers "/download/" too, and wrangler refuses a rule that
+    // another makes redundant (measured: it will not start).
+    "run_worker_first": ["/download", "/download/*"],
     "directory": "./dist",
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",

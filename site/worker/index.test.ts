@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import handler from './index';
-import { FALLBACK_URL, SECURITY_HEADERS, handleDownload, runtimeDeps, type CacheLike } from './download';
+import {
+  FALLBACK_URL,
+  FEED_URLS,
+  SECURITY_HEADERS,
+  downloadRoute,
+  handleDownload,
+  platformOf,
+  runtimeCache,
+  runtimeDeps,
+  type CacheLike,
+} from './download';
 
 const GOOD = 'https://github.com/orthant-app/orthant/releases/download/v1.0.1/Orthant-1.0.1.dmg';
 
@@ -274,5 +284,309 @@ describe('the ASSETS fallthrough', () => {
     const res = await handler.fetch(new Request('https://orthant.app/does/not/exist'), notFoundEnv);
     expect(res.status).toBe(404);
     expect(res.headers.get('content-security-policy')).toContain("default-src 'self'");
+  });
+});
+
+const GOOD_WIN = 'https://github.com/orthant-app/orthant/releases/download/v1.0.4/Orthant-1.0.4-setup.exe';
+
+const WIN_FEED = `<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"><channel><item>
+  <sparkle:shortVersionString>1.0.4</sparkle:shortVersionString>
+  <enclosure url="${GOOD_WIN}" length="11572434"/>
+</item></channel></rss>`;
+
+/** A fetch that answers each feed URL as `answers` says: a body, a status, or
+ *  a promise that never settles until aborted. */
+function feeds(answers: Record<string, string | number | 'never'>): typeof fetch {
+  return ((url: string, init?: RequestInit) => {
+    const answer = answers[url] ?? 404;
+    if (answer === 'never') {
+      return new Promise<Response>((_, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+      });
+    }
+    if (typeof answer === 'number') return Promise.resolve(new Response('', { status: answer }));
+    return Promise.resolve(ok(answer));
+  }) as unknown as typeof fetch;
+}
+
+describe('platformOf', () => {
+  const headers = (h: Record<string, string>) => new Headers(h);
+  const WIN_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
+  const MAC_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15';
+
+  it('reads the platform hint Chromium sends', () => {
+    expect(platformOf(headers({ 'sec-ch-ua-platform': '"Windows"' }))).toBe('windows');
+    expect(platformOf(headers({ 'sec-ch-ua-platform': '"macOS"' }))).toBe('macos');
+  });
+
+  it('believes the hint over the User-Agent', () => {
+    expect(platformOf(headers({ 'sec-ch-ua-platform': '"macOS"', 'user-agent': WIN_UA }))).toBe('macos');
+  });
+
+  it('reads the User-Agent when there is no hint, as from Firefox or Safari', () => {
+    expect(platformOf(headers({ 'user-agent': WIN_UA }))).toBe('windows');
+    expect(platformOf(headers({ 'user-agent': MAC_UA }))).toBe('macos');
+  });
+
+  it('offers macOS to anything else', () => {
+    expect(platformOf(headers({ 'sec-ch-ua-platform': '"Linux"' }))).toBe('macos');
+    expect(platformOf(headers({ 'user-agent': 'curl/8.7.1' }))).toBe('macos');
+    expect(platformOf(headers({}))).toBe('macos');
+  });
+});
+
+describe('downloadRoute', () => {
+  const win = new Headers({ 'sec-ch-ua-platform': '"Windows"' });
+  const mac = new Headers({ 'sec-ch-ua-platform': '"macOS"' });
+
+  it('answers /download with the visitor\'s platform, then macOS', () => {
+    expect(downloadRoute('/download', win)).toEqual({ platforms: ['windows', 'macos'], vary: true });
+    expect(downloadRoute('/download/', win)).toEqual({ platforms: ['windows', 'macos'], vary: true });
+    expect(downloadRoute('/download', mac)).toEqual({ platforms: ['macos'], vary: true });
+  });
+
+  it('answers a named platform with that platform alone, for anyone', () => {
+    expect(downloadRoute('/download/windows', mac)).toEqual({ platforms: ['windows'], vary: false });
+    expect(downloadRoute('/download/macos/', win)).toEqual({ platforms: ['macos'], vary: false });
+  });
+
+  it('is not a download route for anything else', () => {
+    for (const path of ['/downloads', '/download/linux', '/download/windows/x', '/download/Windows', '/']) {
+      expect(downloadRoute(path, win), path).toBeNull();
+    }
+  });
+});
+
+describe('handleDownload for a platform', () => {
+  const both = { [FEED_URLS.macos]: FEED, [FEED_URLS.windows]: WIN_FEED };
+
+  it('302s a Windows request to the installer', async () => {
+    const res = await handleDownload({ fetch: feeds(both), cache: memoryCache() }, ['windows']);
+    expect(res.headers.get('location')).toBe(GOOD_WIN);
+  });
+
+  it('answers a Windows visitor with the DMG while Windows has no stable feed, as before', async () => {
+    const res = await handleDownload(
+      { fetch: feeds({ [FEED_URLS.macos]: FEED, [FEED_URLS.windows]: 404 }), cache: memoryCache() },
+      ['windows', 'macos'],
+      true,
+    );
+    expect(res.headers.get('location')).toBe(GOOD);
+    // The other platform's artifact is never kept.
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('vary')).toBe('User-Agent, Sec-CH-UA-Platform');
+  });
+
+  it('prefers the installer for a Windows visitor once there is one', async () => {
+    const res = await handleDownload({ fetch: feeds(both), cache: memoryCache() }, ['windows', 'macos'], true);
+    expect(res.headers.get('location')).toBe(GOOD_WIN);
+    expect(res.headers.get('cache-control')).toBe('public, max-age=300');
+    expect(res.headers.get('vary')).toBe('User-Agent, Sec-CH-UA-Platform');
+  });
+
+  it('falls back when a named platform has no release, never to the other platform\'s', async () => {
+    const res = await handleDownload(
+      { fetch: feeds({ [FEED_URLS.macos]: FEED, [FEED_URLS.windows]: 404 }), cache: memoryCache() },
+      ['windows'],
+    );
+    expect(res.headers.get('location')).toBe(FALLBACK_URL);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('keeps each platform\'s target under its own key', async () => {
+    const cache = memoryCache();
+    await handleDownload({ fetch: feeds(both), cache }, ['windows']);
+    await handleDownload({ fetch: feeds(both), cache }, ['macos']);
+    expect(cache.store.get('download-target-windows')).toBe(GOOD_WIN);
+    expect(cache.store.get('download-target')).toBe(GOOD);
+  });
+
+  it('never serves the cached DMG to a Windows request', async () => {
+    const cache = memoryCache();
+    await cache.put('download-target', GOOD);
+    const res = await handleDownload({ fetch: feeds({ [FEED_URLS.windows]: 404 }), cache }, ['windows']);
+    expect(res.headers.get('location')).toBe(FALLBACK_URL);
+  });
+
+  it('marks an answer chosen from the visitor\'s headers, and only that one', async () => {
+    const chosen = await handleDownload({ fetch: feeds(both), cache: memoryCache() }, ['macos'], true);
+    const named = await handleDownload({ fetch: feeds(both), cache: memoryCache() }, ['macos']);
+    expect(chosen.headers.get('vary')).toBe('User-Agent, Sec-CH-UA-Platform');
+    expect(named.headers.get('vary')).toBeNull();
+  });
+
+  it('bounds the whole answer by one deadline, not one per platform', async () => {
+    vi.useFakeTimers();
+    try {
+      let settled = false;
+      const pending = handleDownload(
+        { fetch: feeds({ [FEED_URLS.macos]: 'never', [FEED_URLS.windows]: 'never' }), cache: memoryCache() },
+        ['windows', 'macos'],
+        true,
+      ).then((res) => { settled = true; return res; });
+      await vi.advanceTimersByTimeAsync(3500);
+      expect(settled).toBe(true);
+      expect((await pending).headers.get('location')).toBe(FALLBACK_URL);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+/*
+ * The DMG is a Windows visitor's answer only while Windows has no stable: its
+ * feed answers 404. A feed that exists and failed is not that, and sending the
+ * visitor a Mac installer for a hiccup is wrong once Windows has shipped, so
+ * every other failure goes to the releases page, as /download/windows does.
+ */
+describe('handleDownload for a Windows visitor whose feed failed', () => {
+  const deps = (f: typeof fetch, cache = memoryCache()) => ({ fetch: f, cache });
+  const visitor = (d: ReturnType<typeof deps>) => handleDownload(d, ['windows', 'macos'], true);
+  const expectReleasesPage = (res: Response) => {
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe(FALLBACK_URL);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('vary')).toBe('User-Agent, Sec-CH-UA-Platform');
+  };
+
+  it.each([
+    ['500', 500],
+    ['503', 503],
+    ['403', 403],
+  ])('goes to the releases page when the Windows feed answers %s', async (_name, status) => {
+    expectReleasesPage(await visitor(deps(feeds({ [FEED_URLS.macos]: FEED, [FEED_URLS.windows]: status }))));
+  });
+
+  it('goes to the releases page when the Windows feed answers 500 with a valid appcast', async () => {
+    const fetch = (async (url: string) =>
+      new Response(url === FEED_URLS.windows ? WIN_FEED : FEED, { status: url === FEED_URLS.windows ? 500 : 200 })
+    ) as unknown as typeof globalThis.fetch;
+    expectReleasesPage(await visitor(deps(fetch)));
+  });
+
+  it('goes to the releases page when the Windows feed cannot be reached', async () => {
+    const fetch = (async (url: string) => {
+      if (url === FEED_URLS.windows) throw new Error('network');
+      return ok(FEED);
+    }) as unknown as typeof globalThis.fetch;
+    expectReleasesPage(await visitor(deps(fetch)));
+  });
+
+  it('goes to the releases page when the Windows feed times out', async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = visitor(deps(feeds({ [FEED_URLS.macos]: FEED, [FEED_URLS.windows]: 'never' })));
+      await vi.advanceTimersByTimeAsync(5000);
+      expectReleasesPage(await pending);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    ['is not an appcast', '<rss/>'],
+    ['is not XML at all', 'nope'],
+    ['holds the macOS DMG, not an installer', FEED],
+  ])('goes to the releases page when the Windows feed %s', async (_name, body) => {
+    expectReleasesPage(await visitor(deps(feeds({ [FEED_URLS.macos]: FEED, [FEED_URLS.windows]: body }))));
+  });
+
+  it('keeps the DMG only for a feed that is absent, 404, and never caches that answer', async () => {
+    const cache = memoryCache();
+    const res = await visitor(deps(feeds({ [FEED_URLS.macos]: FEED, [FEED_URLS.windows]: 404 }), cache));
+    expect(res.headers.get('location')).toBe(GOOD);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('vary')).toBe('User-Agent, Sec-CH-UA-Platform');
+    expect(cache.store.has('download-target-windows')).toBe(false);
+  });
+
+  it('goes to the releases page when Windows has no stable and the macOS feed failed too', async () => {
+    expectReleasesPage(await visitor(deps(feeds({ [FEED_URLS.macos]: 500, [FEED_URLS.windows]: 404 }))));
+  });
+
+  it('caches nothing for a failed Windows feed', async () => {
+    const cache = memoryCache();
+    await visitor(deps(feeds({ [FEED_URLS.macos]: FEED, [FEED_URLS.windows]: 500 }), cache));
+    expect(cache.store.has('download-target-windows')).toBe(false);
+  });
+
+  it('is not changed for a macOS visitor, whatever the Windows feed does', async () => {
+    const macVisitor = (windows: string | number | 'never', macos: string | number = FEED) =>
+      handleDownload(deps(feeds({ [FEED_URLS.macos]: macos, [FEED_URLS.windows]: windows })), ['macos'], true);
+
+    for (const windows of [500, 404, WIN_FEED, '<rss/>']) {
+      const res = await macVisitor(windows);
+      expect(res.headers.get('location')).toBe(GOOD);
+      expect(res.headers.get('cache-control')).toBe('public, max-age=300');
+      expect(res.headers.get('vary')).toBe('User-Agent, Sec-CH-UA-Platform');
+    }
+    for (const macos of [500, 404, '<rss/>']) {
+      expectReleasesPage(await macVisitor(WIN_FEED, macos));
+    }
+  });
+
+  it('is not changed for a named platform', async () => {
+    const win = (status: string | number) =>
+      handleDownload(deps(feeds({ [FEED_URLS.macos]: FEED, [FEED_URLS.windows]: status })), ['windows']);
+    for (const status of [404, 500, '<rss/>']) {
+      const res = await win(status);
+      expect(res.headers.get('location')).toBe(FALLBACK_URL);
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      expect(res.headers.get('vary')).toBeNull();
+    }
+    expect((await win(WIN_FEED)).headers.get('location')).toBe(GOOD_WIN);
+  });
+});
+
+describe('runtimeCache', () => {
+  it('keeps one entry per key', async () => {
+    const store = new Map<string, string>();
+    const real = (globalThis as { caches?: unknown }).caches;
+    (globalThis as { caches?: unknown }).caches = {
+      default: {
+        async match(req: Request) {
+          const v = store.get(req.url);
+          return v === undefined ? undefined : new Response(v);
+        },
+        async put(req: Request, res: Response) { store.set(req.url, await res.text()); },
+      },
+    };
+    try {
+      const cache = runtimeCache();
+      await cache.put('download-target', GOOD);
+      await cache.put('download-target-windows', GOOD_WIN);
+      expect(await cache.match('download-target')).toBe(GOOD);
+      expect(await cache.match('download-target-windows')).toBe(GOOD_WIN);
+    } finally {
+      (globalThis as { caches?: unknown }).caches = real;
+    }
+  });
+});
+
+describe('the download routes', () => {
+  const env = { ASSETS: { fetch: async () => new Response('the 404 page', { status: 404 }) } };
+
+  it('sends a named platform to its own artifact through the entry module', async () => {
+    const realFetch = globalThis.fetch;
+    const realCaches = (globalThis as { caches?: unknown }).caches;
+    globalThis.fetch = feeds({ [FEED_URLS.macos]: FEED, [FEED_URLS.windows]: WIN_FEED }).bind(globalThis);
+    (globalThis as { caches?: unknown }).caches = {
+      default: { async match() { return undefined; }, async put() {} },
+    };
+    try {
+      const win = await handler.fetch(new Request('https://orthant.app/download/windows'), env);
+      expect(win.headers.get('location')).toBe(GOOD_WIN);
+      const mac = await handler.fetch(new Request('https://orthant.app/download/macos/'), env);
+      expect(mac.headers.get('location')).toBe(GOOD);
+    } finally {
+      globalThis.fetch = realFetch;
+      (globalThis as { caches?: unknown }).caches = realCaches;
+    }
+  });
+
+  it('leaves a path that only looks like one to the assets', async () => {
+    const res = await handler.fetch(new Request('https://orthant.app/download/linux'), env);
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe('the 404 page');
   });
 });

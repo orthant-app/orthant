@@ -91,3 +91,30 @@ describe('resolveDownloadUrl', () => {
     expect(resolveDownloadUrl('<rss><channel><item>')).toBeNull();
   });
 });
+
+describe('resolveDownloadUrl for Windows', () => {
+  const INSTALLER = 'https://github.com/orthant-app/orthant/releases/download/v1.0.4/Orthant-1.0.4-setup.exe';
+
+  it('returns the first item\'s installer', () => {
+    expect(resolveDownloadUrl(feed(item({ url: INSTALLER, short: '1.0.4' })), 'windows')).toBe(INSTALLER);
+  });
+
+  it('never answers a Windows request with a DMG, nor a macOS one with an installer', () => {
+    expect(resolveDownloadUrl(feed(item({ url: GOOD, short: '1.0.1' })), 'windows')).toBeNull();
+    expect(resolveDownloadUrl(feed(item({ url: INSTALLER, short: '1.0.4' })), 'macos')).toBeNull();
+  });
+
+  it('rejects a beta installer, which a stable feed never leads with', () => {
+    const beta = 'https://github.com/orthant-app/orthant/releases/download/v1.1.0-beta.1/Orthant-1.1.0-beta.1-setup.exe';
+    expect(resolveDownloadUrl(feed(item({ url: beta, short: '1.1.0-beta.1' })), 'windows')).toBeNull();
+  });
+
+  it('rejects an installer whose version disagrees with shortVersionString', () => {
+    expect(resolveDownloadUrl(feed(item({ url: INSTALLER, short: '1.0.3' })), 'windows')).toBeNull();
+  });
+
+  it('rejects an installer outside the project\'s releases', () => {
+    const foreign = 'https://github.com/someone/else/releases/download/v1.0.4/Orthant-1.0.4-setup.exe';
+    expect(resolveDownloadUrl(feed(item({ url: foreign, short: '1.0.4' })), 'windows')).toBeNull();
+  });
+});

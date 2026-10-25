@@ -10,6 +10,7 @@ add_executable(${BINARY_NAME} WIN32
   "config_window.cpp"
   "flutter_window.cpp"
   "main.cpp"
+  "overlay_rules.cpp"
   "utils.cpp"
   "win32_window.cpp"
   "window_channel.cpp"
@@ -46,3 +47,16 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
+
+# The overlay session's own decisions, tested alone: built with the app and
+# run by ctest from the build directory. Never installed into the bundle.
+add_executable(overlay_rules_test "overlay_rules.cpp" "overlay_rules_test.cpp")
+apply_standard_settings(overlay_rules_test)
+# Not beside the app: the bundle is that folder, and the installer takes all
+# of it.
+set_target_properties(overlay_rules_test PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/runner_tests")
+target_compile_definitions(overlay_rules_test PRIVATE "NOMINMAX")
+target_include_directories(overlay_rules_test PRIVATE
+  $<TARGET_PROPERTY:flutter_wrapper_app,INTERFACE_INCLUDE_DIRECTORIES>)
+add_test(NAME overlay_rules COMMAND overlay_rules_test)

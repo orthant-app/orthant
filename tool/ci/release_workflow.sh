@@ -290,16 +290,25 @@ check_settled() {
 
 restore() {
   local mode="$1" repo="$2" dist="$3" stable_url beta_url tags tag
+  local win_stable_url win_beta_url
   require_mode "$mode" || return 1
   mkdir -p "$dist" || return 1
   find "$dist" -maxdepth 1 -type f \( \
     -name 'appcast.xml' -o -name 'appcast-beta.xml' -o \
-    -name 'Orthant-*.dmg' -o -name '*.delta' \
+    -name 'appcast-win.xml' -o -name 'appcast-win-beta.xml' -o \
+    -name 'Orthant-*.dmg' -o -name 'Orthant-*-setup.exe' -o -name '*.delta' \
   \) -delete || return 1
   stable_url="$(feed_url appcast.xml)" || return 1
   beta_url="$(feed_url appcast-beta.xml)" || return 1
   fetch_feed "$stable_url" "$dist/appcast.xml" || return 1
   fetch_feed "$beta_url" "$dist/appcast-beta.xml" || return 1
+  # The Windows feeds: the history windows-feed writes over, and the build
+  # numbers this release must top. No installer is restored: a Windows
+  # update is always the whole installer, never a delta from an earlier one.
+  win_stable_url="$(feed_url appcast-win.xml)" || return 1
+  win_beta_url="$(feed_url appcast-win-beta.xml)" || return 1
+  fetch_feed "$win_stable_url" "$dist/appcast-win.xml" || return 1
+  fetch_feed "$win_beta_url" "$dist/appcast-win-beta.xml" || return 1
 
   if [[ "$mode" == stable || "$mode" == dry-run ]]; then
     tags="$(gh release list --exclude-drafts --exclude-pre-releases --limit 3 \
@@ -326,6 +335,10 @@ assemble_pages() {
         workflow_error 'stable appcast is missing' || return 1
       cp "$dist/appcast.xml" "$site/appcast.xml" || return 1
       cp "$dist/appcast.xml" "$site/appcast-beta.xml" || return 1
+      [[ -f "$dist/appcast-win.xml" ]] ||
+        workflow_error 'stable Windows appcast is missing' || return 1
+      cp "$dist/appcast-win.xml" "$site/appcast-win.xml" || return 1
+      cp "$dist/appcast-win.xml" "$site/appcast-win-beta.xml" || return 1
       ;;
     beta)
       [[ -f "$dist/appcast-beta.xml" ]] ||
@@ -333,6 +346,12 @@ assemble_pages() {
       cp "$dist/appcast-beta.xml" "$site/appcast-beta.xml" || return 1
       if [[ -f "$dist/appcast.xml" ]]; then
         cp "$dist/appcast.xml" "$site/appcast.xml" || return 1
+      fi
+      [[ -f "$dist/appcast-win-beta.xml" ]] ||
+        workflow_error 'beta Windows appcast is missing' || return 1
+      cp "$dist/appcast-win-beta.xml" "$site/appcast-win-beta.xml" || return 1
+      if [[ -f "$dist/appcast-win.xml" ]]; then
+        cp "$dist/appcast-win.xml" "$site/appcast-win.xml" || return 1
       fi
       ;;
   esac
@@ -389,7 +408,7 @@ PYTHON
   done <<<"$repaired_urls"
 
   # A Pages deploy replaces the WHOLE site, so anything absent from this
-  # directory ceases to exist at the next release — which is why both feeds are
+  # directory ceases to exist at the next release, which is why every feed is
   # copied above rather than just the one generated. CNAME is subject to the
   # same rule: without it here, the custom domain is dropped on the first
   # deploy and every installed copy's SUFeedURL starts 404ing. Emitting it on
@@ -423,7 +442,7 @@ publish() {
   [[ "$prerelease" == "$RELEASE_PRERELEASE" ]] ||
     workflow_error "prerelease value does not match version: $version" || return 1
 
-  assets=("$dist/Orthant-$version.dmg")
+  assets=("$dist/Orthant-$version.dmg" "$dist/Orthant-$version-setup.exe")
   deltas=()
   shopt -s nullglob
   deltas=("$dist"/*.delta)
@@ -532,6 +551,113 @@ publish() {
   exec gh "${edit_args[@]}"
 }
 
+# The Windows feed for this release. Written here, on the macOS job, because
+# the Ed25519 signature that every installed copy checks before it runs an
+# update is made with Sparkle's sign_update, a macOS tool: the installer the
+# Windows job built and Authenticode-signed is signed as it will be served,
+# the signature verified against the same key, and the mode's feed written by
+# windows_appcast.py over the live one restore fetched. Every refusal comes
+# before the feed is written, so a refusal leaves dist as restore left it.
+WINDOWS_SIGN_LINE_RE='^sparkle:edSignature="([A-Za-z0-9+/]+={0,2})" length="[0-9]+"$'
+
+windows_feed() {
+  local mode="$1" version="$2" dist="$3" feed installer url line signature
+  local -a history_args
+  require_mode "$mode" || return 1
+  validate_release_version "$version" || return 1
+  parse_pubspec_version pubspec.yaml || return 1
+  [[ "$RELEASE_BASE_VERSION" == "$PUBSPEC_BASE_VERSION" ]] ||
+    workflow_error "version $version does not match pubspec $PUBSPEC_BASE_VERSION" || return 1
+  case "$mode" in
+    beta)
+      [[ "$RELEASE_PRERELEASE" == true ]] ||
+        workflow_error "a beta needs a pre-release version, not $version" || return 1
+      feed=appcast-win-beta.xml
+      ;;
+    *)
+      [[ "$RELEASE_PRERELEASE" == false ]] ||
+        workflow_error "a $mode release needs a stable version, not $version" || return 1
+      feed=appcast-win.xml
+      ;;
+  esac
+  installer="$dist/Orthant-$version-setup.exe"
+  [[ -f "$installer" ]] ||
+    workflow_error "Windows installer is missing: $installer" || return 1
+  [[ -n "${SPARKLE_BIN-}" && -x "$SPARKLE_BIN/sign_update" ]] ||
+    workflow_error 'SPARKLE_BIN must name the folder holding sign_update' || return 1
+  [[ -n "${SPARKLE_ED_KEY_FILE-}" && -f "$SPARKLE_ED_KEY_FILE" ]] ||
+    workflow_error 'SPARKLE_ED_KEY_FILE must name the signing key' || return 1
+
+  # One build counter serves both platforms and only ever grows, so this
+  # release's number must top every item of all four live feeds. tool/release.sh
+  # held it above the two macOS feeds before it built, and has since written it
+  # into one of them; nothing before this touches the Windows two.
+  max_feed_version "$dist/appcast-win.xml" "$dist/appcast-win-beta.xml" || return 1
+  if [[ -n "$FEED_MAX_VERSION" ]]; then
+    (( 10#$PUBSPEC_BUILD_NUMBER > 10#$FEED_MAX_VERSION )) ||
+      workflow_error "build $PUBSPEC_BUILD_NUMBER is not above $FEED_MAX_VERSION, the newest in the live feeds" || return 1
+  fi
+
+  line="$("$SPARKLE_BIN/sign_update" -f "$SPARKLE_ED_KEY_FILE" "$installer")" ||
+    workflow_error "sign_update failed on $(basename "$installer")" || return 1
+  [[ "$line" =~ $WINDOWS_SIGN_LINE_RE ]] ||
+    workflow_error "not a sign_update line: $line" || return 1
+  signature="${BASH_REMATCH[1]}"
+  "$SPARKLE_BIN/sign_update" --verify -f "$SPARKLE_ED_KEY_FILE" "$installer" "$signature" ||
+    workflow_error "the signature does not verify for $(basename "$installer")" || return 1
+
+  history_args=()
+  if [[ -f "$dist/$feed" ]]; then
+    history_args=(--history "$dist/$feed")
+  fi
+  url="https://github.com/orthant-app/orthant/releases/download/v$version/$(basename "$installer")"
+  python3 "$SCRIPT_DIR/windows_appcast.py" --out "$dist/$feed" \
+    ${history_args[@]+"${history_args[@]}"} \
+    --installer "$installer" --release-name "$version" \
+    --build "$PUBSPEC_BUILD_NUMBER" --url "$url" --sign-line "$line" ||
+    workflow_error "could not write $feed" || return 1
+}
+
+# Waits for a job of this run, running beside the caller, to upload an
+# artifact and succeed. The release's two packaging jobs run in parallel so
+# that one approval admits both, and the macOS one needs the Windows installer
+# only at its end. The artifact is uploaded whatever happens, to keep a failed
+# job's diagnostics, so it counts only once its job has succeeded. True then;
+# false as soon as that job has ended otherwise, or succeeded without it (one
+# more look first, since it may have uploaded between the two questions), and
+# false after AWAIT_ARTIFACT_TIMEOUT seconds (an hour).
+await_artifact() {
+  local repo="$1" run="$2" attempt="$3" job="$4" artifact="$5" count state deadline
+  deadline=$((SECONDS + ${AWAIT_ARTIFACT_TIMEOUT:-3600}))
+  while :; do
+    count="$(gh api "repos/$repo/actions/runs/$run/artifacts?name=$artifact" --jq '.total_count')" ||
+      workflow_error "could not list this run's artifacts" || return 1
+    [[ "$count" =~ ^[0-9]+$ ]] ||
+      workflow_error "the artifact listing answered '$count'" || return 1
+    state="$(gh api "repos/$repo/actions/runs/$run/attempts/$attempt/jobs" --paginate \
+      --jq ".jobs[] | select(.name == \"$job\") | .status + \" \" + (.conclusion // \"\")")" ||
+      workflow_error "could not read the state of $job" || return 1
+    case "$state" in
+      'completed success')
+        (( count > 0 )) && return 0
+        count="$(gh api "repos/$repo/actions/runs/$run/artifacts?name=$artifact" --jq '.total_count')" ||
+          workflow_error "could not list this run's artifacts" || return 1
+        [[ "$count" =~ ^[1-9][0-9]*$ ]] && return 0
+        workflow_error "$job ended ($state) without uploading $artifact" || return 1
+        ;;
+      'completed '*)
+        workflow_error "$job did not succeed ($state)" || return 1
+        ;;
+      '')
+        workflow_error "this run has no job named $job" || return 1
+        ;;
+    esac
+    (( SECONDS < deadline )) ||
+      workflow_error "no $artifact after ${AWAIT_ARTIFACT_TIMEOUT:-3600} s; $job is $state" || return 1
+    sleep "${AWAIT_ARTIFACT_POLL:-20}"
+  done
+}
+
 command="${1-}"
 [[ $# -gt 0 ]] && shift
 case "$command" in
@@ -554,6 +680,14 @@ case "$command" in
   publish)
     [[ $# -eq 4 ]] || workflow_error 'usage: publish OWNER/REPO VERSION PRERELEASE DIST' || exit 2
     publish "$@"
+    ;;
+  windows-feed)
+    [[ $# -eq 3 ]] || workflow_error 'usage: windows-feed MODE VERSION DIST' || exit 2
+    windows_feed "$@"
+    ;;
+  await-artifact)
+    [[ $# -eq 5 ]] || workflow_error 'usage: await-artifact OWNER/REPO RUN ATTEMPT JOB ARTIFACT' || exit 2
+    await_artifact "$@"
     ;;
   *)
     workflow_error "unknown command: $command"

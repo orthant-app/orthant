@@ -1,5 +1,14 @@
 const REPO_PREFIX = '/orthant-app/orthant/releases/download/';
-const DMG = /^Orthant-(\d+\.\d+\.\d+)\.dmg$/;
+
+/** A platform the site offers a download for. */
+export type Platform = 'macos' | 'windows';
+
+/** Each platform's artifact, by its file name: a stable release's three
+ *  integers, as a stable feed's first item always is. */
+const ARTIFACT: Record<Platform, RegExp> = {
+  macos: /^Orthant-(\d+\.\d+\.\d+)\.dmg$/,
+  windows: /^Orthant-(\d+\.\d+\.\d+)-setup\.exe$/,
+};
 
 /** The first <item>…</item>, or null. */
 function firstItem(xml: string): string | null {
@@ -26,14 +35,15 @@ function shortVersion(item: string): string | null {
 }
 
 /**
- * The current full-DMG download URL, or null if the feed cannot be trusted.
+ * The current download URL for `platform` (the full DMG, or the Windows
+ * installer), or null if the feed cannot be trusted.
  *
  * `/download` 302s to whatever this returns, so an unvalidated result would be
  * an open redirect driven by a fetched document. Every field is checked against
  * an allowlist; anything unrecognised returns null and the caller falls back to
  * the releases page.
  */
-export function resolveDownloadUrl(xml: string): string | null {
+export function resolveDownloadUrl(xml: string, platform: Platform = 'macos'): string | null {
   const item = firstItem(xml);
   if (item === null) return null;
 
@@ -56,7 +66,7 @@ export function resolveDownloadUrl(xml: string): string | null {
   if (!url.pathname.startsWith(REPO_PREFIX)) return null;
 
   const filename = url.pathname.slice(url.pathname.lastIndexOf('/') + 1);
-  const named = DMG.exec(filename);
+  const named = ARTIFACT[platform].exec(filename);
   if (named === null) return null;
 
   const declared = shortVersion(item);

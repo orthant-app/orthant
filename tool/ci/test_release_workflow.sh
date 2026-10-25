@@ -788,7 +788,7 @@ assert_ok 'draft publication with no delta succeeds' \
   run_workflow publish orthant-app/orthant 1.0.0 false "$WORKSPACE/dist"
 calls="$(<"$CALL_LOG")"
 assert_contains 'new draft is created explicitly' \
-  'gh <release> <create> <v1.0.0> <--draft> <--verify-tag> <--notes-file> <build/dist/release-notes.md> <--repo> <orthant-app/orthant>' "$calls"
+  'gh <release> <create> <v1.0.0> <--title> <v1.0.0> <--draft> <--verify-tag> <--notes-file> <build/dist/release-notes.md> <--repo> <orthant-app/orthant>' "$calls"
 assert_contains 'the DMG and the installer are uploaded explicitly' \
   "gh <release> <upload> <v1.0.0> <$WORKSPACE/dist/Orthant-1.0.0.dmg> <$WORKSPACE/dist/Orthant-1.0.0-setup.exe> <--clobber> <--repo> <orthant-app/orthant>" "$calls"
 assert_contains 'release notes carry the changelog body' \
@@ -869,7 +869,7 @@ assert_ok 'exact asset equality publishes prerelease' \
   run_workflow publish orthant-app/orthant 1.1.0-beta.1 true "$WORKSPACE/dist"
 calls="$(<"$CALL_LOG")"
 assert_contains 'prerelease creation flags are exact' \
-  'gh <release> <create> <v1.1.0-beta.1> <--draft> <--verify-tag> <--notes-file> <build/dist/release-notes.md> <--prerelease> <--latest=false>' "$calls"
+  'gh <release> <create> <v1.1.0-beta.1> <--title> <v1.1.0-beta.1> <--draft> <--verify-tag> <--notes-file> <build/dist/release-notes.md> <--prerelease> <--latest=false>' "$calls"
 assert_contains 'publication edit carries prerelease latest flags' \
   'gh <release> <edit> <v1.1.0-beta.1> <--draft=false> <--prerelease=true> <--latest=false> <--repo> <orthant-app/orthant>' "$calls"
 assert_eq 'publication edit is the final state-changing call' \

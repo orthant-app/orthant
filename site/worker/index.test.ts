@@ -372,15 +372,16 @@ describe('handleDownload for a platform', () => {
       true,
     );
     expect(res.headers.get('location')).toBe(GOOD);
-    // Once Windows ships, the same answer means its feed failed for a moment:
-    // the other platform's artifact is never kept.
+    // The other platform's artifact is never kept.
     expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('vary')).toBe('User-Agent, Sec-CH-UA-Platform');
   });
 
   it('prefers the installer for a Windows visitor once there is one', async () => {
     const res = await handleDownload({ fetch: feeds(both), cache: memoryCache() }, ['windows', 'macos'], true);
     expect(res.headers.get('location')).toBe(GOOD_WIN);
     expect(res.headers.get('cache-control')).toBe('public, max-age=300');
+    expect(res.headers.get('vary')).toBe('User-Agent, Sec-CH-UA-Platform');
   });
 
   it('falls back when a named platform has no release, never to the other platform\'s', async () => {
@@ -429,6 +430,111 @@ describe('handleDownload for a platform', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+/*
+ * The DMG is a Windows visitor's answer only while Windows has no stable: its
+ * feed answers 404. A feed that exists and failed is not that, and sending the
+ * visitor a Mac installer for a hiccup is wrong once Windows has shipped, so
+ * every other failure goes to the releases page, as /download/windows does.
+ */
+describe('handleDownload for a Windows visitor whose feed failed', () => {
+  const deps = (f: typeof fetch, cache = memoryCache()) => ({ fetch: f, cache });
+  const visitor = (d: ReturnType<typeof deps>) => handleDownload(d, ['windows', 'macos'], true);
+  const expectReleasesPage = (res: Response) => {
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe(FALLBACK_URL);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('vary')).toBe('User-Agent, Sec-CH-UA-Platform');
+  };
+
+  it.each([
+    ['500', 500],
+    ['503', 503],
+    ['403', 403],
+  ])('goes to the releases page when the Windows feed answers %s', async (_name, status) => {
+    expectReleasesPage(await visitor(deps(feeds({ [FEED_URLS.macos]: FEED, [FEED_URLS.windows]: status }))));
+  });
+
+  it('goes to the releases page when the Windows feed answers 500 with a valid appcast', async () => {
+    const fetch = (async (url: string) =>
+      new Response(url === FEED_URLS.windows ? WIN_FEED : FEED, { status: url === FEED_URLS.windows ? 500 : 200 })
+    ) as unknown as typeof globalThis.fetch;
+    expectReleasesPage(await visitor(deps(fetch)));
+  });
+
+  it('goes to the releases page when the Windows feed cannot be reached', async () => {
+    const fetch = (async (url: string) => {
+      if (url === FEED_URLS.windows) throw new Error('network');
+      return ok(FEED);
+    }) as unknown as typeof globalThis.fetch;
+    expectReleasesPage(await visitor(deps(fetch)));
+  });
+
+  it('goes to the releases page when the Windows feed times out', async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = visitor(deps(feeds({ [FEED_URLS.macos]: FEED, [FEED_URLS.windows]: 'never' })));
+      await vi.advanceTimersByTimeAsync(5000);
+      expectReleasesPage(await pending);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    ['is not an appcast', '<rss/>'],
+    ['is not XML at all', 'nope'],
+    ['holds the macOS DMG, not an installer', FEED],
+  ])('goes to the releases page when the Windows feed %s', async (_name, body) => {
+    expectReleasesPage(await visitor(deps(feeds({ [FEED_URLS.macos]: FEED, [FEED_URLS.windows]: body }))));
+  });
+
+  it('keeps the DMG only for a feed that is absent, 404, and never caches that answer', async () => {
+    const cache = memoryCache();
+    const res = await visitor(deps(feeds({ [FEED_URLS.macos]: FEED, [FEED_URLS.windows]: 404 }), cache));
+    expect(res.headers.get('location')).toBe(GOOD);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('vary')).toBe('User-Agent, Sec-CH-UA-Platform');
+    expect(cache.store.has('download-target-windows')).toBe(false);
+  });
+
+  it('goes to the releases page when Windows has no stable and the macOS feed failed too', async () => {
+    expectReleasesPage(await visitor(deps(feeds({ [FEED_URLS.macos]: 500, [FEED_URLS.windows]: 404 }))));
+  });
+
+  it('caches nothing for a failed Windows feed', async () => {
+    const cache = memoryCache();
+    await visitor(deps(feeds({ [FEED_URLS.macos]: FEED, [FEED_URLS.windows]: 500 }), cache));
+    expect(cache.store.has('download-target-windows')).toBe(false);
+  });
+
+  it('is not changed for a macOS visitor, whatever the Windows feed does', async () => {
+    const macVisitor = (windows: string | number | 'never', macos: string | number = FEED) =>
+      handleDownload(deps(feeds({ [FEED_URLS.macos]: macos, [FEED_URLS.windows]: windows })), ['macos'], true);
+
+    for (const windows of [500, 404, WIN_FEED, '<rss/>']) {
+      const res = await macVisitor(windows);
+      expect(res.headers.get('location')).toBe(GOOD);
+      expect(res.headers.get('cache-control')).toBe('public, max-age=300');
+      expect(res.headers.get('vary')).toBe('User-Agent, Sec-CH-UA-Platform');
+    }
+    for (const macos of [500, 404, '<rss/>']) {
+      expectReleasesPage(await macVisitor(WIN_FEED, macos));
+    }
+  });
+
+  it('is not changed for a named platform', async () => {
+    const win = (status: string | number) =>
+      handleDownload(deps(feeds({ [FEED_URLS.macos]: FEED, [FEED_URLS.windows]: status })), ['windows']);
+    for (const status of [404, 500, '<rss/>']) {
+      const res = await win(status);
+      expect(res.headers.get('location')).toBe(FALLBACK_URL);
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      expect(res.headers.get('vary')).toBeNull();
+    }
+    expect((await win(WIN_FEED)).headers.get('location')).toBe(GOOD_WIN);
   });
 });
 

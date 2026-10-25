@@ -545,7 +545,10 @@ publish() {
   fi
   rm -rf "$temporary" || return 1
 
-  edit_args=(release edit "$tag" --draft=false "--prerelease=$prerelease")
+  # The title is set here as well as at creation: a draft left by an earlier
+  # run, or made by hand without one, skips the create above and would
+  # otherwise be published with a null name.
+  edit_args=(release edit "$tag" --title "$tag" --draft=false "--prerelease=$prerelease")
   if [[ "$prerelease" == true ]]; then
     edit_args+=(--latest=false)
   fi

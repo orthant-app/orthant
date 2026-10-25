@@ -815,6 +815,9 @@ assert_contains 'stale draft asset is deleted' \
 assert_before 'stale draft asset is deleted before upload' '<delete-asset>' '<upload>' "$calls"
 assert_contains 'all explicit delta paths are uploaded' \
   "<$WORKSPACE/dist/a.delta> <$WORKSPACE/dist/z.delta>" "$calls"
+assert_not_contains 'a draft that already exists is not created again' '<create>' "$calls"
+assert_contains 'publishing an existing draft sets the tag as its title' \
+  'gh <release> <edit> <v1.1.0-beta.1> <--title> <v1.1.0-beta.1> <--draft=false> <--prerelease=true> <--latest=false> <--repo> <orthant-app/orthant>' "$calls"
 
 reset_fixture
 mkdir -p "$WORKSPACE/dist"
@@ -871,9 +874,9 @@ calls="$(<"$CALL_LOG")"
 assert_contains 'prerelease creation flags are exact' \
   'gh <release> <create> <v1.1.0-beta.1> <--title> <v1.1.0-beta.1> <--draft> <--verify-tag> <--notes-file> <build/dist/release-notes.md> <--prerelease> <--latest=false>' "$calls"
 assert_contains 'publication edit carries prerelease latest flags' \
-  'gh <release> <edit> <v1.1.0-beta.1> <--draft=false> <--prerelease=true> <--latest=false> <--repo> <orthant-app/orthant>' "$calls"
+  'gh <release> <edit> <v1.1.0-beta.1> <--title> <v1.1.0-beta.1> <--draft=false> <--prerelease=true> <--latest=false> <--repo> <orthant-app/orthant>' "$calls"
 assert_eq 'publication edit is the final state-changing call' \
-  'gh <release> <edit> <v1.1.0-beta.1> <--draft=false> <--prerelease=true> <--latest=false> <--repo> <orthant-app/orthant>' \
+  'gh <release> <edit> <v1.1.0-beta.1> <--title> <v1.1.0-beta.1> <--draft=false> <--prerelease=true> <--latest=false> <--repo> <orthant-app/orthant>' \
   "$(tail -n 1 "$CALL_LOG")"
 assert_contains 'a beta publish reads notes from the shared BASE-version entry, not a per-tag file' \
   'Beta body.' "$(<"$FIXTURES/actual_notes")"

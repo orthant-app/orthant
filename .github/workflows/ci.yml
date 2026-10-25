@@ -125,6 +125,19 @@ jobs:
       # analysis is platform-independent and the macOS job already runs it.
       - run: flutter test
       - run: flutter build windows --debug
+      # The runner's own decisions (windows/runner/overlay_rules.cpp), whose
+      # test the Debug build above compiled; ctest runs it.
+      - name: Runner tests
+        run: ctest --test-dir build/windows/x64 -C Debug --output-on-failure
+      # The installer, compiled unsigned from a Release bundle as the release
+      # job compiles it signed, so a broken installer script fails here rather
+      # than at a tag. PowerShell 5.1, as the release job runs it.
+      - run: flutter build windows --release
+      - name: Compile the installer
+        shell: powershell
+        run: |
+          $m = Select-String -Path pubspec.yaml -Pattern '^version: (\d+\.\d+\.\d+)\+'
+          .\tool\windows\make_installer.ps1 -ReleaseName $m.Matches[0].Groups[1].Value -OutDir build\ci-installer
 
   site:
     runs-on: ubuntu-latest

@@ -37,11 +37,13 @@ One check, the winget manifest's (step 4), runs on any Windows.
 The Windows job signs with Azure Artifact Signing, signed in to Azure with OpenID Connect,
 so no signing key is stored anywhere. In the `release` environment, beside the macOS
 secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID` (the app
-registration whose federated credential trusts
-`repo:orthant-app/orthant:environment:release`, and which holds the "Artifact Signing
-Certificate Profile Signer" role), and `ARTIFACT_SIGNING_ENDPOINT`,
-`ARTIFACT_SIGNING_ACCOUNT` and `ARTIFACT_SIGNING_PROFILE`. The Windows job fails before it
-builds if any is empty.
+registration, which holds the "Artifact Signing Certificate Profile Signer" role and
+whose federated credential trusts
+`repo:orthant-app@308256916/orthant@1350370232:environment:release`, the subject this
+repository presents because its OIDC subject is immutable and names owner and repository
+by numeric ID, so a credential written with the names never matches), and
+`ARTIFACT_SIGNING_ENDPOINT`, `ARTIFACT_SIGNING_ACCOUNT` and `ARTIFACT_SIGNING_PROFILE`.
+The Windows job fails before it builds if any is empty.
 
 winget: a `winget` environment, limited to `v*` tags, holding `WINGET_TOKEN`, a classic
 token with `public_repo` from the account whose fork of `microsoft/winget-pkgs` opens the

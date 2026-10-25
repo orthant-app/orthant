@@ -52,6 +52,7 @@ class SettingsWindow extends StatefulWidget {
     this.initialTab = SettingsTab.general,
     this.version = const AppVersion('', ''),
     this.onCheckForUpdates,
+    this.availableUpdate,
     this.automaticChecks = true,
     this.onAutomaticChecksChanged,
   });
@@ -82,6 +83,9 @@ class SettingsWindow extends StatefulWidget {
 
   /// The About pane's update button — the same call the tray item makes.
   final VoidCallback? onCheckForUpdates;
+
+  /// The name of an update a check found, for the About pane; null for none.
+  final String? availableUpdate;
 
   /// Whether the updater checks on its own schedule, and the way to change it.
   final bool automaticChecks;
@@ -199,6 +203,7 @@ class _SettingsWindowState extends State<SettingsWindow> {
                   scrollController: _scroll[SettingsTab.about],
                   version: widget.version,
                   onCheckForUpdates: widget.onCheckForUpdates,
+                  availableUpdate: widget.availableUpdate,
                   automaticChecks: widget.automaticChecks,
                   onAutomaticChecksChanged: widget.onAutomaticChecksChanged,
                 ),

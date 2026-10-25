@@ -8,6 +8,7 @@ void main() {
   Widget host(
     AppVersion version, {
     VoidCallback? onCheckForUpdates,
+    String? availableUpdate,
     bool automaticChecks = true,
     void Function(bool)? onAutomaticChecksChanged,
   }) =>
@@ -17,6 +18,7 @@ void main() {
           body: AboutPane(
             version: version,
             onCheckForUpdates: onCheckForUpdates,
+            availableUpdate: availableUpdate,
             automaticChecks: automaticChecks,
             onAutomaticChecksChanged: onAutomaticChecksChanged,
           ),
@@ -84,6 +86,24 @@ void main() {
       expect(calls, 1);
     });
 
+
+    testWidgets('an update a check found is named, with a button that opens '
+        'the updater as Check for Updates does; with none, neither shows',
+        (tester) async {
+      var calls = 0;
+      await tester.pumpWidget(host(const AppVersion('1.0.3', '7'),
+          onCheckForUpdates: () => calls++, availableUpdate: '1.0.4'));
+      expect(find.text('Orthant 1.0.4 is available.'), findsOneWidget);
+      await tester.tap(find.text('Update…'));
+      await tester.pump();
+      expect(calls, 1);
+
+      await tester.pumpWidget(host(const AppVersion('1.0.3', '7'),
+          onCheckForUpdates: () => calls++));
+      expect(find.textContaining('is available'), findsNothing);
+      expect(find.text('Update…'), findsNothing);
+      expect(find.text('Check for Updates…'), findsOneWidget);
+    });
 
     testWidgets('the automatic-check state is offered, and reflects what it is '
         'given', (tester) async {

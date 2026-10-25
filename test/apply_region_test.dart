@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/geometry.dart';
 import 'package:orthant/core/window_controller.dart';
@@ -67,6 +68,8 @@ class _FakeWc implements WindowController {
   Future<void> openLoginItemsSettings() async {}
   @override
   Future<void> checkForUpdates() async {}
+  @override
+  final ValueNotifier<AvailableUpdate?> availableUpdate = ValueNotifier(null);
 }
 
 void main() {

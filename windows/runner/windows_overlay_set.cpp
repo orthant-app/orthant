@@ -1085,17 +1085,24 @@ void WindowsOverlaySet::OnForeground(HWINEVENTHOOK hook, HWND hwnd) {
   // session's; no window at all is a switch still in progress.
   if (!session_ || hook != foreground_hook_ || !hwnd) return;
   DWORD pid = 0;
-  GetWindowThreadProcessId(hwnd, &pid);
-  // Orthant's own windows: a tray summon's foreground is the hidden window
-  // until its capture reactivates the target.
-  if (pid == GetCurrentProcessId()) return;
+  const DWORD thread = GetWindowThreadProcessId(hwnd, &pid);
+  // Orthant's own windows, all made on this thread, where this hook runs: a
+  // tray summon's foreground is the hidden window until its capture
+  // reactivates the target. A window from another thread of this process is
+  // the updater's (WinSparkle runs its windows on a thread of its own), and
+  // ends the session as another app's would: left up, the grid's grabbed
+  // Enter and arrows would act on the captured window while the user
+  // answers the updater.
+  if (pid == GetCurrentProcessId() && thread == GetCurrentThreadId()) return;
   // The captured window's own process: a tray summon's capture activates
   // that window after the panels show, and a dialog of the app's own may come
   // forward. Neither is the user going elsewhere.
   const bool shell = IsShellSurface(hwnd);
   if (pid == session_->owner_pid && !shell) return;
-  DevLog(std::string("overlay foreground moved: ") +
-         (shell ? "shell" : "process " + std::to_string(pid)));
+  std::string to = "process " + std::to_string(pid);
+  if (shell) to = "shell";
+  else if (pid == GetCurrentProcessId()) to = "the updater";
+  DevLog("overlay foreground moved: " + to);
   Dismiss("click-away");
 }
 

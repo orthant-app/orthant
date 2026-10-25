@@ -49,6 +49,10 @@ endfunction()
 set(FLUTTER_MANAGED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/flutter")
 add_subdirectory(${FLUTTER_MANAGED_DIR})
 
+# The runner's own tests, which ctest finds from here; see
+# runner/CMakeLists.txt.
+enable_testing()
+
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
 

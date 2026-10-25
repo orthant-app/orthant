@@ -64,16 +64,25 @@ const EXPECTED_LOCATION_PREFIX = 'https://github.com/orthant-app/orthant/';
 const FALLBACK_LOCATION = 'https://github.com/orthant-app/orthant/releases/latest';
 const FEED_URL = 'https://updates.orthant.app/appcast.xml';
 // A 404 until the first Windows stable is published, so /download/windows
-// falls back until then and that is not a failure.
+// falls back until then and that is not a failure. The Worker tells that 404
+// from any other failure of this feed (only a 404 offers a Windows visitor the
+// DMG), so the probe below reports which it saw.
 const WINDOWS_FEED_URL = 'https://updates.orthant.app/appcast-win.xml';
 
-async function feedIsReachable(url = FEED_URL) {
+/** The feed's HTTP status, or null when the fetch itself failed. */
+async function feedStatus(url) {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-    return res.ok;
+    return res.status;
   } catch {
-    return false;
+    return null;
   }
+}
+
+const isOk = (status) => status !== null && status >= 200 && status < 300;
+
+async function feedIsReachable(url = FEED_URL) {
+  return isOk(await feedStatus(url));
 }
 
 if (!existsSync(path.join(SITE_DIR, 'dist', '_headers'))) {
@@ -214,17 +223,27 @@ try {
   await checkDownloadPath('/download', strict, '.dmg');
   await checkDownloadPath('/download/', strict, '.dmg');
   await checkDownloadPath('/download/macos', strict, '.dmg');
-  const windowsStrict = await feedIsReachable(WINDOWS_FEED_URL);
-  console.log(
-    windowsStrict
-      ? '  the Windows feed is reachable from here, so /download/windows falling back is a FAILURE'
-      : '  the Windows feed is not reachable from here (none is published yet, or the network); /download/windows may fall back',
-  );
+  const windowsStatus = await feedStatus(WINDOWS_FEED_URL);
+  const windowsStrict = isOk(windowsStatus);
+  const windowsAbsent = windowsStatus === 404;
+  if (windowsStrict) {
+    console.log('  the Windows feed is reachable from here, so /download/windows falling back is a FAILURE');
+  } else if (windowsAbsent) {
+    console.log('  the Windows feed is not published yet (404); /download/windows may fall back');
+  } else {
+    console.log(
+      `  ⚠️  the Windows feed failed from here (${windowsStatus ?? 'no response'}); /download/windows may fall back, ` +
+        'and a Windows visitor may be sent to the releases page, so its strict check is skipped',
+    );
+  }
   await checkDownloadPath('/download/windows', windowsStrict, '-setup.exe');
-  // Until a Windows stable exists, a Windows visitor is offered the DMG.
+  // Until a Windows stable exists (its feed is a 404), a Windows visitor is
+  // offered the DMG. A Windows feed that failed some other way is not that: the
+  // Worker sends the visitor to the releases page, and may have met the same
+  // failure that was seen from here, so nothing strict is asserted then.
   await checkDownloadPath(
     '/download',
-    windowsStrict || strict,
+    windowsStrict || (windowsAbsent && strict),
     windowsStrict ? '-setup.exe' : '.dmg',
     WINDOWS_VISITOR,
     ' (a Windows visitor)',

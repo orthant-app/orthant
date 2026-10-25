@@ -139,10 +139,11 @@ async function resolveTarget(deps: Deps, platform: Platform): Promise<Target> {
 }
 
 /**
- * A redirect to the first of `platforms` whose artifact can be had, or to the
- * releases page when none can. Every candidate is resolved at once, so the
- * deadline bounds the whole answer rather than each candidate in turn.
- * `vary` marks an answer chosen from the request's headers.
+ * A redirect for the first of `platforms` whose feed is not absent: to its
+ * artifact when it has one, to the releases page when its feed failed (or when
+ * every feed is absent). Every candidate is resolved at once, so the deadline
+ * bounds the whole answer rather than each candidate in turn. `vary` marks an
+ * answer chosen from the request's headers.
  *
  * A candidate whose feed is absent (404) has no release yet, so the next one
  * answers: that is how a Windows visitor is given the DMG until Windows ships.

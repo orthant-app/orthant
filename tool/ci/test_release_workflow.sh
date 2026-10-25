@@ -1210,6 +1210,40 @@ assert_contains 'publish() still sources release notes from the changelog entry'
 assert_ok 'publish() does not use --generate-notes' \
   bash -c "! sed 's/#.*//' '$REPO_ROOT/tool/ci/release_workflow.sh' | grep -q -- '--generate-notes'"
 
+# The Windows facts the runbook states, each read from the code that acts on
+# it: the four feeds the release restores and the build number must top, the
+# installer's asset name, the winget identifier, and the secrets the Windows
+# job fails without.
+for feed in appcast.xml appcast-beta.xml appcast-win.xml appcast-win-beta.xml; do
+  assert_contains "restore fetches $feed" "feed_url $feed" "$(<"$REPO_ROOT/tool/ci/release_workflow.sh")"
+  assert_contains "RELEASING.md names $feed among the feeds a build number must top" "\`$feed\`" "$(<"$RELEASING")"
+done
+assert_contains 'publish() uploads the installer by its asset name' \
+  'Orthant-$version-setup.exe' "$(<"$REPO_ROOT/tool/ci/release_workflow.sh")"
+assert_contains 'RELEASING.md names the installer as publish() uploads it' \
+  'Orthant-<version>-setup.exe' "$(<"$RELEASING")"
+winget_id="$(sed -n "s/^IDENTIFIER = '\(.*\)'$/\1/p" "$REPO_ROOT/tool/ci/winget_manifest.py")"
+assert_eq 'the winget manifest writer has one identifier' 'Orthant.Orthant' "$winget_id"
+assert_contains 'RELEASING.md names the winget identifier the manifest carries' "\`$winget_id\`" "$(<"$RELEASING")"
+for secret in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID ARTIFACT_SIGNING_ENDPOINT ARTIFACT_SIGNING_ACCOUNT ARTIFACT_SIGNING_PROFILE; do
+  assert_contains "the Windows job requires $secret" "'$secret'" "$(<"$REPO_ROOT/.github/workflows/release.yml")"
+  assert_contains "RELEASING.md names $secret" "\`$secret\`" "$(<"$RELEASING")"
+done
+assert_contains 'bump-winget reads its token from the winget environment' 'secrets.WINGET_TOKEN' "$(<"$REPO_ROOT/.github/workflows/release.yml")"
+assert_contains 'RELEASING.md names the winget token' '`WINGET_TOKEN`' "$(<"$RELEASING")"
+
+# Where a failed Windows job's diagnostics are, and how to read them: its
+# artifact, named for the attempt (which is also why a run that fails before
+# publication is re-run whole), encrypted with the flags RELEASING.md gives.
+assert_contains 'the Windows job names its artifact for the run and the attempt' \
+  'name: orthant-windows-${{ github.run_id }}-${{ github.run_attempt }}' "$(<"$REPO_ROOT/.github/workflows/release.yml")"
+assert_contains 'RELEASING.md names that artifact' '`orthant-windows-<run>-<attempt>`' "$(<"$RELEASING")"
+assert_contains 'the Windows job encrypts with the flags RELEASING.md decrypts with' \
+  'openssl enc -aes-256-cbc -salt -pbkdf2 -iter 10000 -md sha256' "$(<"$REPO_ROOT/.github/workflows/release.yml")"
+assert_contains 'RELEASING.md decrypts with those flags' \
+  'openssl enc -d -aes-256-cbc -pbkdf2 -iter 10000 -md sha256' "$(<"$RELEASING")"
+assert_contains 'RELEASING.md says to re-run a run whole before publication' 'Re-run all jobs' "$(<"$RELEASING")"
+
 if (( FAIL_COUNT > 0 )); then
   printf '%d passed, %d failed\n' "$PASS_COUNT" "$FAIL_COUNT" >&2
   exit 1

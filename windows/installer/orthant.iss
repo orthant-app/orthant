@@ -100,6 +100,9 @@ var
   Installed: Boolean;
   Before: TStringList;
   BeforeWhole: Boolean;
+  // Whether the log already says a process from the install folder outlived
+  // its panels (OrthantRunning), so that a run of Setup records it once.
+  ProcessLogged: Boolean;
 
 const
   ERROR_NO_MORE_FILES = 18;
@@ -117,13 +120,49 @@ begin
   Result := WasRunning or RelaunchRequested;
 end;
 
+// Whether a process runs Orthant.exe from the folder Setup writes, asked of
+// WMI, which answers for one's own processes without elevation. Another
+// person's Orthant is installed in their own profile, so not in this folder.
+// Any failure answers False, as Setup decided before this test.
+function OrthantProcessInFolder: Boolean;
+var
+  Locator, Service, Found: Variant;
+  Path: String;
+begin
+  Result := False;
+  // In a WQL string a backslash and a quote are each escaped with a
+  // backslash: backslashes first, so that the quotes' escapes stay single.
+  Path := ExpandConstant('{app}\Orthant.exe');
+  StringChangeEx(Path, '\', '\\', True);
+  StringChangeEx(Path, '''', '\''', True);
+  try
+    Locator := CreateOleObject('WbemScripting.SWbemLocator');
+    Service := Locator.ConnectServer('.', 'root\CIMV2');
+    Found := Service.ExecQuery('SELECT ProcessId FROM Win32_Process WHERE ExecutablePath = ''' + Path + '''');
+    Result := Found.Count > 0;
+  except
+    Log('Could not ask Windows which processes run from ' + ExpandConstant('{app}') + ': ' + GetExceptionMessage);
+  end;
+end;
+
 // Orthant keeps a hidden panel on every monitor for as long as it runs, and
 // holds the mutex OrthantRunning for as long as its process exists, which can
-// be seconds after the panels have gone. Either means it is running; a copy
-// built before the mutex has only the panels.
+// be seconds after the panels have gone. A copy built before the mutex (1.1.0
+// and earlier) has only the panels, and that gap: its process is asked of WMI,
+// and only when neither of the others answers (the script's or short-circuits),
+// so a poll that leans on it takes longer than its 100 ms.
 function OrthantRunning: Boolean;
 begin
   Result := (FindWindowByClassName('ORTHANT_OVERLAY_PANEL') <> 0) or CheckForMutexes('OrthantRunning');
+  if not Result then
+  begin
+    Result := OrthantProcessInFolder;
+    if Result and not ProcessLogged then
+    begin
+      Log('Orthant has no panel or mutex, but a process still runs from ' + ExpandConstant('{app}') + ': waiting for it');
+      ProcessLogged := True;
+    end;
+  end;
 end;
 
 // Asks a running Orthant to quit as its tray's Quit does (the runner's

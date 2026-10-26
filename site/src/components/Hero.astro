@@ -14,7 +14,7 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
       grid-template-areas below reunites the two copy blocks in one column
       on the desktop two-column layout, without moving either in the DOM. */}
   <div class="copy-lead">
-    <p class="eyebrow">A window manager for macOS</p>
+    <p class="eyebrow">A window manager for macOS and Windows</p>
     <h1>Draw where a window should go. Give it a shortcut.</h1>
   </div>
 
@@ -83,8 +83,18 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
       want, name it, and bind it. Free and open source.
     </p>
 
+    {/* One button: /download answers with the visitor's own platform (the
+        Worker reads the browser's platform hint or User-Agent). The links
+        under it name each platform, for a download meant for another
+        computer. */}
     <div class="cta">
-      <a class="btn btn-primary" href="/download/macos">Download for macOS 13+</a>
+      <div class="download">
+        <a class="btn btn-primary" href="/download">Download</a>
+        <p class="platforms">
+          Or choose: <a href="/download/macos">macOS 13+</a> ·{' '}
+          <a href="/download/windows">Windows 10 (1809+) or 11</a>
+        </p>
+      </div>
       <a class="btn btn-secondary" href="#see-it-work">See it work</a>
     </div>
   </div>
@@ -131,6 +141,11 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
   }
   .lede { font-size: 19px; color: var(--label-secondary); margin: 0 0 24px; max-width: 34ch; }
   .cta { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+  /* The per-platform links sit right under the button they qualify. Inline in
+     a sentence, but padded to clear the 24px target minimum anyway: they are
+     the only route to the other platform's download. */
+  .platforms { margin: 6px 0 0; font-size: 14px; color: var(--label-secondary); }
+  .platforms a { display: inline-block; padding-block: 3px; }
 
   .demo { margin: 0; grid-area: figure; }
   .eyebrow {

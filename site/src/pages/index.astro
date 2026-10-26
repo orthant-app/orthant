@@ -19,11 +19,12 @@ const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
   name: 'Orthant',
-  description: 'Grid-based window manager for macOS.',
+  description: 'Grid-based window manager for macOS and Windows.',
   applicationCategory: 'UtilitiesApplication',
-  operatingSystem: 'macOS 13+',
+  operatingSystem: 'macOS 13+, Windows 10 (1809+), Windows 11',
   url: 'https://orthant.app/',
-  downloadUrl: 'https://orthant.app/download/macos',
+  // The visitor's own platform's download, as the hero's button is.
+  downloadUrl: 'https://orthant.app/download',
   license: 'https://opensource.org/licenses/MIT',
   isAccessibleForFree: true,
   offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
@@ -31,8 +32,8 @@ const jsonLd = {
 };
 ---
 <Base
-  title="Orthant · Grid-based window manager for macOS"
-  description="Snap the frontmost window with keyboard shortcuts, or summon a grid and draw exactly where it should go. Free and open source, for macOS 13+."
+  title="Orthant · Grid-based window manager for macOS and Windows"
+  description="Snap the frontmost window with keyboard shortcuts, or summon a grid and draw exactly where it should go. Free and open source, for macOS and Windows."
   path="/"
 >
   <Fragment slot="head">
@@ -76,8 +77,8 @@ const jsonLd = {
       <li>
         <RegionDiagram cols={3} rows={1} c0={0} c1={1} r0={0} r1={0}
           title="Left two thirds, bound to a shortcut" label="2/3" combo="⌃⌥2" />
-        <p><strong>Bind it.</strong> Press <kbd>⌘S</kbd> before you let go, name it, give it a
-          key.</p>
+        <p><strong>Bind it.</strong> Press <kbd>⌘S</kbd> (<kbd>Ctrl+S</kbd> on Windows) before you
+          let go, name it, give it a key.</p>
       </li>
       <li>
         <RegionDiagram cols={12} rows={1} c0={0} c1={7} r0={0} r1={0}
@@ -107,7 +108,8 @@ const jsonLd = {
     </ul>
     <p class="lead-sub">
       Center keeps the window at its current size, and Open grid places nothing at all, so neither
-      has a shape to draw.
+      has a shape to draw. On Windows each is the same key with <kbd>Win+Ctrl+Shift</kbd> in place
+      of <kbd>⌃⌥</kbd>, and Enter for <kbd>↩</kbd>.
     </p>
     <p><a href="/docs/shortcuts/">Every default shortcut →</a></p>
   </section>
@@ -116,7 +118,8 @@ const jsonLd = {
     <h2>It stays out of the way</h2>
     <p>
       The window you are arranging stays active while you arrange it. Orthant runs in the
-      menu bar in the background, and it idles at <strong>0.0% CPU</strong> with 0 wake-ups.
+      background, from the menu bar on a Mac and the notification area on Windows. On macOS it
+      idles at <strong>0.0% CPU</strong> with 0 wake-ups.
     </p>
     <p>
       A <em>shortcut</em> snaps a window within its own display, not the one your pointer happens
@@ -127,6 +130,7 @@ const jsonLd = {
 
   <section class="section wrap prose">
     <h2>Install</h2>
+    <h3>On a Mac</h3>
     <Command value="brew install --cask orthant-app/tap/orthant" />
     <p class="trust">
       Free and open source. Signed by the developer and notarized by Apple.
@@ -145,11 +149,26 @@ const jsonLd = {
       Orthant updates itself in place, so <code>brew upgrade</code> deliberately skips it rather
       than fighting the built-in updater.
     </p>
+    <h3>On Windows</h3>
+    <p>
+      <a href="/download/windows">Download the installer</a> and run it. It installs Orthant for
+      your account only, with no administrator rights, and there is no permission to grant
+      afterwards. Requires <strong>Windows 11</strong> or <strong>Windows 10 (version 1809 or
+      later)</strong>, 64-bit.
+    </p>
+    <p>
+      The installer is signed. If Microsoft Defender SmartScreen stops it at first, choose{' '}
+      <strong>More info</strong>, then <strong>Run anyway</strong>.{' '}
+      <a href="/docs/getting-started/">More about installing →</a>
+    </p>
+    <p>
+      Orthant checks for updates on its own and says so in its tray menu when one is ready.
+    </p>
     {version && (
       <p class="quiet">Latest release: <a href="/changelog/">{version}</a>.</p>
     )}
     <p class="quiet">
-      Windows support is planned. Linux is not supported.
+      Linux is not supported.
     </p>
   </section>
 </Base>

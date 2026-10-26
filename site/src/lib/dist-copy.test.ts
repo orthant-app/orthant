@@ -61,6 +61,17 @@ describe('the built site', () => {
   });
 
   /*
+   * Orthant runs on Windows. These are the sentences that said otherwise
+   * before it did; any of them coming back is a page telling a Windows
+   * visitor the app is not for them.
+   */
+  it('never says Windows is planned or that Orthant is macOS only', () => {
+    const stale = /Windows (?:support )?is planned|is macOS only|for macOS 13\+<\/a>/i;
+    const guilty = files.filter((f) => stale.test(readFileSync(f, 'utf8').replace(/\s+/g, ' ')));
+    expect(guilty, `macOS-only copy in: ${guilty.join(', ')}`).toEqual([]);
+  });
+
+  /*
    * Spec §3.4 fixes the wording of the latency figure because the number is a
    * real measurement and a reworded one loses the precision it was stating.
    * There are exactly two approved forms and no third.

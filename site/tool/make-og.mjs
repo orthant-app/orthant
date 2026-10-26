@@ -19,7 +19,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630">
   <text x="380" y="392" font-family="-apple-system, Helvetica, Arial, sans-serif"
         font-size="76" font-weight="600" fill="rgba(0,0,0,0.90)">Orthant</text>
   <text x="380" y="446" font-family="-apple-system, Helvetica, Arial, sans-serif"
-        font-size="30" fill="rgba(0,0,0,0.55)">Grid-based window manager for macOS</text>
+        font-size="30" fill="rgba(0,0,0,0.55)">Grid-based window manager for macOS and Windows</text>
 </svg>`;
 
 const png = new Resvg(svg, { fitTo: { mode: 'width', value: 1200 } }).render().asPng();

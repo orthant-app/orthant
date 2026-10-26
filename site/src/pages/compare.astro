@@ -93,7 +93,15 @@ const rows = [
     <p class="quiet">Prices and capabilities checked {checked}. Corrections welcome: <a
       href="https://github.com/orthant-app/orthant/issues">open an issue</a>. Magnet's own site
       lists no price; the figure above is from its Mac App Store listing.</p>
-    <p class="cta"><a class="btn btn-primary" href="/download/macos">Download for macOS 13+</a></p>
+    {/* The same pattern as the hero: /download answers with the visitor's own
+        platform, and the line under it names each one. */}
+    <div class="cta">
+      <a class="btn btn-primary" href="/download">Download</a>
+      <p class="platforms">
+        Or choose: <a href="/download/macos">macOS 13+</a> ·{' '}
+        <a href="/download/windows">Windows 10 (1809+) or 11</a>
+      </p>
+    </div>
 
     <h2>Which one should you use?</h2>
     <p>
@@ -130,8 +138,8 @@ const rows = [
       which is more keys to remember and no guessing about which press you are on.
     </p>
     <p>
-      <strong>It is macOS only, and macOS 13 or later.</strong> Windows is planned. Linux is
-      not supported.
+      <strong>It does not run on Linux.</strong> It needs macOS 13 or later, or Windows 11 or
+      Windows 10 (version 1809 or later), 64-bit. The table above compares macOS apps only.
     </p>
   </div>
 </Base>
@@ -262,6 +270,11 @@ const rows = [
   .table-scroll-wrap[data-can-scroll="false"] + .swipe-hint { visibility: hidden; }
 
   .cta { margin-top: 28px; }
+  /* As in Hero.astro: inline in a sentence, padded to the 24px target anyway.
+     The bottom margin is the one the paragraph this replaced gave the heading
+     below it. */
+  .platforms { margin: 6px 0 17px; font-size: 14px; color: var(--label-secondary); }
+  .platforms a { display: inline-block; padding-block: 3px; }
 </style>
 
 <script>

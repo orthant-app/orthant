@@ -1,10 +1,11 @@
 <div align="center">
   <img src="macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_256.png" width="128" alt="Orthant icon">
   <h1>Orthant</h1>
-  <p><strong>Grid-based window manager for macOS.</strong><br>
+  <p><strong>Grid-based window manager for macOS and Windows.</strong><br>
   Snap the frontmost window with keyboard shortcuts, or summon a grid and draw exactly where it should go.</p>
   <p>
     <img src="https://img.shields.io/badge/macOS-13%2B-blue" alt="macOS 13+">
+    <img src="https://img.shields.io/badge/Windows-10%20(1809%2B)%20%7C%2011-blue" alt="Windows 10 (1809+) or 11">
     <img src="https://img.shields.io/badge/license-MIT-brightgreen" alt="MIT license">
     <a href="https://github.com/orthant-app/orthant/actions/workflows/ci.yml"><img src="https://github.com/orthant-app/orthant/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   </p>
@@ -16,6 +17,8 @@
 
 ## Install
 
+### macOS
+
 ```sh
 brew install --cask orthant-app/tap/orthant
 ```
@@ -24,19 +27,27 @@ Or grab the `.dmg` from [the latest release](https://github.com/orthant-app/orth
 
 Orthant checks for updates on its own and installs them in place. Homebrew knows this: the cask is marked `auto_updates true`, so `brew upgrade` deliberately skips it rather than fighting over the same app. If you'd rather Homebrew drove updates, `brew upgrade --cask --greedy-auto-updates orthant` includes it.
 
+### Windows
+
+Download the installer from [orthant.app](https://orthant.app/download/windows), or `Orthant-…-setup.exe` from [the latest release](https://github.com/orthant-app/orthant/releases/latest), and run it. It installs Orthant for your account only, with no administrator rights, and there is no permission to grant afterwards. It needs Windows 11 or Windows 10 (version 1809 or later), 64-bit.
+
+The installer is signed. At first, Microsoft Defender SmartScreen may stop it with "Windows protected your PC" because it has not seen the download often yet: choose **More info**, then **Run anyway**.
+
+Orthant checks for updates on its own, about once a day, without opening anything: when one is ready, its tray menu gains **Update to Orthant …** with the new version's number, and **Settings → About** says so too, with an **Update…** button. Installing it closes Orthant and starts it again with your settings as they were.
+
 ## What it does
 
-Orthant runs in the menu bar in the background and moves the window you were just using, without stealing focus during placement. The target window is captured *before* the grid appears, so the app you're arranging stays frontmost throughout. Settings and update windows can appear in the Dock while open.
+Orthant runs in the background, in the menu bar on macOS and the notification area on Windows, and moves the window you were just using, without stealing focus during placement. The target window is captured *before* the grid appears, so the app you're arranging stays frontmost throughout. On macOS, settings and update windows can appear in the Dock while open.
 
 Two ways to place a window:
 
-- **Direct shortcuts.** Halves, quarters, maximize, center, each on its own chord. Press `⌃⌥→` and the window fills the right half of its display. Instant.
-- **The grid overlay.** Press `⌃⌥O` and a translucent grid appears over every display in about 50 ms. Drag across cells (or arrow around, with `⇧` to extend) and the selection previews exactly where the window will land. Release or `↩` places it, `Esc` cancels.
+- **Direct shortcuts.** Halves, quarters, maximize, center, each on its own chord. Press `⌃⌥→` (`Win+Ctrl+Shift+→` on Windows) and the window fills the right half of its display. Instant.
+- **The grid overlay.** Press `⌃⌥O` (`Win+Ctrl+Shift+O` on Windows) and a translucent grid appears over every display, in about 50 ms on macOS. Drag across cells (or arrow around, with `⇧` to extend) and the selection previews exactly where the window will land. Release or `↩` (Enter on Windows) places it, `Esc` cancels.
 
 And it grows with you:
 
 - **Custom regions.** Draw any block on a grid of your own choosing ("left ⅔"), name it, give it a shortcut. A region remembers its own proportions, so changing the overlay's grid size later never moves your windows.
-- **`⌘S` on the overlay** saves the selection you just made as a region, pre-named and ready to bind.
+- **`⌘S` on the overlay** (`Ctrl+S` on Windows) saves the selection you just made as a region, pre-named and ready to bind.
 - **Every shortcut is rebindable**, including the overlay summon. Conflicts aren't refused or silently stolen: the pane names the current owner, asks, and leaves an Undo.
 - **Settings that stick.** Grid size (2–12 per axis), gaps between windows, launch at login. Everything survives a relaunch, and grid and gaps have a live preview.
 - **Multi-display aware.** Windows snap within their *own* display, not the cursor's, mixed-DPI arrangements included.
@@ -57,24 +68,26 @@ On the overlay: **drag** (or **arrow keys**, `⇧` to extend) to select, `↩` t
 
 All of these are rebindable in **Settings → Shortcuts**. (`⌃` Control, `⌥` Option, `⇧` Shift, `⌘` Command, `↩` Return.)
 
+On Windows the defaults are the same keys with `Win+Ctrl+Shift` in place of `⌃⌥`, and Enter for `↩`: `Win+Ctrl+Shift+←` is the left half, `Win+Ctrl+Shift+O` opens the grid. On the overlay, `Ctrl+S` saves the selection.
+
 ## Platforms
 
 | Platform | Status |
 | --- | --- |
 | **macOS 13+** | Works today |
-| **Windows** | In development: the same Dart UI behind the same `WindowController` seam, with Win32 called from Dart over FFI and a small C++ runner for the overlay windows, global hotkeys and the second Flutter engine |
+| **Windows 11, or Windows 10 (version 1809 or later), 64-bit** | Works today |
 | **Linux** | Not supported |
 
 ## Permissions
 
-**Accessibility permission** lets Orthant position other apps' windows through the macOS Accessibility API. Enable it in **System Settings ▸ Privacy & Security ▸ Accessibility**. On first launch Orthant walks you through granting it, and gets out of the way the moment it's on.
+On Windows there is none to grant. On macOS, **Accessibility permission** lets Orthant position other apps' windows through the macOS Accessibility API. Enable it in **System Settings ▸ Privacy & Security ▸ Accessibility**. On first launch Orthant walks you through granting it, and gets out of the way the moment it's on.
 
 > [!TIP]
 > **Why isn't this on the Mac App Store?** Orthant is distributed directly, with its own updater. Its window-control code runs outside the App Sandbox. Each release is Developer ID-signed and notarized by Apple.
 
 ## Build from source
 
-Prerequisites: [Flutter](https://flutter.dev) 3.35+ (stable channel) and a recent Xcode. Native dependencies resolve through Swift Package Manager, so there's no CocoaPods to install.
+These steps build the macOS app. Prerequisites: [Flutter](https://flutter.dev) 3.35+ (stable channel) and a recent Xcode. Native dependencies resolve through Swift Package Manager, so there's no CocoaPods to install.
 
 ```sh
 git clone https://github.com/orthant-app/orthant.git
@@ -94,28 +107,32 @@ Two more dev-loop notes:
 
 ## Architecture
 
-Shared **Flutter/Dart** UI over a thin **Swift** native core, behind a single platform-agnostic `WindowController` seam:
+Shared **Flutter/Dart** UI over a thin native core, behind a single platform-agnostic `WindowController` seam: **Swift** on macOS; on Windows, Win32 called from Dart over FFI and a small **C++** runner:
 
 ```text
 lib/
-  core/         WindowController seam, grid geometry, channel adapter (pure Dart)
+  core/         WindowController seam, grid geometry, the macOS channel adapter,
+                the Windows backend (Win32 over FFI)
   overlay/      grid overlay UI + selection model (runs on a second Flutter engine)
   shortcuts/    commands, bindings, custom regions, persistence, hotkey service
-  settings/     settings window, panes, macOS design tokens
-  permission/   Accessibility state + onboarding
+  settings/     settings window, panes, design tokens for each platform
+  permission/   Accessibility state (macOS) + onboarding
   app/          coordinator that wires it all together
 macos/Runner/   Swift core: WindowControl (AX), HotkeyManager (Carbon hotkeys),
                 OverlayPanel/OverlaySet (non-activating panels), AppShell,
                 LoginItem (SMAppService), Updater (Sparkle)
+windows/runner/ C++ runner: window creation, the WM_HOTKEY message pump,
+                the overlay's Flutter engines
+windows/installer/  Inno Setup script for the per-user installer
 test/           Dart unit + widget tests
 tool/           run_dev.sh, dev_signing.sh, release.sh, reset_state.sh, make_app_icon.py
 ```
 
 The choices that matter:
 
-- **One coordinate system.** All window geometry is top-left-origin global points (the Accessibility/CoreGraphics space), converted from AppKit's bottom-left space exactly once, natively. Mixing the two spaces is the classic correctness bug in this category of app.
-- **The overlay is a non-activating `NSPanel`** on a second, resident Flutter engine. It appears without Orthant ever becoming the frontmost app, and idles at 0% CPU while hidden.
-- **Native handles never cross the platform channel.** Only plain data does, which is what keeps a second backend practical: the planned **Windows** port implements the same `WindowController` seam behind the same UI, with Win32 called from Dart over FFI and C++ only where a window handle, a message pump or a Flutter engine is needed. **Linux** is not supported.
+- **One coordinate system.** On macOS, all window geometry is top-left-origin global points (the Accessibility/CoreGraphics space), converted from AppKit's bottom-left space exactly once, natively. Mixing the two spaces is the classic correctness bug in this category of app.
+- **The overlay is a non-activating `NSPanel`** on a second, resident Flutter engine (on Windows, a non-activating window per monitor, each with an engine of its own). It appears without Orthant ever becoming the frontmost app, and on macOS idles at 0% CPU while hidden.
+- **Native handles never cross the platform channel.** Only plain data does, which is what keeps a second backend practical: the **Windows** backend implements the same `WindowController` seam behind the same UI, with Win32 called from Dart over FFI and C++ only where a window handle, a message pump or a Flutter engine is needed. **Linux** is not supported.
 
 ## Testing
 
@@ -135,6 +152,8 @@ Maintainer process, including the changelog entry every release depends on:
 
 ## Uninstall
 
+### macOS
+
 ```sh
 brew uninstall --zap orthant
 ```
@@ -144,6 +163,12 @@ Before uninstalling, turn off **Settings → General → Launch at login** if yo
 `--zap` also clears Orthant's preferences, caches and saved state, and revokes its Accessibility grant. A plain `brew uninstall` leaves those behind. If you reinstall after a zap, you'll be asked for Accessibility again.
 
 Installed by hand instead? Quit Orthant and delete the app. Settings live in `~/Library/Preferences/app.orthant.orthant.plist`, and the Accessibility entry can be removed in System Settings ▸ Privacy & Security ▸ Accessibility.
+
+### Windows
+
+Open **Settings ▸ Apps ▸ Installed apps** (**Apps & features** on older versions), find Orthant, and choose **Uninstall**. The uninstaller quits Orthant if it is running, then removes it along with its launch-at-login entry and the settings it keeps in the registry (the settings window's size and position, and the update settings). There is nothing to turn off first.
+
+Your shortcuts, custom regions, grid size and gaps stay behind, in `%APPDATA%\Orthant\Orthant\shared_preferences.json`, so installing Orthant again brings them back. For a clean slate, delete the `%APPDATA%\Orthant` folder after uninstalling.
 
 ## Name
 

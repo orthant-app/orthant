@@ -1,9 +1,11 @@
 ---
 title: Uninstall
-description: Removing Orthant completely, and the one thing an uninstall cannot remove.
+description: Removing Orthant from macOS or Windows, and the one thing a Mac uninstall cannot remove.
 group: help
 order: 4
 ---
+
+## macOS
 
 ```sh
 brew uninstall --zap orthant
@@ -14,7 +16,7 @@ state, **and revokes its Accessibility grant**. A plain `brew uninstall` leaves 
 behind. If you reinstall after a zap you will be asked for Accessibility again. That is
 the grant having genuinely gone, not a bug.
 
-## What an uninstall cannot remove
+### What an uninstall cannot remove
 
 **If you enabled "Launch at login", that registration survives the uninstall.** macOS records
 it in a system database that Homebrew's uninstall step does not manage, and by the time the
@@ -25,9 +27,20 @@ To clear it, **turn off "Launch at login" in Settings ▸ General before uninsta
 you have already removed Orthant, the leftover entry does nothing, because there is no app for
 it to launch, and installing Orthant again will pick the setting back up.
 
-## Uninstalling a manual install
+### Uninstalling a manual install
 
 Quit Orthant and delete the app. Settings live in
 `~/Library/Preferences/app.orthant.orthant.plist`, and the Accessibility entry can be
 removed in System Settings ▸ Privacy & Security ▸ Accessibility by selecting the row and
 clicking **−**.
+
+## Windows
+
+Open **Settings ▸ Apps ▸ Installed apps** (**Apps & features** on older versions), find Orthant,
+and choose **Uninstall**. The uninstaller quits Orthant if it is running, then removes it
+along with its "Launch at login" entry and the settings it keeps in the registry: the settings
+window's size and position, and the update settings. There is nothing to turn off first.
+
+Your shortcuts, custom regions, grid size and gaps stay behind, in
+`%APPDATA%\Orthant\Orthant\shared_preferences.json`, so installing Orthant again brings them
+back. For a clean slate, delete the `%APPDATA%\Orthant` folder after uninstalling.

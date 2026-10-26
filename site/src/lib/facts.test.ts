@@ -14,10 +14,24 @@ describe('FACTS', () => {
   it('is exactly the approved set, in order', () => {
     expect(FACTS).toEqual([
       { value: 'Free · MIT', note: 'open source, no paid tier' },
-      { value: 'about 50 ms', note: 'grid on every display' },
-      { value: '0.0% CPU', note: '0 wake-ups while idle' },
+      { value: 'about 50 ms', note: 'grid on every display, on macOS' },
+      { value: '0.0% CPU', note: '0 wake-ups while idle, on macOS' },
       { value: 'macOS 13+', note: 'Ventura and later' },
+      { value: 'Windows 10 (1809+)', note: 'and Windows 11, 64-bit' },
     ]);
+  });
+
+  /*
+   * The latency and idle figures were measured on macOS. Beside a Windows
+   * requirement, a bare figure reads as true of both platforms, and the idle
+   * one is not: Windows has no 0.0% CPU measurement behind it.
+   */
+  it('says which platform the measured figures were measured on', () => {
+    for (const value of ['about 50 ms', '0.0% CPU']) {
+      const fact = FACTS.find((f) => f.value === value);
+      expect(fact, value).toBeDefined();
+      expect(fact!.note, value).toMatch(/on macOS$/);
+    }
   });
 
   it('never rounds the CPU measurement', () => {

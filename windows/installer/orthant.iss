@@ -110,6 +110,9 @@ const
 function GetLastError: Cardinal;
   external 'GetLastError@kernel32.dll stdcall';
 
+function GetTickCount64: Int64;
+  external 'GetTickCount64@kernel32.dll stdcall';
+
 function RelaunchRequested: Boolean;
 begin
   Result := ExpandConstant('{param:RELAUNCH|0}') = '1';
@@ -149,8 +152,7 @@ end;
 // holds the mutex OrthantRunning for as long as its process exists, which can
 // be seconds after the panels have gone. A copy built before the mutex (1.1.0
 // and earlier) has only the panels, and that gap: its process is asked of WMI,
-// and only when neither of the others answers (the script's or short-circuits),
-// so a poll that leans on it takes longer than its 100 ms.
+// and only when neither of the others answers (the script's or short-circuits).
 function OrthantRunning: Boolean;
 begin
   Result := (FindWindowByClassName('ORTHANT_OVERLAY_PANEL') <> 0) or CheckForMutexes('OrthantRunning');
@@ -165,6 +167,22 @@ begin
   end;
 end;
 
+// Whether Orthant is gone within Ms milliseconds, asked every 100 ms. Timed by
+// the clock, not by counting polls: one that asks WMI takes about twice as
+// long, which stretched ten seconds to nineteen (measured).
+function GoneWithin(Ms: Integer): Boolean;
+var
+  Deadline: Int64;
+begin
+  Deadline := GetTickCount64 + Ms;
+  repeat
+    Result := not OrthantRunning;
+    if Result then
+      exit;
+    Sleep(100);
+  until GetTickCount64 >= Deadline;
+end;
+
 // Asks a running Orthant to quit as its tray's Quit does (the runner's
 // OrthantQuitRequest, broadcast), and waits up to ten seconds; ends it if it
 // is still there (a hung process), and waits up to thirty more for it to be
@@ -172,26 +190,17 @@ end;
 // was running.
 function CloseOrthant: Boolean;
 var
-  I, Code: Integer;
+  Code: Integer;
 begin
   Result := OrthantRunning;
   if not Result then
     exit;
   PostBroadcastMessage(RegisterWindowMessage('OrthantQuitRequest'), 0, 0);
-  for I := 1 to 100 do
-  begin
-    if not OrthantRunning then
-      exit;
-    Sleep(100);
-  end;
+  if GoneWithin(10000) then
+    exit;
   Log('Orthant did not quit within 10 seconds of the request: ending it');
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM Orthant.exe', '', SW_HIDE, ewWaitUntilTerminated, Code);
-  for I := 1 to 300 do
-  begin
-    if not OrthantRunning then
-      exit;
-    Sleep(100);
-  end;
+  GoneWithin(30000);
 end;
 
 // Setup shows nothing at all: winget passes /VERYSILENT for `winget install

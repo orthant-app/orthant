@@ -1,6 +1,6 @@
 ---
 title: Uninstall
-description: Removing Orthant completely from macOS or Windows, and the one thing a Mac uninstall cannot remove.
+description: Removing Orthant from macOS or Windows, and the one thing a Mac uninstall cannot remove.
 group: help
 order: 4
 ---
@@ -40,3 +40,7 @@ Open **Settings ▸ Apps ▸ Installed apps** (**Apps & features** on older vers
 and choose **Uninstall**. The uninstaller quits Orthant if it is running, then removes it
 along with its "Launch at login" entry and the settings it keeps in the registry: the settings
 window's size and position, and the update settings. There is nothing to turn off first.
+
+Your shortcuts, custom regions, grid size and gaps stay behind, in
+`%APPDATA%\Orthant\Orthant\shared_preferences.json`, so installing Orthant again brings them
+back. For a clean slate, delete the `%APPDATA%\Orthant` folder after uninstalling.

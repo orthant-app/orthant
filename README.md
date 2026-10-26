@@ -33,7 +33,7 @@ Download the installer from [orthant.app](https://orthant.app/download/windows),
 
 The installer is signed. At first, Microsoft Defender SmartScreen may stop it with "Windows protected your PC" because it has not seen the download often yet: choose **More info**, then **Run anyway**.
 
-Orthant checks for updates on its own, about once a day, without opening anything: when one is ready, its tray menu offers **Update to Orthant …**, and so does **Settings → About**. Installing it closes Orthant and starts it again with your settings as they were.
+Orthant checks for updates on its own, about once a day, without opening anything: when one is ready, its tray menu gains **Update to Orthant …** with the new version's number, and **Settings → About** says so too, with an **Update…** button. Installing it closes Orthant and starts it again with your settings as they were.
 
 ## What it does
 
@@ -167,6 +167,8 @@ Installed by hand instead? Quit Orthant and delete the app. Settings live in `~/
 ### Windows
 
 Open **Settings ▸ Apps ▸ Installed apps** (**Apps & features** on older versions), find Orthant, and choose **Uninstall**. The uninstaller quits Orthant if it is running, then removes it along with its launch-at-login entry and the settings it keeps in the registry (the settings window's size and position, and the update settings). There is nothing to turn off first.
+
+Your shortcuts, custom regions, grid size and gaps stay behind, in `%APPDATA%\Orthant\Orthant\shared_preferences.json`, so installing Orthant again brings them back. For a clean slate, delete the `%APPDATA%\Orthant` folder after uninstalling.
 
 ## Name
 

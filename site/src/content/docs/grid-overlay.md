@@ -6,7 +6,7 @@ order: 1
 ---
 
 Keys on this page are written as on a Mac. On Windows, read `Win+Ctrl+Shift` for `⌃⌥`,
-Enter for `↩` and `Ctrl+S` for `⌘S`.
+Shift for `⇧`, Enter for `↩` and `Ctrl+S` for `⌘S`.
 
 Press `⌃⌥O` and a translucent grid appears over every display. On macOS it takes about 50
 milliseconds. Orthant never becomes the frontmost app, so the window you were using stays

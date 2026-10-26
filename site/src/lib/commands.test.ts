@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BINDINGS } from './commands';
+import { BINDINGS, windowsCombo } from './commands';
 
 describe('BINDINGS', () => {
   // Eleven, not ten: kDefaultBindings opens with showGrid (⌃⌥O), then the ten
@@ -45,6 +45,59 @@ describe('BINDINGS', () => {
       expect(b.label.length, b.id).toBeGreaterThan(0);
       expect(b.combo.startsWith('⌃⌥'), b.id).toBe(true);
     }
+  });
+});
+
+/*
+ * Windows has the same eleven defaults on the same keys, so its combos are
+ * derived from BINDINGS rather than typed out a second time. These pin the
+ * function's shape; test/site_docs_test.dart pins the two constants it reads
+ * against the app's own Windows defaults.
+ */
+describe('windowsCombo', () => {
+  it('puts Win+Ctrl+Shift in place of ⌃⌥ and keeps the key', () => {
+    expect(windowsCombo('⌃⌥←')).toBe('Win+Ctrl+Shift+←');
+    expect(windowsCombo('⌃⌥O')).toBe('Win+Ctrl+Shift+O');
+    expect(windowsCombo('⌃⌥C')).toBe('Win+Ctrl+Shift+C');
+  });
+
+  it('names the key Windows names otherwise: ↩ is Enter', () => {
+    expect(windowsCombo('⌃⌥↩')).toBe('Win+Ctrl+Shift+Enter');
+  });
+
+  // A combo it does not know how to translate is an error, not a guess: a
+  // ⌘ chord has no Windows counterpart this rule could produce.
+  it('refuses a combo that does not start with ⌃⌥', () => {
+    expect(() => windowsCombo('⌘S')).toThrow();
+    expect(() => windowsCombo('⌃⌥')).toThrow();
+  });
+
+  it('gives the eleven defaults eleven different Windows combos', () => {
+    expect(new Set(BINDINGS.map((b) => windowsCombo(b.combo))).size).toBe(BINDINGS.length);
+  });
+});
+
+/*
+ * The Windows table on the shortcuts page is rendered from BINDINGS through
+ * windowsCombo, so this checks the page uses them: every action, once, with
+ * its derived combo. Reads built output, so `npm run build` must have run.
+ */
+describe('the built Windows shortcuts table', () => {
+  const PAGE = 'dist/docs/shortcuts/index.html';
+
+  it('lists every default with its Windows combo, and nothing else', () => {
+    if (!existsSync(PAGE)) throw new Error(`${PAGE} missing - run \`npm run build\` first`);
+    const html = readFileSync(PAGE, 'utf8');
+
+    // The table under the Windows heading, not the macOS one above it.
+    const start = html.search(/<h2 id="windows"/);
+    expect(start, 'no Windows heading on the shortcuts page').toBeGreaterThan(-1);
+    const table = /<table[\s\S]*?<\/table>/.exec(html.slice(start));
+    expect(table, 'no table under the Windows heading').not.toBeNull();
+
+    const rows = [...table![0].matchAll(/<td>([^<]+)<\/td>\s*<td><code>([^<]+)<\/code><\/td>/g)]
+      .map((m) => [m[1], m[2]]);
+    expect(rows).toEqual(BINDINGS.map((b) => [b.label, windowsCombo(b.combo)]));
   });
 });
 

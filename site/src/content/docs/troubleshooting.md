@@ -1,13 +1,24 @@
 ---
 title: Troubleshooting
-description: Fixing the Accessibility permission when macOS says it is on but Orthant says it is not.
+description: Getting the Windows installer past SmartScreen, fixing the Accessibility permission on a Mac, and shortcuts that do nothing.
 group: help
 order: 1
 ---
 
+## Windows stopped the installer
+
+If running the installer shows Microsoft Defender SmartScreen's **Windows protected your PC**,
+choose **More info**, then **Run anyway**. SmartScreen shows this for a download it has not
+seen often yet. The installer is signed: right-click it, choose **Properties**, and its
+**Digital Signatures** tab names the publisher.
+
+You do not need administrator rights for any of this: the installer installs Orthant for your
+account only.
+
 ## System Settings shows Orthant as enabled, but Orthant says permission is missing
 
-This is not your mistake, and it has a specific cause. macOS ties the Accessibility grant to
+This is a macOS problem: Windows has no Accessibility permission to get wrong. It is not your
+mistake, and it has a specific cause. macOS ties the Accessibility grant to
 an app's **code signature**, not to its name or its location. If a differently-signed build of
 Orthant has ever run on this Mac, macOS keeps a separate record for it, and the Accessibility
 list collapses both records into one row with one toggle. The row can show **on** while the copy
@@ -41,9 +52,9 @@ The pane is showing a stale cache. Quit System Settings entirely and reopen it.
 
 ## A shortcut does nothing
 
-- Another app may own the combination. Open **Settings ▸ Shortcuts**: a combination macOS
-  itself has claimed is marked in the list rather than silently failing.
-- If *every* shortcut stopped working, quit and reopen Orthant, then check the
+- Another app may own the combination. Open **Settings ▸ Shortcuts**: a combination the
+  system or another app has claimed is marked in the list rather than silently failing.
+- If *every* shortcut stopped working, quit and reopen Orthant, then, on a Mac, check the
   Accessibility grant above.
 
 ## An app ignores Orthant, or snaps to the wrong size
@@ -54,5 +65,5 @@ wider than the region you drew is usually this, not a placement bug.
 
 ## Still stuck
 
-[Open an issue](https://github.com/orthant-app/orthant/issues) with your macOS version and
-what you saw.
+[Open an issue](https://github.com/orthant-app/orthant/issues) with your macOS or Windows
+version and what you saw.

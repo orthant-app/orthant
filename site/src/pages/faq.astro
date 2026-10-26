@@ -9,10 +9,11 @@ const faqs = [
         upgrade prompt, and no feature waiting behind a paywall.</p>`,
   },
   {
-    q: 'Why does it need Accessibility permission?',
+    q: 'Why does it need Accessibility permission on a Mac?',
     a: `<p>Orthant uses the macOS Accessibility API to move and resize other apps' windows.
         Enable it in <strong>System Settings ▸ Privacy & Security ▸ Accessibility</strong>.
-        First launch walks you through this step.</p>`,
+        First launch walks you through this step.</p>
+        <p>Windows has no such permission, so there is nothing to grant there.</p>`,
   },
   {
     q: "Why isn't it on the Mac App Store?",
@@ -25,19 +26,24 @@ const faqs = [
     q: 'Does it conflict with macOS tiling, Rectangle, or Moom?',
     a: `<p>Orthant acts on the shortcuts you give it and can run alongside macOS's
         built-in tiling or another window manager. If two apps want the same
-        combination, rebind one of them. Orthant's Shortcuts pane tells you when macOS itself
-        has already claimed a chord.</p>`,
+        combination, rebind one of them. Orthant's Shortcuts pane tells you when the system or
+        another app has already claimed a chord.</p>`,
   },
   {
     q: 'Windows? Linux?',
-    a: `<p>Windows support is planned. Linux is not supported.</p>`,
+    a: `<p>Orthant runs on Windows 11 and Windows 10 (version 1809 or later), 64-bit, with the
+        same grid, shortcuts and custom regions as on macOS. Its default shortcuts are the same
+        keys with Win+Ctrl+Shift in place of ⌃⌥. <a href="/download/windows">Download the
+        installer</a>.</p>
+        <p>Linux is not supported.</p>`,
   },
   {
     q: 'How do updates work?',
     a: `<p>Orthant updates itself in place, verifying each update's signature before applying
-        it. Your permission, shortcuts and regions are untouched. If you installed with
-        Homebrew, <code>brew upgrade</code> deliberately skips Orthant rather than fighting the
-        built-in updater. See <a href="/docs/updates/">Updates</a>.</p>`,
+        it. Your shortcuts and regions are untouched, and so is your Accessibility permission on
+        a Mac. On Windows it tells you in its tray menu when an update is ready. If you
+        installed with Homebrew, <code>brew upgrade</code> deliberately skips Orthant rather
+        than fighting the built-in updater. See <a href="/docs/updates/">Updates</a>.</p>`,
   },
   {
     q: 'How do I get help?',

@@ -1,15 +1,20 @@
 ---
 title: Shortcuts
-description: Every default Orthant shortcut, and how to rebind them.
+description: Every default Orthant shortcut on macOS and Windows, and how to rebind them.
 group: start
 order: 2
 ---
 
 import RegionDiagram from '../../components/RegionDiagram.astro';
-import { BINDINGS } from '../../lib/commands';
+import { BINDINGS, windowsCombo } from '../../lib/commands';
 
 Every shortcut below is rebindable in **Settings ▸ Shortcuts**, including the one that
-opens the grid.
+opens the grid. Windows has the same defaults on the same keys, with `Win+Ctrl+Shift` in place
+of `⌃⌥`.
+
+A window snaps within **its own display**, not the one your pointer happens to be on.
+
+## macOS
 
 | Action | Default |
 | --- | --- |
@@ -36,7 +41,20 @@ opens the grid.
 
 `⌃` Control · `⌥` Option · `⇧` Shift · `⌘` Command · `↩` Return.
 
-A window snaps within **its own display**, not the one your pointer happens to be on.
+## Windows
+
+<table>
+  <thead>
+    <tr><th>Action</th><th>Default</th></tr>
+  </thead>
+  <tbody>
+    {BINDINGS.map((b) => (
+      <tr><td>{b.label}</td><td><code>{windowsCombo(b.combo)}</code></td></tr>
+    ))}
+  </tbody>
+</table>
+
+Win is the Windows logo key.
 
 ## Rebinding
 
@@ -48,8 +66,8 @@ one and asks. Press the same combination again, or click the button beside the
 question, to take it. The command that lost it becomes *Not set*, and an **Undo**
 appears for ten seconds.
 
-Some combinations belong to macOS itself. Those are marked in the list rather than
-silently failing to fire.
+Some combinations already belong to the system or to another app. Those are marked in the
+list rather than silently failing to fire.
 
 ## Resetting
 

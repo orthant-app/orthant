@@ -1,7 +1,9 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/geometry.dart';
+import 'package:orthant/core/key_words.dart';
 import 'package:orthant/settings/settings.dart';
 import 'package:orthant/settings/shortcuts_screen.dart';
 import 'package:orthant/shortcuts/bindings.dart';
@@ -32,6 +34,22 @@ void main() {
         buffer.writeln(entity.readAsStringSync());
       }
     }
+    return buffer.toString();
+  }
+
+  /// Everywhere a visitor reads a platform claim: [allSiteText], the site's
+  /// TypeScript sources (the spec strip's figures live in one; its tests are
+  /// left out) and the README.
+  String platformText() {
+    final buffer = StringBuffer(allSiteText());
+    for (final entity in Directory('site/src/lib').listSync()) {
+      if (entity is File &&
+          entity.path.endsWith('.ts') &&
+          !entity.path.endsWith('.test.ts')) {
+        buffer.writeln(entity.readAsStringSync());
+      }
+    }
+    buffer.writeln(read('README.md'));
     return buffer.toString();
   }
 
@@ -74,6 +92,110 @@ void main() {
     expect(claims, isNotEmpty, reason: 'the site must state a minimum macOS');
     expect(claims, {major},
         reason: 'the deployment target is $major; the site also claims $claims');
+  });
+
+  test('every stated minimum Windows matches the installer', () {
+    final iss = read('windows/installer/orthant.iss');
+    final minVersion = RegExp(r'^MinVersion=(\S+)\s*$', multiLine: true)
+        .firstMatch(iss)!
+        .group(1)!;
+
+    // Windows 10 names its releases by version and the installer names its
+    // floor by build. When MinVersion moves, add its row here rather than
+    // loosening the check.
+    const builds = {'1809': '10.0.17763'};
+
+    // Every mention of Windows 10 states its floor: the compact
+    // "Windows 10 (1809+)", or "Windows 10 (version 1809 or later)" with or
+    // without the brackets. A bare "Windows 10" would claim every release of
+    // it. Whitespace is collapsed first: source wraps wherever it wrapped,
+    // so a claim can arrive split across two lines.
+    final text = platformText().replaceAll(RegExp(r'\s+'), ' ');
+    final mentions = RegExp(r'Windows 10\b').allMatches(text).length;
+    final claims = RegExp(
+            r'Windows 10 (?:\((\d{4})\+\)|\(?version (\d{4}) or later\)?)')
+        .allMatches(text)
+        .map((m) => m.group(1) ?? m.group(2)!)
+        .toList();
+    expect(claims, isNotEmpty, reason: 'the site must state a minimum Windows');
+    expect(claims, hasLength(mentions),
+        reason: 'a mention of Windows 10 does not state its minimum version');
+    expect({for (final v in claims) builds[v]}, {minVersion},
+        reason: 'the installer requires $minVersion; the site claims $claims');
+  });
+
+  test('the stated Windows install facts match the installer', () {
+    final iss = read('windows/installer/orthant.iss');
+    final text = platformText().replaceAll(RegExp(r'\s+'), ' ');
+    bool sets(String key, String value) =>
+        RegExp('^$key=$value\\s*\$', multiLine: true).hasMatch(iss);
+
+    // Per user, so it never asks for administrator rights.
+    expect(sets('PrivilegesRequired', 'lowest'), isTrue,
+        reason: 'the site says the installer needs no administrator rights');
+    expect(text, contains('no administrator rights'));
+
+    // x64, and x64 emulation on Arm: never a 32-bit Windows.
+    expect(sets('ArchitecturesAllowed', 'x64compatible'), isTrue,
+        reason: 'the site says Orthant needs a 64-bit Windows');
+    expect(text, contains('64-bit'));
+  });
+
+  // The site keeps no second list for Windows: commands.ts derives each
+  // Windows combo from the macOS one with two constants (`windowsCombo`).
+  // This applies that rule to the macOS defaults, which the catalogue test
+  // below pins, and compares the result with what the app itself shows on
+  // Windows. A change to the Windows modifiers or to a key's Windows name
+  // fails here.
+  test("the site's Windows combos are the app's Windows defaults", () {
+    final ts = read('site/src/lib/commands.ts');
+    final modifiers =
+        RegExp(r"WINDOWS_MODIFIERS\s*=\s*'([^']+)'").firstMatch(ts)?.group(1);
+    expect(modifiers, isNotNull,
+        reason: 'WINDOWS_MODIFIERS not found in commands.ts');
+    final table = RegExp(r'WINDOWS_KEY_NAMES[^=]*=\s*\{([^}]*)\}')
+        .firstMatch(ts)
+        ?.group(1);
+    expect(table, isNotNull,
+        reason: 'WINDOWS_KEY_NAMES not found in commands.ts');
+    final names = {
+      for (final m in RegExp(r"'([^']+)':\s*'([^']+)'").allMatches(table!))
+        m.group(1)!: m.group(2)!,
+    };
+
+    const macModifiers = '⌃⌥';
+    final fromSite = <String, String>{};
+    for (final b in macDefaults) {
+      final mac = formatCombo(b.chord!);
+      expect(mac.startsWith(macModifiers), isTrue, reason: mac);
+      final key = mac.substring(macModifiers.length);
+      fromSite[(b.command as BuiltIn).command.name] =
+          '$modifiers+${names[key] ?? key}';
+    }
+
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    final fromApp = {
+      for (final b in defaultBindings(platform: TargetPlatform.windows))
+        (b.command as BuiltIn).command.name: formatCombo(b.chord!),
+    };
+    expect(fromSite, fromApp);
+  });
+
+  // Prose writes the Windows modifiers by hand ("Win+Ctrl+Shift in place of
+  // ⌃⌥"), so every chord written that way must hold exactly the modifiers the
+  // app's Windows defaults hold, in the order Windows names them.
+  test('every Windows chord the site writes uses the default modifiers', () {
+    final windows = defaultBindings(platform: TargetPlatform.windows);
+    final held = windows.first.chord!.modifiers;
+    expect(windows.every((b) => b.chord!.modifiers == held), isTrue);
+    final expected = KeyWords.windows.join(KeyWords.windows.modifierNames(held));
+
+    final written = RegExp(r'\bWin(?:\+(?:Ctrl|Alt|Shift))+')
+        .allMatches(platformText())
+        .map((m) => m.group(0)!)
+        .toSet();
+    expect(written, {expected});
   });
 
   test('every install command names the real cask', () {

@@ -5,7 +5,8 @@ group: help
 order: 2
 ---
 
-Open Settings from the menu bar icon. Everything here survives a relaunch.
+Open Settings from Orthant's icon in the menu bar, or in the notification area on Windows.
+Everything here survives a relaunch.
 
 ## General
 
@@ -20,10 +21,11 @@ than 40 points, Orthant quietly reduces it rather than refusing, so the number b
 stepper is a maximum. This is measured against the block you actually placed, not the smallest
 cell on the grid, so a half-screen window keeps a wide gap that a single small cell could not.
 
-**Launch at login.** Registers Orthant with macOS to start when you log in.
+**Launch at login.** Registers Orthant with the system to start when you log in.
 
-> Turn this **off before uninstalling**. macOS records the registration outside the app, and an
-> uninstall cannot remove it. See [Uninstall](/docs/uninstall/).
+> On macOS, turn this **off before uninstalling**. macOS records the registration outside the
+> app, and an uninstall cannot remove it. On Windows the uninstaller removes it for you. See
+> [Uninstall](/docs/uninstall/).
 
 ## Shortcuts
 

@@ -42,3 +42,28 @@ export const BINDINGS: Binding[] = [
   { kind: 'block', id: 'maximize',    label: 'Maximize',             combo: '⌃⌥↩', block: { c0: 0, c1: 1, r0: 0, r1: 1 } },
   { kind: 'keepsSize', id: 'center',  label: 'Center',               combo: '⌃⌥C' },
 ];
+
+/**
+ * Windows has the same defaults on the same keys, with Win+Ctrl+Shift in
+ * place of ⌃⌥ (`defaultBindings` in lib/shortcuts/bindings.dart) and the
+ * parts joined with a plus. Named keys are named the Windows way
+ * (`KeyWords.windows` in lib/core/key_words.dart): of the defaults, only ↩,
+ * which is Enter.
+ *
+ * Derived from BINDINGS rather than listed a second time, so the two
+ * platforms cannot disagree about which key does what. Both constants are
+ * asserted against the Dart source by test/site_docs_test.dart.
+ */
+export const WINDOWS_MODIFIERS = 'Win+Ctrl+Shift';
+export const WINDOWS_KEY_NAMES: Readonly<Record<string, string>> = { '↩': 'Enter' };
+
+const MAC_MODIFIERS = '⌃⌥';
+
+/** A default's Windows combo, from its macOS one: `⌃⌥↩` is `Win+Ctrl+Shift+Enter`. */
+export function windowsCombo(macCombo: string): string {
+  const key = macCombo.slice(MAC_MODIFIERS.length);
+  if (!macCombo.startsWith(MAC_MODIFIERS) || key === '') {
+    throw new Error(`not a ${MAC_MODIFIERS} combo: ${macCombo}`);
+  }
+  return `${WINDOWS_MODIFIERS}+${WINDOWS_KEY_NAMES[key] ?? key}`;
+}

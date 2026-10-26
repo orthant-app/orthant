@@ -117,15 +117,20 @@ begin
   Result := WasRunning or RelaunchRequested;
 end;
 
-// Orthant keeps a hidden panel on every monitor for as long as it runs.
+// Orthant keeps a hidden panel on every monitor for as long as it runs, and
+// holds the mutex OrthantRunning for as long as its process exists, which can
+// be seconds after the panels have gone. Either means it is running; a copy
+// built before the mutex has only the panels.
 function OrthantRunning: Boolean;
 begin
-  Result := FindWindowByClassName('ORTHANT_OVERLAY_PANEL') <> 0;
+  Result := (FindWindowByClassName('ORTHANT_OVERLAY_PANEL') <> 0) or CheckForMutexes('OrthantRunning');
 end;
 
 // Asks a running Orthant to quit as its tray's Quit does (the runner's
 // OrthantQuitRequest, broadcast), and waits up to ten seconds; ends it if it
-// is still there (a hung process). True if one was running.
+// is still there (a hung process), and waits up to thirty more for it to be
+// gone, which on a slow machine has taken fifteen (measured). True if one was
+// running.
 function CloseOrthant: Boolean;
 var
   I, Code: Integer;
@@ -142,7 +147,7 @@ begin
   end;
   Log('Orthant did not quit within 10 seconds of the request: ending it');
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM Orthant.exe', '', SW_HIDE, ewWaitUntilTerminated, Code);
-  for I := 1 to 50 do
+  for I := 1 to 300 do
   begin
     if not OrthantRunning then
       exit;
@@ -150,8 +155,10 @@ begin
   end;
 end;
 
-// winget's switch: nobody is there to read a message box, and winget reports
-// Setup's failure itself.
+// Setup shows nothing at all: winget passes /VERYSILENT for `winget install
+// --silent` (its default, like WinSparkle's update, is /SILENT, which shows
+// progress to someone who may be watching). Nobody is there to read a message
+// box, and the caller reports Setup's failure itself.
 function VerySilent: Boolean;
 var
   I: Integer;

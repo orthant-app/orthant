@@ -235,9 +235,10 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
         // (setCommandsRunning), which then holds the attaches until the
         // commands are done, up to a ceiling. The hold runs out whether or
         // not Dart says so.
-        if (overlay_set_) overlay_set_->HoldAttaches();
-        window_channel_->NotifyHotkey(
-            id, WindowsOverlaySet::PressTick(GetMessageTime()));
+        // A summon Show refuses releases its own hold (ReleaseHold).
+        const double press = WindowsOverlaySet::PressTick(GetMessageTime());
+        if (overlay_set_) overlay_set_->HoldAttaches(press);
+        window_channel_->NotifyHotkey(id, press);
         return 0;
       }
       break;

@@ -91,8 +91,9 @@ class WindowsOverlaySet {
 
   // The user is doing something: a hotkey's command, or the tray's. The next
   // attach waits a second, so that work does not run behind one (each costs
-  // over a second of this thread, measured).
-  void HoldAttaches();
+  // over a second of this thread, measured). `press_ms` is the hotkey press
+  // the hold is for (PressTick), 0 for anything else.
+  void HoldAttaches(double press_ms = 0);
   // A menu (the tray's) is being tracked on this thread, whose modal loop
   // would run an attach and freeze the menu for its length: none starts while
   // it is open.
@@ -170,6 +171,9 @@ class WindowsOverlaySet {
   void Reconcile(const char* reason);
   void Fit(Panel& panel);
   void ScheduleAttach();
+  // A summon that Show refused: the hold its press set protects a command
+  // that is now over, and only delays the engines it was waiting for.
+  void ReleaseHold(double press_ms);
   void AttachNext();
   void AttachEngine(Panel& panel);
   void AttachFailed(Panel& panel, const char* why);
@@ -218,6 +222,7 @@ class WindowsOverlaySet {
   bool reconciling_ = false;
   bool reconcile_again_ = false;
   ULONGLONG hold_until_ = 0;  // no attach starts before this tick
+  double hold_press_ = 0;     // the hotkey press that hold is for, or 0
   bool menu_open_ = false;
   bool commands_running_ = false;
   ULONGLONG commands_since_ = 0;  // the tick they started running

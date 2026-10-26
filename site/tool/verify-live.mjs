@@ -133,6 +133,11 @@ for (const path of PAGES) {
 
 // The single most important control on the site, asked the way a visitor asks.
 // NAV's User-Agent names no platform, so /download answers it as a Mac.
+//
+// /download chooses by platform and is cacheable, so it must say it varies by
+// the headers it reads, or a shared cache could hand one platform's download
+// to the other. A named platform's route does not vary.
+const VARY = 'User-Agent, Sec-CH-UA-Platform';
 {
   for (const path of ['/download', '/download/', '/download/macos']) {
     const res = await get(BASE + path);
@@ -143,6 +148,12 @@ for (const path of PAGES) {
       `GET ${path} resolves a DMG rather than falling back`,
       loc || 'no location',
     );
+    const vary = res.headers.get('vary');
+    if (path === '/download/macos') {
+      check(vary === null, `GET ${path} does not vary`, `vary: ${vary}`);
+    } else {
+      check(vary === VARY, `GET ${path} varies by the visitor's platform`, `vary: ${vary}`);
+    }
   }
 }
 
@@ -198,6 +209,8 @@ for (const path of PAGES) {
   const namedLoc = named.headers.get('location') || '';
   const autoLoc = auto.headers.get('location') || '';
   check(named.status === 302 && auto.status === 302, 'the Windows downloads redirect', `status ${named.status}, ${auto.status}`);
+  check(auto.headers.get('vary') === VARY, 'GET /download varies for a Windows visitor too', `vary: ${auto.headers.get('vary')}`);
+  check(named.headers.get('vary') === null, 'GET /download/windows does not vary', `vary: ${named.headers.get('vary')}`);
   if (published) {
     check(namedLoc.endsWith('-setup.exe'), 'GET /download/windows resolves the installer', namedLoc || 'no location');
     check(autoLoc.endsWith('-setup.exe'), 'GET /download offers a Windows visitor the installer', autoLoc || 'no location');

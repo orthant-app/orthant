@@ -584,6 +584,33 @@ describe('the download routes', () => {
     }
   });
 
+  // The entry module hands the request's own headers and the route's `vary` on
+  // to handleDownload. Both answers are cacheable for five minutes, so without
+  // the Vary a shared cache could hand one platform's download to the other.
+  it('chooses by the visitor\'s platform through the entry module, and says it varies by it', async () => {
+    const realFetch = globalThis.fetch;
+    const realCaches = (globalThis as { caches?: unknown }).caches;
+    globalThis.fetch = feeds({ [FEED_URLS.macos]: FEED, [FEED_URLS.windows]: WIN_FEED }).bind(globalThis);
+    (globalThis as { caches?: unknown }).caches = {
+      default: { async match() { return undefined; }, async put() {} },
+    };
+    const visitor = (platform: string) =>
+      new Request('https://orthant.app/download', { headers: { 'sec-ch-ua-platform': `"${platform}"` } });
+    try {
+      const win = await handler.fetch(visitor('Windows'), env);
+      expect(win.headers.get('location')).toBe(GOOD_WIN);
+      expect(win.headers.get('vary')).toBe('User-Agent, Sec-CH-UA-Platform');
+      const mac = await handler.fetch(visitor('macOS'), env);
+      expect(mac.headers.get('location')).toBe(GOOD);
+      expect(mac.headers.get('vary')).toBe('User-Agent, Sec-CH-UA-Platform');
+      const named = await handler.fetch(new Request('https://orthant.app/download/windows'), env);
+      expect(named.headers.get('vary')).toBeNull();
+    } finally {
+      globalThis.fetch = realFetch;
+      (globalThis as { caches?: unknown }).caches = realCaches;
+    }
+  });
+
   it('leaves a path that only looks like one to the assets', async () => {
     const res = await handler.fetch(new Request('https://orthant.app/download/linux'), env);
     expect(res.status).toBe(404);

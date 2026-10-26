@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/window_controller.dart';
@@ -592,6 +593,59 @@ void main() {
       expect(offered('10.0.99'), isFalse, reason: 'under 100, a service pack');
       expect(offered('later'), isTrue, reason: 'not a number: no limit');
       expect(offered(''), isTrue);
+    });
+  });
+
+  // WinINet's timeouts bound each call, not the request: a server dripping
+  // bytes under the 1 MiB cap would hold `_checking` for the session.
+  group('reading the response body', () {
+    /// [chunks] chunks of [size] bytes each, then the end; each read takes
+    /// [each] on the fake clock.
+    ({Uint8List Function() next, Duration Function() elapsed}) server(
+        {required int chunks, int size = 100, Duration each = Duration.zero}) {
+      var reads = 0;
+      var now = Duration.zero;
+      return (
+        next: () {
+          now += each;
+          return reads++ < chunks ? Uint8List(size) : Uint8List(0);
+        },
+        elapsed: () => now,
+      );
+    }
+
+    test('reads to the end', () {
+      final s = server(chunks: 3);
+      expect(readFeedBody(s.next, elapsed: s.elapsed), hasLength(300));
+    });
+
+    test('stops a response that is still arriving after the limit', () {
+      // One chunk a second, for ever.
+      final s = server(chunks: 1 << 30, size: 1, each: const Duration(seconds: 1));
+      expect(
+          () => readFeedBody(s.next, elapsed: s.elapsed),
+          throwsA(isA<StateError>()
+              .having((e) => e.message, 'message', contains('120 s'))));
+      expect(s.elapsed(), kFeedFetchLimit + const Duration(seconds: 1),
+          reason: 'stopped at the first read past the limit');
+    });
+
+    test('keeps a response that ends just as the limit passes', () {
+      // The end itself comes after the limit: the body is whole.
+      final s = server(chunks: 120, size: 1, each: const Duration(seconds: 1));
+      expect(readFeedBody(s.next, elapsed: s.elapsed), hasLength(120));
+    });
+
+    test('stops a response over 1 MiB', () {
+      final s = server(chunks: 65, size: 16384);
+      expect(
+          () => readFeedBody(s.next, elapsed: s.elapsed),
+          throwsA(isA<StateError>()
+              .having((e) => e.message, 'message', contains('1 MiB'))));
+    });
+
+    test('allows two minutes', () {
+      expect(kFeedFetchLimit, const Duration(seconds: 120));
     });
   });
 

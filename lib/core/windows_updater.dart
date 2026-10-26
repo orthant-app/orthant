@@ -603,23 +603,25 @@ class RegistryUpdateStore implements UpdateStore {
 /// check goes through the same proxy and certificate settings as the update
 /// that follows it. WinINet blocks, so each request runs on an isolate of
 /// its own; nothing is cached, at most 1 MiB is read, connecting, sending
-/// and receiving each have 30 s, and the whole request [kFeedFetchLimit].
+/// and each receive have 30 s, and the whole request [kFeedFetchLimit].
 Future<FeedResponse> winInetGet(String url) =>
     Isolate.run(() => _winInetGet(url));
 
 /// How long one fetch of the feed may take as a whole. WinINet's timeouts
-/// bound each call, not the request, so a server dripping bytes under the
-/// 1 MiB cap would otherwise hold the check, and with it every later one,
-/// for the rest of the session. Kept inside the read loop rather than as a
-/// `.timeout()` on the isolate: that would end the check while the isolate
-/// stayed blocked in WinINet, leaking one for every check made after it.
+/// bound each receive from the socket, not the request, so a server dripping
+/// bytes under the 1 MiB cap would otherwise hold the check, and with it
+/// every later one, for the rest of the session. Kept inside the read loop
+/// rather than as a `.timeout()` on the isolate: that would end the check
+/// while the isolate stayed blocked in WinINet, leaking one for every check
+/// made after it.
 const kFeedFetchLimit = Duration(seconds: 120);
 
 /// The body of a response, read with [next] until it returns no bytes: at
 /// most 1 MiB, and only while [elapsed], measured from the start of the
 /// request, is within [limit]. A response that ends at the first read past
 /// the limit is whole and kept. Throws a [StateError] otherwise, as the
-/// fetch's other failures do.
+/// fetch's other failures do. The limit holds only if [next] returns what has
+/// arrived rather than waiting for more (`_winInetGet`).
 @visibleForTesting
 Uint8List readFeedBody(Uint8List Function() next,
     {required Duration Function() elapsed, Duration limit = kFeedFetchLimit}) {
@@ -653,6 +655,8 @@ typedef _QueryDart = int Function(
 typedef _ReadNative = Int32 Function(
     IntPtr, Pointer<Uint8>, Uint32, Pointer<Uint32>);
 typedef _ReadDart = int Function(int, Pointer<Uint8>, int, Pointer<Uint32>);
+typedef _AvailableNative = Int32 Function(IntPtr, Pointer<Uint32>, Uint32, IntPtr);
+typedef _AvailableDart = int Function(int, Pointer<Uint32>, int, int);
 typedef _CloseNative = Int32 Function(IntPtr);
 typedef _CloseDart = int Function(int);
 
@@ -670,6 +674,8 @@ FeedResponse _winInetGet(String url) {
       lib.lookupFunction<_OpenUrlNative, _OpenUrlDart>('InternetOpenUrlW');
   final query = lib.lookupFunction<_QueryNative, _QueryDart>('HttpQueryInfoW');
   final read = lib.lookupFunction<_ReadNative, _ReadDart>('InternetReadFile');
+  final available = lib.lookupFunction<_AvailableNative, _AvailableDart>(
+      'InternetQueryDataAvailable');
   final close =
       lib.lookupFunction<_CloseNative, _CloseDart>('InternetCloseHandle');
   final agent = 'Orthant'.toNativeUtf16();
@@ -697,7 +703,16 @@ FeedResponse _winInetGet(String url) {
       throw StateError('no HTTP status');
     }
     final body = readFeedBody(() {
-      if (read(request, chunk, 16384, length) == 0) {
+      // InternetReadFile waits until it has filled the buffer or the body
+      // has ended, however slowly the bytes come, so each read asks only for
+      // what has arrived. InternetQueryDataAvailable waits for at least one
+      // byte, within the receive timeout, and says how many; 0 is the end,
+      // which a full-size read then confirms at once.
+      if (available(request, length, 0, 0) == 0) {
+        throw StateError('the feed was cut off');
+      }
+      final want = length.value == 0 || length.value > 16384 ? 16384 : length.value;
+      if (read(request, chunk, want, length) == 0) {
         throw StateError('the feed was cut off');
       }
       return Uint8List.fromList(chunk.asTypedList(length.value));

@@ -129,8 +129,8 @@ end;
 // Asks a running Orthant to quit as its tray's Quit does (the runner's
 // OrthantQuitRequest, broadcast), and waits up to ten seconds; ends it if it
 // is still there (a hung process), and waits up to thirty more for it to be
-// gone, which on a slow machine has taken fifteen (measured). True if one was
-// running.
+// gone, which on a slow machine has taken up to twenty (measured). True if one
+// was running.
 function CloseOrthant: Boolean;
 var
   I, Code: Integer;

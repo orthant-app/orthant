@@ -550,8 +550,18 @@ void WindowsOverlaySet::ScheduleAttach() {
   }
 }
 
-void WindowsOverlaySet::HoldAttaches() {
+void WindowsOverlaySet::HoldAttaches(double press_ms) {
   hold_until_ = GetTickCount64() + kAttachHoldMs;
+  hold_press_ = press_ms;
+  ScheduleAttach();
+}
+
+void WindowsOverlaySet::ReleaseHold(double press_ms) {
+  // Only the summon's own: a press handled since holds for its own command,
+  // and the tray's and the settings window's holds carry no press.
+  if (press_ms <= 0 || hold_press_ != press_ms) return;
+  hold_until_ = 0;
+  hold_press_ = 0;
   ScheduleAttach();
 }
 
@@ -906,6 +916,9 @@ WindowsOverlaySet::ShowResult WindowsOverlaySet::Show(
     DevLog("overlay summon refused: stale, " + Ms(age) +
            " ms after its hotkey");
     MessageBeep(MB_OK);
+    // At launch, a press that waited out one engine's attach: held, the next
+    // attach would wait a second more for nothing (measured).
+    ReleaseHold(pressed_ms);
     return ShowResult::kStale;
   }
   const double trigger = pressed_ms > 0 ? now - age : now;
@@ -938,6 +951,10 @@ WindowsOverlaySet::ShowResult WindowsOverlaySet::Show(
     if (!panel || !panel->channel) {
       DevLog("overlay summon refused: engines not ready");
       MessageBeep(MB_OK);
+      // Held, the engines this summon needed would attach a second later for
+      // each refused press: pressing again until the grid opened delayed it
+      // by 0.9 to 1.3 s on two monitors (measured in the VM).
+      ReleaseHold(pressed_ms);
       return ShowResult::kNotReady;
     }
   }

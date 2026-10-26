@@ -393,6 +393,38 @@ void main() {
         reason: 'ids: ${grabs.map((g) => g.id).join(', ')}');
   });
 
+  // Setup tells whether Orthant is running by its panels' window class and
+  // its mutex, and asks it to quit with a registered message, each by name
+  // (windows/installer/orthant.iss). A name changed on one side only makes
+  // Setup believe Orthant is not running, and a silent update over a running
+  // copy then fails on the files in use, which only the VM battery, not CI,
+  // would notice.
+  test('the installer finds and quits Orthant by the names the runner uses', () {
+    String read(String path) => File(path).readAsStringSync().replaceAll('\r\n', '\n');
+    // The one name `pattern` captures in `src`: a pattern gone blind, or a
+    // second, different name beside the first, fails here.
+    String only(RegExp pattern, String src, String what) {
+      final names = {for (final m in pattern.allMatches(src)) m.group(1)!};
+      expect(names, hasLength(1), reason: what);
+      return names.single;
+    }
+
+    final iss = read('windows/installer/orthant.iss');
+    expect(
+        only(RegExp(r"FindWindowByClassName\('([^']+)'\)"), iss, 'Setup: the panel class'),
+        only(RegExp(r'kPanelClass\[\] = L"([^"]+)";'),
+            read('windows/runner/windows_overlay_set.cpp'), 'the runner: the panel class'));
+    expect(
+        only(RegExp(r"CheckForMutexes\('([^']+)'\)"), iss, 'Setup: the mutex'),
+        only(RegExp(r'CreateMutexW\(nullptr, FALSE, L"([^"]+)"\)'),
+            read('windows/runner/main.cpp'), 'the runner: the mutex'));
+    expect(
+        only(RegExp(r"RegisterWindowMessage\('([^']+)'\)"), iss, 'Setup: the quit request'),
+        only(RegExp(r'QuitRequestMessage\(\) \{\s*static const UINT message = '
+                r'RegisterWindowMessageW\(L"([^"]+)"\);'),
+            read('windows/runner/flutter_window.cpp'), 'the runner: the quit request'));
+  });
+
   // The grid's key grabs are one table in C++ (kGrabs) and one in Dart
   // (windowsOverlayGrabs), which refuses a shortcut on any of them: a chord
   // added to one and not the other is either a dead grid key or a refusal of

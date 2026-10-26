@@ -121,13 +121,14 @@ const _sparkleNs = 'http://www.andymatuschak.org/xml-namespaces/sparkle';
 /// The newest update in a Windows feed for this machine, or null when it is
 /// not newer than [build] or is the one the user chose to skip.
 ///
-/// Decided as WinSparkle decides it: among the items whose enclosure's
+/// Modelled on WinSparkle's own choice: among the items whose enclosure's
 /// `sparkle:os` is absent, `windows` or [os] and whose
 /// `sparkle:minimumSystemVersion` [system] meets, the one with the highest
 /// `sparkle:version` (the build number), and only then compared with [build]
-/// and [skip]. An item it cannot read is passed over; WinSparkle reads the
-/// feed again, and checks the installer's signature, when the user chooses
-/// to install. Throws a [FormatException] for a body that is not a
+/// and [skip]. The two can differ on inputs our feed generator never writes;
+/// there, at worst, the tray offers an update that WinSparkle then declines.
+/// An item it cannot read is passed over; WinSparkle reads the feed again,
+/// and checks the installer's signature, when the user chooses to install. Throws a [FormatException] for a body that is not a
 /// well-formed RSS document, a truncated one or one using a namespace prefix
 /// it never declares included, so that a check which reads one fails rather
 /// than reporting no update.
@@ -601,10 +602,41 @@ class RegistryUpdateStore implements UpdateStore {
 /// [FeedFetch] over WinINet, the HTTP stack WinSparkle itself uses, so the
 /// check goes through the same proxy and certificate settings as the update
 /// that follows it. WinINet blocks, so each request runs on an isolate of
-/// its own; nothing is cached, at most 1 MiB is read, and connecting,
-/// sending and receiving each have 30 s.
+/// its own; nothing is cached, at most 1 MiB is read, connecting, sending
+/// and each receive have 30 s, and the whole request [kFeedFetchLimit].
 Future<FeedResponse> winInetGet(String url) =>
     Isolate.run(() => _winInetGet(url));
+
+/// How long one fetch of the feed may take as a whole. WinINet's timeouts
+/// bound each receive from the socket, not the request, so a server dripping
+/// bytes under the 1 MiB cap would otherwise hold the check, and with it
+/// every later one, for the rest of the session. Kept inside the read loop
+/// rather than as a `.timeout()` on the isolate: that would end the check
+/// while the isolate stayed blocked in WinINet, leaking one for every check
+/// made after it.
+const kFeedFetchLimit = Duration(seconds: 120);
+
+/// The body of a response, read with [next] until it returns no bytes: at
+/// most 1 MiB, and only while [elapsed], measured from the start of the
+/// request, is within [limit]. A response that ends at the first read past
+/// the limit is whole and kept. Throws a [StateError] otherwise, as the
+/// fetch's other failures do. The limit holds only if [next] returns what has
+/// arrived rather than waiting for more (`_winInetGet`).
+@visibleForTesting
+Uint8List readFeedBody(Uint8List Function() next,
+    {required Duration Function() elapsed, Duration limit = kFeedFetchLimit}) {
+  final bytes = BytesBuilder(copy: false);
+  while (true) {
+    final chunk = next();
+    if (chunk.isEmpty) break;
+    bytes.add(chunk);
+    if (bytes.length > 1 << 20) throw StateError('the feed is over 1 MiB');
+    if (elapsed() > limit) {
+      throw StateError('the feed took over ${limit.inSeconds} s');
+    }
+  }
+  return bytes.takeBytes();
+}
 
 typedef _OpenNative = IntPtr Function(
     Pointer<Utf16>, Uint32, Pointer<Utf16>, Pointer<Utf16>, Uint32);
@@ -623,6 +655,8 @@ typedef _QueryDart = int Function(
 typedef _ReadNative = Int32 Function(
     IntPtr, Pointer<Uint8>, Uint32, Pointer<Uint32>);
 typedef _ReadDart = int Function(int, Pointer<Uint8>, int, Pointer<Uint32>);
+typedef _AvailableNative = Int32 Function(IntPtr, Pointer<Uint32>, Uint32, IntPtr);
+typedef _AvailableDart = int Function(int, Pointer<Uint32>, int, int);
 typedef _CloseNative = Int32 Function(IntPtr);
 typedef _CloseDart = int Function(int);
 
@@ -640,6 +674,8 @@ FeedResponse _winInetGet(String url) {
       lib.lookupFunction<_OpenUrlNative, _OpenUrlDart>('InternetOpenUrlW');
   final query = lib.lookupFunction<_QueryNative, _QueryDart>('HttpQueryInfoW');
   final read = lib.lookupFunction<_ReadNative, _ReadDart>('InternetReadFile');
+  final available = lib.lookupFunction<_AvailableNative, _AvailableDart>(
+      'InternetQueryDataAvailable');
   final close =
       lib.lookupFunction<_CloseNative, _CloseDart>('InternetCloseHandle');
   final agent = 'Orthant'.toNativeUtf16();
@@ -648,6 +684,7 @@ FeedResponse _winInetGet(String url) {
   final number = calloc<Uint32>();
   final length = calloc<Uint32>();
   final chunk = calloc<Uint8>(16384);
+  final clock = Stopwatch()..start();
   var session = 0, request = 0;
   try {
     session = open(agent, preconfig, nullptr, nullptr, 0);
@@ -665,18 +702,24 @@ FeedResponse _winInetGet(String url) {
         0) {
       throw StateError('no HTTP status');
     }
-    final bytes = BytesBuilder(copy: false);
-    while (true) {
-      if (read(request, chunk, 16384, length) == 0) {
+    final body = readFeedBody(() {
+      // InternetReadFile waits until it has filled the buffer or the body
+      // has ended, however slowly the bytes come, so each read asks only for
+      // what has arrived. InternetQueryDataAvailable waits for at least one
+      // byte, within the receive timeout, and says how many; 0 is the end,
+      // which a full-size read then confirms at once.
+      if (available(request, length, 0, 0) == 0) {
         throw StateError('the feed was cut off');
       }
-      if (length.value == 0) break;
-      bytes.add(Uint8List.fromList(chunk.asTypedList(length.value)));
-      if (bytes.length > 1 << 20) throw StateError('the feed is over 1 MiB');
-    }
+      final want = length.value == 0 || length.value > 16384 ? 16384 : length.value;
+      if (read(request, chunk, want, length) == 0) {
+        throw StateError('the feed was cut off');
+      }
+      return Uint8List.fromList(chunk.asTypedList(length.value));
+    }, elapsed: () => clock.elapsed);
     return (
       status: number.value,
-      body: utf8.decode(bytes.takeBytes(), allowMalformed: true),
+      body: utf8.decode(body, allowMalformed: true),
     );
   } finally {
     if (request != 0) close(request);

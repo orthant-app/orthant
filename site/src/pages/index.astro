@@ -6,7 +6,7 @@ import SpecStrip from '../components/SpecStrip.astro';
 import Command from '../components/Command.astro';
 import RegionDiagram from '../components/RegionDiagram.astro';
 import { currentVersion } from '../lib/releases';
-import { BINDINGS } from '../lib/commands';
+import { BINDINGS, windowsCombo } from '../lib/commands';
 
 // The newest PUBLISHED STABLE entry. An unpublished release (written at release
 // prep, before the tag is approved) and a beta can therefore never become the
@@ -37,6 +37,11 @@ const jsonLd = {
   path="/"
 >
   <Fragment slot="head">
+    {/* Before anything paints, which platform to show (public/platform.js). A
+        plain <script src>, render-blocking on purpose and a few hundred bytes:
+        the CSP admits no inline script, and a deferred one would flash the
+        other platform first. */}
+    <script is:inline src="/platform.js"></script>
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </Fragment>
   <Hero />
@@ -47,17 +52,34 @@ const jsonLd = {
     <p class="lead-sub">
       Shortcuts, then the grid overlay, then drawing a region and binding it to a key.
     </p>
-    <div class="demo-frame">
+    {/* One recording per platform, cut by one script to the same storyboard,
+        size and pace (.claude/tool/demo/assemble.sh); the page shows the one
+        for the platform it shows. preload="none" on both, so the other is
+        never fetched unless asked for. */}
+    <div class="demo-frame only-macos">
       <video
         controls muted playsinline loop
         preload="none"
         poster="/demo-poster.webp"
         width="1280"
         height="706"
-        aria-label="Windows snap to halves and quarters with keyboard shortcuts; the grid overlay places a window on a drawn selection; a left-two-thirds region is drawn, saved, bound to a shortcut, and used."
+        aria-label="On macOS: windows snap to halves and quarters with keyboard shortcuts; the grid overlay places a window on a drawn selection; a left-two-thirds region is drawn, saved, bound to a shortcut, and used."
       >
         <source src="/demo.webm" type="video/webm" />
         <source src="/demo.mp4" type="video/mp4" />
+      </video>
+    </div>
+    <div class="demo-frame only-windows">
+      <video
+        controls muted playsinline loop
+        preload="none"
+        poster="/demo-windows-poster.webp"
+        width="1280"
+        height="706"
+        aria-label="On Windows: windows snap to halves and quarters with keyboard shortcuts; the grid overlay places a window on a drawn selection; a left-two-thirds region is drawn, saved, bound to a shortcut, and used."
+      >
+        <source src="/demo-windows.webm" type="video/webm" />
+        <source src="/demo-windows.mp4" type="video/mp4" />
       </video>
     </div>
   </section>
@@ -74,19 +96,27 @@ const jsonLd = {
           title="Two thirds of a three-column grid" label="2/3" />
         <p><strong>Draw it.</strong> Drag across the grid.</p>
       </li>
+      {/* Windows' example key is T, not 2: Win+Ctrl+Shift with a digit is
+          Windows' own, opening a taskbar app as administrator. */}
       <li>
-        <RegionDiagram cols={3} rows={1} c0={0} c1={1} r0={0} r1={0}
-          title="Left two thirds, bound to a shortcut" label="2/3" combo="⌃⌥2" />
-        <p><strong>Bind it.</strong> Press <kbd>⌘S</kbd> (<kbd>Ctrl+S</kbd> on Windows) before you
-          let go, name it, give it a key.</p>
+        <div class="only-macos"><RegionDiagram cols={3} rows={1} c0={0} c1={1} r0={0} r1={0}
+          title="Left two thirds, bound to a shortcut" label="2/3" combo="⌃⌥2" /></div>
+        <div class="only-windows"><RegionDiagram cols={3} rows={1} c0={0} c1={1} r0={0} r1={0}
+          title="Left two thirds, bound to a shortcut" label="2/3" combo="Win+Ctrl+Shift+T" /></div>
+        <p><strong>Bind it.</strong> Press <kbd><span class="only-macos">⌘S</span><span
+          class="only-windows">Ctrl+S</span></kbd> before you let go, name it, give it a key.</p>
       </li>
       <li>
-        <RegionDiagram cols={12} rows={1} c0={0} c1={7} r0={0} r1={0}
+        <div class="only-macos"><RegionDiagram cols={12} rows={1} c0={0} c1={7} r0={0} r1={0}
           title="The same two thirds on a twelve-column grid, on the same shortcut"
-          label="8/12" combo="⌃⌥2" />
-        <p><strong>Press it, from then on.</strong> <kbd>⌃⌥2</kbd> puts the active window
-          there, in any app. Change your grid to twelfths later and the same key still gives
-          you two thirds.</p>
+          label="8/12" combo="⌃⌥2" /></div>
+        <div class="only-windows"><RegionDiagram cols={12} rows={1} c0={0} c1={7} r0={0} r1={0}
+          title="The same two thirds on a twelve-column grid, on the same shortcut"
+          label="8/12" combo="Win+Ctrl+Shift+T" /></div>
+        <p><strong>Press it, from then on.</strong> <kbd><span class="only-macos">⌃⌥2</span><span
+          class="only-windows">Win+Ctrl+Shift+T</span></kbd> puts the active window there, in
+          any app. Change your grid to twelfths later and the same key still gives you two
+          thirds.</p>
       </li>
     </ol>
     <p><a href="/docs/custom-regions/">How custom regions work →</a></p>
@@ -102,14 +132,16 @@ const jsonLd = {
             ? <RegionDiagram cols={2} rows={2} {...b.block} title={b.label} />
             : <div class="no-glyph" aria-hidden="true">{b.kind === 'summon' ? 'grid' : 'as-is'}</div>}
           <span class="key-label">{b.label}</span>
-          <kbd>{b.combo}</kbd>
+          {/* Windows' combos are three times as long: on a phone's two-column
+              map Win+Ctrl+Shift+Enter is wider than its column, so it may
+              break, but only after a +. */}
+          <kbd><span class="only-macos">{b.combo}</span><span class="only-windows">{windowsCombo(b.combo).split('+').map((part, i, all) => i < all.length - 1 ? <Fragment>{part}+<wbr /></Fragment> : part)}</span></kbd>
         </li>
       ))}
     </ul>
     <p class="lead-sub">
       Center keeps the window at its current size, and Open grid places nothing at all, so neither
-      has a shape to draw. On Windows each is the same key with <kbd>Win+Ctrl+Shift</kbd> in place
-      of <kbd>⌃⌥</kbd>, and Enter for <kbd>↩</kbd>.
+      has a shape to draw.
     </p>
     <p><a href="/docs/shortcuts/">Every default shortcut →</a></p>
   </section>
@@ -230,6 +262,7 @@ const jsonLd = {
   .keymap li { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
   .keymap :global(.diagram) { width: 100%; max-width: 84px; }
   .key-label { font-size: 14px; }
+  .keymap kbd { white-space: normal; max-width: 100%; }
   /* Center and the summon have no shape. The slot keeps its place in the grid
      so the map does not reflow, and says why rather than looking broken. */
   .no-glyph {
@@ -242,6 +275,5 @@ const jsonLd = {
 
 <script>
   import { attachDemo } from '../lib/demo';
-  const root = document.querySelector<HTMLElement>('.demo-frame');
-  if (root) attachDemo(root);
+  for (const frame of document.querySelectorAll<HTMLElement>('.demo-frame')) attachDemo(frame);
 </script>

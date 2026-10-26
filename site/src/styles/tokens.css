@@ -307,3 +307,14 @@ pre {
   margin-top: 6px; font-family: var(--font-mono);
   font-size: 12px; color: var(--label-secondary);
 }
+
+/*
+ * One platform at a time. public/platform.js marks <html> with data-platform
+ * before the page paints (the visitor's own platform, or ?platform=), and the
+ * homepage's switch changes it. Anything that differs between macOS and
+ * Windows is in the page twice, once each way, and the other is not shown;
+ * with scripting off there is no mark and macOS shows, as it always has.
+ * `display: none` alone, so whatever is shown keeps its own display.
+ */
+:root:not([data-platform="windows"]) .only-windows,
+:root[data-platform="windows"] .only-macos { display: none !important; }

@@ -19,21 +19,30 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
   </div>
 
   <figure class="demo">
-    {/* A macOS screen, drawn in CSS. No screenshot: nothing to go stale, and
-        nothing that could carry a real menu bar, wallpaper or third-party app. */}
+    {/* Which platform the page shows. public/platform.js chose it before the
+        page painted (the visitor's own, or ?platform=); these change it, for
+        the whole page, without storing anything. */}
+    <div class="platform" role="group" aria-label="Show the page for">
+      <button type="button" data-platform-choice="macos">macOS</button>
+      <button type="button" data-platform-choice="windows">Windows</button>
+    </div>
+    {/* A screen, drawn in CSS: macOS's, with its menu bar along the top, or
+        Windows', with the taskbar along the bottom and Orthant's icon in its
+        notification area. No screenshot: nothing to go stale, and nothing
+        that could carry a real menu bar, wallpaper or third-party app. */}
     <div class="scene">
       <div class="bar" aria-hidden="true">
-        <span class="bar-app">Safari</span>
+        <span class="bar-app only-macos">Safari</span>
         <img src="/icon.svg" width="12" height="12" alt="" />
       </div>
       <div class="desktop">
         <div class="win win-back win-b" aria-hidden="true"><span>Terminal</span></div>
-        <div class="win win-back win-c" aria-hidden="true"><span>Notes</span></div>
+        <div class="win win-back win-c" aria-hidden="true"><span><span class="only-macos">Notes</span><span class="only-windows">Notepad</span></span></div>
 
         {/* The window that actually LANDS. It sits where it currently is and
             moves only on commit, which is what the app does: the overlay
             previews, the window moves when you release or press Return. */}
-        <div id="hero-placed" class="win win-front" aria-hidden="true"><span>Safari</span></div>
+        <div id="hero-placed" class="win win-front" aria-hidden="true"><span><span class="only-macos">Safari</span><span class="only-windows">Edge</span></span></div>
 
         {/* The true-scale preview: where the window WILL land, at real size and
             position. Its resting geometry is a CSS constant, asserted against
@@ -43,7 +52,7 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
         {/* The compact panel: a scale model of the display, centred, with the
             captured app's name above the cells. This is `_panelRect`. */}
         <div class="panel">
-          <div class="chip" aria-hidden="true">Safari</div>
+          <div class="chip" aria-hidden="true"><span class="only-macos">Safari</span><span class="only-windows">Microsoft Edge</span></div>
           <div
             id="hero-grid"
             class="grid"
@@ -69,8 +78,8 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
         Drag across the grid, or focus it and use the arrow keys.
       </p>
       <ul class="keys">
-        <li><kbd>⇧</kbd> extends</li>
-        <li><kbd>↩</kbd> places</li>
+        <li><kbd><span class="only-macos">⇧</span><span class="only-windows">Shift</span></kbd> extends</li>
+        <li><kbd><span class="only-macos">↩</span><span class="only-windows">Enter</span></kbd> places</li>
         <li><kbd>Esc</kbd> resets</li>
       </ul>
     </figcaption>
@@ -165,6 +174,37 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
   }
   .bar-app { font-weight: 600; color: var(--label); }
   .bar img { display: block; opacity: 0.85; }
+  /* Windows: the taskbar along the bottom, Orthant's icon at its right, where
+     its notification area icon sits. */
+  /* Grid rows, as the hero's own reorder uses areas: a reversed flex column
+     is forbidden in this file (it desyncs focus order from what is seen,
+     though the bar holds nothing focusable). */
+  :global(:root[data-platform="windows"]) .scene { display: grid; grid-template-rows: auto auto; }
+  :global(:root[data-platform="windows"]) .desktop { grid-row: 1; }
+  :global(:root[data-platform="windows"]) .bar {
+    grid-row: 2;
+    justify-content: flex-end;
+    border-bottom: 0; border-top: 1px solid var(--separator);
+  }
+
+  /* The platform switch. The shown platform's button is marked from the
+     page's own data-platform, not from aria-pressed, so it is right before
+     the script that sets aria-pressed has run. 28px tall: over the 24px
+     target minimum. */
+  .platform {
+    display: inline-flex; gap: 2px; padding: 2px; margin: 0 0 10px;
+    border: 1px solid var(--rule); border-radius: 8px; background: var(--surface);
+  }
+  .platform button {
+    min-height: 28px; padding: 3px 12px;
+    border: 0; border-radius: 6px; background: transparent;
+    color: var(--label-secondary); font: inherit; font-size: 13px; cursor: pointer;
+  }
+  :global(:root:not([data-platform="windows"])) .platform [data-platform-choice="macos"],
+  :global(:root[data-platform="windows"]) .platform [data-platform-choice="windows"] {
+    background: var(--raised); color: var(--label); font-weight: 600;
+    box-shadow: 0 0 0 1px var(--separator);
+  }
 
   .desktop { position: relative; aspect-ratio: 16 / 10; }
 
@@ -173,7 +213,8 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
     border: 1px solid var(--separator); border-radius: 6px;
     background: var(--surface); overflow: hidden;
   }
-  .win span {
+  /* The title strip: the window's own span, not the per-platform names in it. */
+  .win > span {
     display: block; height: 18px; line-height: 18px; padding-inline: 8px;
     border-bottom: 1px solid var(--separator); background: var(--raised);
     font-size: 10.5px; color: var(--label-secondary);
@@ -285,7 +326,7 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
      something a sighted visitor can see; the live region alone left the key
      looking broken. */
   .win-front[data-placed] { border-color: var(--accent); }
-  .win-front[data-placed] span { background: color-mix(in srgb, var(--accent) 22%, var(--surface)); }
+  .win-front[data-placed] > span { background: color-mix(in srgb, var(--accent) 22%, var(--surface)); }
 
   /*
    * The panel obscured its own payoff: selecting a region moves the Safari
@@ -324,6 +365,9 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
 
 <script>
   import { attachHero } from '../lib/hero';
+  import { attachPlatformSwitch } from '../lib/platform';
   const root = document.querySelector<HTMLElement>('.hero');
   if (root) attachHero(root);
+  const choice = document.querySelector<HTMLElement>('.platform');
+  if (choice) attachPlatformSwitch(choice);
 </script>

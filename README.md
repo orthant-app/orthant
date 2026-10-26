@@ -12,8 +12,15 @@
 </div>
 
 <p align="center">
-  <img src=".github/demo.gif" alt="Demo: windows snap to halves and quarters with keyboard shortcuts; the grid overlay places a window on a drawn selection; a left-two-thirds region is drawn, saved with Cmd-S, bound to a shortcut of its own, and used.">
+  <img src=".github/demo.gif" alt="Demo on macOS: windows snap to halves and quarters with keyboard shortcuts; the grid overlay places a window on a drawn selection; a left-two-thirds region is drawn, saved with Cmd-S, bound to a shortcut of its own, and used.">
 </p>
+
+<details>
+<summary>The same demo on Windows</summary>
+<p align="center">
+  <img src=".github/demo-windows.gif" alt="Demo on Windows: windows snap to halves and quarters with Win+Ctrl+Shift shortcuts; the grid overlay places a window on a drawn selection; a left-two-thirds region is drawn, saved with Ctrl+S, bound to Win+Ctrl+Shift+T, and used.">
+</p>
+</details>
 
 ## Install
 

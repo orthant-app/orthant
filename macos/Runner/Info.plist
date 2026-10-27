@@ -12,6 +12,17 @@
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<!-- The languages the app speaks. Its own strings live in Dart (gen-l10n),
+	     so this array is what makes macOS list Orthant in System Settings ▸
+	     General ▸ Language & Region ▸ Applications, and what lets Sparkle pick
+	     its own Chinese strings. Without it the bundle declares English only
+	     and both stay English. CFBundleDevelopmentRegion stays as it is. -->
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>zh-Hans</string>
+		<string>zh-Hant</string>
+	</array>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
 	<!-- The name macOS shows the user: the menu bar, ⌘-Tab, and the

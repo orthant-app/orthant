@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../core/key_chord.dart';
+import '../core/key_words.dart';
 import '../l10n/strings.dart';
 
 /// The overlay's words for the keys it names, on the platform it runs on.
@@ -31,8 +33,22 @@ class OverlayCopy {
   final bool pixels;
 
   static const macOS = OverlayCopy._(place: 'Return', save: '⌘S', pixels: false);
-  static const windows =
-      OverlayCopy._(place: 'Enter', save: 'Ctrl+S', pixels: true);
+
+  /// Windows' words: the Enter legend places, and the Ctrl legend joined to S
+  /// the way Windows joins every combo (`Ctrl+S`) saves. They come from
+  /// [KeyWords.windows], so they follow the language, which is why this is a
+  /// getter and not a constant.
+  static OverlayCopy get windows {
+    final words = KeyWords.windows;
+    return OverlayCopy._(
+      place: words.keyName(_enterUsage)!,
+      save: words.join([...words.modifierNames(Modifiers.ctrl), 'S']),
+      pixels: true,
+    );
+  }
+
+  /// Enter's USB HID usage: the key that places.
+  static const _enterUsage = 0x00070028;
 
   /// The overlay runs on macOS and Windows only; anything else (a test host)
   /// reads as macOS, where it began.

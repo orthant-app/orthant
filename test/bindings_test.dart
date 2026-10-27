@@ -4,9 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/shortcuts/bindings.dart';
 import 'package:orthant/shortcuts/command_ref.dart';
 import 'package:orthant/core/key_chord.dart';
+import 'package:orthant/l10n/strings.dart';
 import 'package:orthant/shortcuts/shortcut_command.dart';
 
 import 'support/carbon_terms.dart';
+import 'support/locales.dart';
+import 'support/strg_strings.dart';
 
 /// Orthant 1.0.3's glyph table, verbatim, keyed by Carbon code as it was.
 /// The labels test below holds today's labels to it.
@@ -241,6 +244,28 @@ void main() {
       );
       expect(keySymbol(PhysicalKeyboardKey.enter.usbHidUsage), 'Enter');
     });
+
+    test('follow the language: Ctrl is whatever the strings call it', () {
+      addTearDown(() => setAppStrings(kEnglish));
+      appStrings = StrgStrings();
+      final chord = KeyChord(
+        physical: PhysicalKeyboardKey.arrowLeft.usbHidUsage,
+        logical: LogicalKeyboardKey.arrowLeft.keyId,
+        modifiers: Modifiers.meta | Modifiers.ctrl | Modifiers.shift,
+      );
+      expect(formatCombo(chord), 'Win+STRG+Shift+←');
+      expect(comboSymbols(chord), ['Win', 'STRG', 'Shift', '←']);
+      expect(modifierSymbols(Modifiers.ctrl), ['STRG']);
+      // The named keys and the keypad are strings too.
+      expect(keySymbol(PhysicalKeyboardKey.enter.usbHidUsage), 'Eingabe');
+      expect(keySymbol(PhysicalKeyboardKey.delete.usbHidUsage), 'Entf');
+      expect(keySymbol(PhysicalKeyboardKey.numpad0.usbHidUsage), 'Ziff 0');
+      expect(keySymbol(PhysicalKeyboardKey.numpadDivide.usbHidUsage), 'Ziff /');
+      // And English again once the language is.
+      setAppStrings(kEnglish);
+      expect(formatCombo(chord), 'Win+Ctrl+Shift+←');
+      expect(keySymbol(PhysicalKeyboardKey.numpad0.usbHidUsage), 'Num 0');
+    });
   });
 
   test('keySymbol is the shared glyph on macOS', () {
@@ -250,6 +275,21 @@ void main() {
     expect(keySymbol(PhysicalKeyboardKey.arrowLeft.usbHidUsage), '←');
     expect(keySymbol(PhysicalKeyboardKey.keyA.usbHidUsage), 'A');
     expect(keySymbol(0x00070001), isNull, reason: 'no shortcut uses it');
+  });
+
+  test('on macOS only the keypad\'s words are strings; the glyphs are not', () {
+    addTearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+      setAppStrings(kEnglish);
+    });
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    appStrings = StrgStrings();
+    expect(keySymbol(PhysicalKeyboardKey.numpad7.usbHidUsage), 'Ziff 7');
+    expect(keySymbol(PhysicalKeyboardKey.numpadMultiply.usbHidUsage), 'Ziff *');
+    expect(keySymbol(PhysicalKeyboardKey.numLock.usbHidUsage), '⌧');
+    expect(keySymbol(PhysicalKeyboardKey.numpadEnter.usbHidUsage), '⌤');
+    expect(keySymbol(PhysicalKeyboardKey.enter.usbHidUsage), '↩');
+    expect(keySymbol(PhysicalKeyboardKey.delete.usbHidUsage), '⌦');
   });
 
   test('conflictFor finds a different command already using the combo', () {

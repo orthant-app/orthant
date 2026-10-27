@@ -247,5 +247,101 @@
   "overlayCancelGrid": "Cancel grid",
   "@overlayCancelGrid": {
     "description": "The name of a button in the grid's accessibility tree that closes the grid without moving anything."
+  },
+  "keyWin": "Win",
+  "@keyWin": {
+    "description": "The Windows logo key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key."
+  },
+  "keyCtrl": "Ctrl",
+  "@keyCtrl": {
+    "description": "The Control key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key."
+  },
+  "keyAlt": "Alt",
+  "@keyAlt": {
+    "description": "The Alt key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key."
+  },
+  "keyShift": "Shift",
+  "@keyShift": {
+    "description": "The Shift key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key."
+  },
+  "keyEnter": "Enter",
+  "@keyEnter": {
+    "description": "The Enter key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key."
+  },
+  "keySpace": "Space",
+  "@keySpace": {
+    "description": "The Space bar, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key."
+  },
+  "keyTab": "Tab",
+  "@keyTab": {
+    "description": "The Tab key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key."
+  },
+  "keyBackspace": "Backspace",
+  "@keyBackspace": {
+    "description": "The Backspace key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key."
+  },
+  "keyEsc": "Esc",
+  "@keyEsc": {
+    "description": "The Escape key, as written in Windows shortcuts and in the Shortcuts hint \"Listening… press a combination, or Esc to cancel.\" Use the legend printed on the key."
+  },
+  "keyHome": "Home",
+  "@keyHome": {
+    "description": "The Home key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key."
+  },
+  "keyEnd": "End",
+  "@keyEnd": {
+    "description": "The End key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key."
+  },
+  "keyPageUp": "PgUp",
+  "@keyPageUp": {
+    "description": "The Page Up key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key."
+  },
+  "keyPageDown": "PgDn",
+  "@keyPageDown": {
+    "description": "The Page Down key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key."
+  },
+  "keyDelete": "Del",
+  "@keyDelete": {
+    "description": "The Delete key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key."
+  },
+  "keyNumLock": "Num Lock",
+  "@keyNumLock": {
+    "description": "The Num Lock key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key."
+  },
+  "keyNumEnter": "Num Enter",
+  "@keyNumEnter": {
+    "description": "The Enter key on the numeric keypad, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key."
+  },
+  "keyNumpad": "Num {key}",
+  "@keyNumpad": {
+    "description": "A key on the numeric keypad, as written in shortcuts on both macOS and Windows, such as Num 5 or Num /. {key} is the character on the key. Use the legend printed on the keypad.",
+    "placeholders": {
+      "key": {
+        "type": "String",
+        "example": "/"
+      }
+    }
+  },
+  "keyListAnyModifier": "{a}, {b}, {c} or {d}",
+  "@keyListAnyModifier": {
+    "description": "The four modifier keys as a list in a sentence, in the Shortcuts hint \"Click a shortcut to change it. Combinations need Win, Ctrl, Alt or Shift.\" Each placeholder is one key name (a glyph such as ⌃ on macOS). Use your language's list pattern, ending with its word for \"or\".",
+    "placeholders": {
+      "a": {
+        "type": "String",
+        "example": "Win"
+      },
+      "b": {
+        "type": "String",
+        "example": "Ctrl"
+      },
+      "c": {
+        "type": "String",
+        "example": "Alt"
+      },
+      "d": {
+        "type": "String",
+        "example": "Shift"
+      }
+    }
   }
 }

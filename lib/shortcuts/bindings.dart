@@ -4,6 +4,7 @@ import 'package:flutter/services.dart' show PhysicalKeyboardKey;
 import 'command_ref.dart';
 import '../core/key_chord.dart';
 import '../core/key_words.dart';
+import '../l10n/strings.dart';
 import 'shortcut_command.dart';
 
 /// A command and the chord that fires it.
@@ -185,11 +186,13 @@ List<Binding> withRebind(List<Binding> bindings, Binding updated) {
 
 /// A key's USB HID usage → how a shortcut displays that key, macOS's glyphs
 /// for the named keys; `KeyWords.named` holds the names Windows uses instead.
+/// The keypad's "Num" keys are in [_numpadKeys], because their word is a
+/// string.
 ///
-/// Must cover every key `isBindableKey` accepts, or a rebound key shows up as
-/// a raw `key:0x…`. Letters are uppercase because that is how both platforms
-/// render shortcuts (⌘C, not ⌘c). Tab and Escape are labelled though neither
-/// can be bound.
+/// With [_numpadKeys] it must cover every key `isBindableKey` accepts, or a
+/// rebound key shows up as a raw `key:0x…`. Letters are uppercase because that
+/// is how both platforms render shortcuts (⌘C, not ⌘c). Tab and Escape are
+/// labelled though neither can be bound.
 const Map<int, String> _keySymbols = {
   // Letters, in alphabetical order.
   0x00070004: 'A', 0x00070005: 'B', 0x00070006: 'C', 0x00070007: 'D',
@@ -218,13 +221,19 @@ const Map<int, String> _keySymbols = {
   0x00070042: 'F9', 0x00070043: 'F10', 0x00070044: 'F11', 0x00070045: 'F12',
   0x00070068: 'F13', 0x00070069: 'F14', 0x0007006A: 'F15', 0x0007006B: 'F16',
   0x0007006C: 'F17', 0x0007006D: 'F18', 0x0007006E: 'F19', 0x0007006F: 'F20',
-  0x00070053: '⌧', 0x00070058: '⌤', 0x00070054: 'Num /', 0x00070055: 'Num *',
-  0x00070056: 'Num -', 0x00070057: 'Num +', 0x00070067: 'Num =',
-  0x00070063: 'Num .', 0x00070085: 'Num ,',
-  0x00070062: 'Num 0', 0x00070059: 'Num 1', 0x0007005A: 'Num 2',
-  0x0007005B: 'Num 3', 0x0007005C: 'Num 4', 0x0007005D: 'Num 5',
-  0x0007005E: 'Num 6', 0x0007005F: 'Num 7', 0x00070060: 'Num 8',
-  0x00070061: 'Num 9',
+  0x00070053: '⌧', 0x00070058: '⌤',
+};
+
+/// The keypad's keys by USB HID usage → the character on each. A keypad key is
+/// labelled "Num" and that character, in a language's own words
+/// (`keyNumpad`), so they are not in [_keySymbols], which is constant;
+/// [keySymbol] joins them to the legend when asked.
+const Map<int, String> _numpadKeys = {
+  0x00070054: '/', 0x00070055: '*', 0x00070056: '-', 0x00070057: '+',
+  0x00070067: '=', 0x00070063: '.', 0x00070085: ',',
+  0x00070062: '0', 0x00070059: '1', 0x0007005A: '2', 0x0007005B: '3',
+  0x0007005C: '4', 0x0007005D: '5', 0x0007005E: '6', 0x0007005F: '7',
+  0x00070060: '8', 0x00070061: '9',
 };
 
 /// The combo as individual symbols, in the platform's order (⌃⌥⇧⌘ then the
@@ -254,8 +263,12 @@ List<String> comboSymbols(KeyChord? chord, {
 /// How the running platform labels the key at [usage] (a USB HID usage) in a
 /// shortcut: its own name for it ([KeyWords.keyName]), else the shared glyph.
 /// Null for a key no shortcut uses.
-String? keySymbol(int? usage) =>
-    KeyWords.current.keyName(usage) ?? _keySymbols[usage];
+String? keySymbol(int? usage) {
+  final named = KeyWords.current.keyName(usage);
+  if (named != null) return named;
+  final pad = _numpadKeys[usage];
+  return pad == null ? _keySymbols[usage] : appStrings.keyNumpad(pad);
+}
 
 /// The modifiers held, as the platform names them, in its order
 /// ([KeyWords.modifierNames]).

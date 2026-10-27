@@ -6,6 +6,7 @@ import 'package:orthant/overlay/overlay_copy.dart';
 
 import 'support/locales.dart';
 import 'support/no_english.dart';
+import 'support/strg_strings.dart';
 
 /// The overlay names three things that differ by platform: the key that
 /// places, the chord that places and saves, and what a global coordinate is
@@ -34,6 +35,23 @@ void main() {
         'Grid open for Notepad. 6 columns, 6 rows. Arrow keys move, '
         'Shift and arrows extend, Enter places, Escape cancels.');
     expect(c.unit, 'pixels');
+  });
+
+  test('Windows\' place and save are the key legends, read at use', () {
+    // The legends are the settings window's (`KeyWords`), so a language that
+    // prints Ctrl as STRG says so here too; the save chord is joined the way
+    // Windows joins every combo.
+    addTearDown(() => setAppStrings(kEnglish));
+    appStrings = StrgStrings();
+    final c = OverlayCopy.of(TargetPlatform.windows);
+    expect(c.place, 'Eingabe');
+    expect(c.save, 'STRG+S');
+    expect(c.saveHint, startsWith('STRG+S  '));
+    expect(c.gridHint, contains('Eingabe places the window'));
+    // macOS names its keys with glyphs and words that no language changes.
+    final m = OverlayCopy.of(TargetPlatform.macOS);
+    expect(m.place, 'Return');
+    expect(m.save, '⌘S');
   });
 
   test('every other platform reads as macOS, where the overlay began', () {

@@ -175,4 +175,62 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get overlayCancelGrid => 'Cancel grid';
+
+  @override
+  String get keyWin => 'Win';
+
+  @override
+  String get keyCtrl => 'Ctrl';
+
+  @override
+  String get keyAlt => 'Alt';
+
+  @override
+  String get keyShift => 'Shift';
+
+  @override
+  String get keyEnter => 'Enter';
+
+  @override
+  String get keySpace => 'Space';
+
+  @override
+  String get keyTab => 'Tab';
+
+  @override
+  String get keyBackspace => 'Backspace';
+
+  @override
+  String get keyEsc => 'Esc';
+
+  @override
+  String get keyHome => 'Home';
+
+  @override
+  String get keyEnd => 'End';
+
+  @override
+  String get keyPageUp => 'PgUp';
+
+  @override
+  String get keyPageDown => 'PgDn';
+
+  @override
+  String get keyDelete => 'Del';
+
+  @override
+  String get keyNumLock => 'Num Lock';
+
+  @override
+  String get keyNumEnter => 'Num Enter';
+
+  @override
+  String keyNumpad(String key) {
+    return 'Num $key';
+  }
+
+  @override
+  String keyListAnyModifier(String a, String b, String c, String d) {
+    return '$a, $b, $c or $d';
+  }
 }

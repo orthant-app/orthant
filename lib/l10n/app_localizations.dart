@@ -314,6 +314,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel grid'**
   String get overlayCancelGrid;
+
+  /// The Windows logo key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Win'**
+  String get keyWin;
+
+  /// The Control key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Ctrl'**
+  String get keyCtrl;
+
+  /// The Alt key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Alt'**
+  String get keyAlt;
+
+  /// The Shift key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift'**
+  String get keyShift;
+
+  /// The Enter key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter'**
+  String get keyEnter;
+
+  /// The Space bar, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Space'**
+  String get keySpace;
+
+  /// The Tab key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Tab'**
+  String get keyTab;
+
+  /// The Backspace key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Backspace'**
+  String get keyBackspace;
+
+  /// The Escape key, as written in Windows shortcuts and in the Shortcuts hint "Listening… press a combination, or Esc to cancel." Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Esc'**
+  String get keyEsc;
+
+  /// The Home key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get keyHome;
+
+  /// The End key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get keyEnd;
+
+  /// The Page Up key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'PgUp'**
+  String get keyPageUp;
+
+  /// The Page Down key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'PgDn'**
+  String get keyPageDown;
+
+  /// The Delete key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Del'**
+  String get keyDelete;
+
+  /// The Num Lock key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Num Lock'**
+  String get keyNumLock;
+
+  /// The Enter key on the numeric keypad, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Num Enter'**
+  String get keyNumEnter;
+
+  /// A key on the numeric keypad, as written in shortcuts on both macOS and Windows, such as Num 5 or Num /. {key} is the character on the key. Use the legend printed on the keypad.
+  ///
+  /// In en, this message translates to:
+  /// **'Num {key}'**
+  String keyNumpad(String key);
+
+  /// The four modifier keys as a list in a sentence, in the Shortcuts hint "Click a shortcut to change it. Combinations need Win, Ctrl, Alt or Shift." Each placeholder is one key name (a glyph such as ⌃ on macOS). Use your language's list pattern, ending with its word for "or".
+  ///
+  /// In en, this message translates to:
+  /// **'{a}, {b}, {c} or {d}'**
+  String keyListAnyModifier(String a, String b, String c, String d);
 }
 
 class _AppLocalizationsDelegate

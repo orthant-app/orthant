@@ -312,10 +312,30 @@ void main() {
     'lib/overlay/overlay_main.dart',
   ].map((f) => File(f).readAsStringSync()).toList();
 
+  // Keys Dart already sends that the runner is yet to read. `setOverlayGrid`
+  // carries the app's language now; the runner starts reading it when the
+  // overlay is localized, which hands it on to each panel's engine. The test
+  // after this one fails the moment the runner reads one of them, so this set
+  // cannot outlive the work it stands in for.
+  const sentBeforeTheRunnerReads = {'locale'};
+
   test("every key the Windows controller and the overlay write, the runner "
       'reads', () {
-    expect(keys(writeKey, windowsSources).difference(runnerReads), isEmpty,
+    expect(
+        keys(writeKey, windowsSources)
+            .difference(runnerReads)
+            .difference(sentBeforeTheRunnerReads),
+        isEmpty,
         reason: 'Dart sends these and the runner ignores them');
+  });
+
+  test('a key the runner now reads is no longer excused above', () {
+    expect(sentBeforeTheRunnerReads.intersection(runnerReads), isEmpty,
+        reason: 'the runner reads these: delete them from '
+            'sentBeforeTheRunnerReads');
+    expect(keys(writeKey, windowsSources),
+        containsAll(sentBeforeTheRunnerReads),
+        reason: 'Dart stopped sending these: delete them from the set');
   });
 
   test("every key the Windows controller and the overlay read, the runner "

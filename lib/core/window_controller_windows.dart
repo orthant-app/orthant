@@ -438,12 +438,14 @@ class WindowsWindowController implements WindowController {
     required int rows,
     required double gap,
     required bool saveHint,
+    required String locale,
   }) =>
       _channel.invokeMethod<void>(kSetOverlayGrid, {
         'cols': cols,
         'rows': rows,
         'gap': gap,
         'saveHint': saveHint,
+        'locale': locale,
       });
 
   /// Capture, then ask the runner to show the panels for that capture.

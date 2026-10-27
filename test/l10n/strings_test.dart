@@ -61,4 +61,29 @@ void main() {
     })));
     expect(seen.l10nProbeLocale, 'en');
   });
+
+  testWidgets('the main app\'s localization setup serves every shipped locale',
+      (tester) async {
+    // The three arguments `lib/main.dart` hands its MaterialApp: the locale
+    // the coordinator resolved, the supported list and the generated
+    // delegates. Each of the four must load ours and Flutter's own widgets'
+    // strings, or the first screen in that language would throw.
+    for (final locale in AppLocalizations.supportedLocales) {
+      late AppLocalizations ours;
+      late MaterialLocalizations material;
+      await tester.pumpWidget(MaterialApp(
+        locale: locale,
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Builder(builder: (context) {
+          ours = context.l10n;
+          material = MaterialLocalizations.of(context);
+          return const SizedBox();
+        }),
+      ));
+      expect(ours.l10nProbeLocale, locale.toString().replaceAll('-', '_'),
+          reason: 'for $locale');
+      expect(material.okButtonLabel, isNotEmpty, reason: 'for $locale');
+    }
+  });
 }

@@ -16,4 +16,32 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get languageNativeName => 'English';
+
+  @override
+  String get trayEnableAccessibility => 'Enable Accessibility…';
+
+  @override
+  String get trayOpenGrid => 'Open Grid';
+
+  @override
+  String get traySettings => 'Settings…';
+
+  @override
+  String get trayAbout => 'About Orthant';
+
+  @override
+  String trayUpdateTo(String version) {
+    return 'Update to Orthant $version…';
+  }
+
+  @override
+  String get trayCheckForUpdates => 'Check for Updates…';
+
+  @override
+  String get trayQuit => 'Quit Orthant';
+
+  @override
+  String trayTooltipUpdate(String version) {
+    return 'Orthant: update $version available';
+  }
 }

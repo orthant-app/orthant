@@ -48,6 +48,7 @@ class _FakeWc implements WindowController {
     required int rows,
     required double gap,
     required bool saveHint,
+    required String locale,
   }) async {}
   @override
   Future<Map<int, String>> keyboardLabels() async => const {};

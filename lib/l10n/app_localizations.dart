@@ -121,6 +121,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'English'**
   String get languageNativeName;
+
+  /// The menu-bar (tray) menu row that opens the onboarding window to ask for the macOS Accessibility permission. Shown only while the permission is missing. Accessibility is the name of the macOS Privacy pane.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Accessibility…'**
+  String get trayEnableAccessibility;
+
+  /// The tray menu row that opens the grid overlay. The grid shortcut, if it has one, is added after this text by the app.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Grid'**
+  String get trayOpenGrid;
+
+  /// The tray menu row that opens the Settings window.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings…'**
+  String get traySettings;
+
+  /// The tray menu row that opens Settings on the About pane. Orthant is the app name and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'About Orthant'**
+  String get trayAbout;
+
+  /// The tray menu row that offers an update a check found. {version} is the new version, such as 1.1.2.
+  ///
+  /// In en, this message translates to:
+  /// **'Update to Orthant {version}…'**
+  String trayUpdateTo(String version);
+
+  /// The tray menu row that checks for a new version of the app.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for Updates…'**
+  String get trayCheckForUpdates;
+
+  /// The tray menu row that quits the app. Orthant is the app name and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Quit Orthant'**
+  String get trayQuit;
+
+  /// The tray icon's tooltip on Windows while an update is waiting to be installed. {version} is the new version, such as 1.1.2.
+  ///
+  /// In en, this message translates to:
+  /// **'Orthant: update {version} available'**
+  String trayTooltipUpdate(String version);
 }
 
 class _AppLocalizationsDelegate

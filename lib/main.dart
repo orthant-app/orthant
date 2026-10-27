@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'app/coordinator.dart';
 import 'core/window_controller_factory.dart';
+import 'l10n/app_localizations.dart';
 import 'overlay/overlay_main.dart';
 import 'permission/onboarding_screen.dart';
 import 'permission/permission_controller.dart';
@@ -65,6 +66,10 @@ Future<void> main() async {
     // screen.
     permissionGate: !Platform.isWindows,
   );
+
+  // The language before anything that shows it: the tray's first build and
+  // its Windows tooltip are just below, and `app.start()` pushes the grid.
+  await app.loadLanguage();
 
   // macOS: isTemplate, because the icon is solid black + alpha and the menu
   // bar tints it for the current appearance (white on dark, black on light);
@@ -189,6 +194,12 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
         labels: app.keyboardLabels,
         child: MaterialApp(
       debugShowCheckedModeBanner: false,
+      // The coordinator resolves the language (the system's, or the choice in
+      // Settings), so the app is told it rather than left to Flutter's own
+      // resolution, which gets Chinese scripts wrong.
+      locale: app.locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: orthantTheme(Brightness.light, accent: app.accent),
       darkTheme: orthantTheme(Brightness.dark, accent: app.accent),
       home: switch (app.screen) {

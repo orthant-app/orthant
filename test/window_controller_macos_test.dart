@@ -358,4 +358,25 @@ void main() {
       expect(calls.map((c) => c.arguments), ['zh-Hans', null]);
     });
   });
+
+  test('the grid reaches Swift with the language the overlay is to speak',
+      () async {
+    final calls = <MethodCall>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      return null;
+    });
+    await const MacosWindowController().setOverlayGrid(
+        cols: 6, rows: 4, gap: 8, saveHint: false, locale: 'zh-Hant');
+    expect(calls.map((c) => c.method), [kSetOverlayGrid]);
+    // Swift ignores the key until the overlay reads it; it must still arrive
+    // beside the grid, which is what the overlay's engine is told by.
+    expect(calls.single.arguments, {
+      'cols': 6,
+      'rows': 4,
+      'gap': 8.0,
+      'saveHint': false,
+      'locale': 'zh-Hant',
+    });
+  });
 }

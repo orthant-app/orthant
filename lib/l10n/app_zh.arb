@@ -2,5 +2,13 @@
   "@@locale": "zh",
   "l10nProbeLocale": "zh",
   "l10nProbeScript": "Hans",
-  "languageNativeName": "简体中文"
+  "languageNativeName": "简体中文",
+  "trayEnableAccessibility": "启用无障碍…",
+  "trayOpenGrid": "打开网格",
+  "traySettings": "设置…",
+  "trayAbout": "关于 Orthant",
+  "trayUpdateTo": "更新到 Orthant {version}…",
+  "trayCheckForUpdates": "检查更新…",
+  "trayQuit": "退出 Orthant",
+  "trayTooltipUpdate": "Orthant：有可用更新 {version}"
 }

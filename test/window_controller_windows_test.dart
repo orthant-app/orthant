@@ -779,9 +779,18 @@ void main() {
         sent = call.arguments;
         return null;
       };
-      await wc().setOverlayGrid(cols: 4, rows: 3, gap: 8, saveHint: true);
+      await wc().setOverlayGrid(
+          cols: 4, rows: 3, gap: 8, saveHint: true, locale: 'zh-Hant');
       expect(calls, [kSetOverlayGrid]);
-      expect(sent, {'cols': 4, 'rows': 3, 'gap': 8.0, 'saveHint': true});
+      // The language rides with the grid because the overlay's engine cannot
+      // ask for it (it has no preferences of its own to read).
+      expect(sent, {
+        'cols': 4,
+        'rows': 3,
+        'gap': 8.0,
+        'saveHint': true,
+        'locale': 'zh-Hant',
+      });
     });
 
     test('a summon captures first, then names the session by the capture id',

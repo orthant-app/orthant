@@ -46,6 +46,7 @@ class _FakeWc implements WindowController {
     required int rows,
     required double gap,
     required bool saveHint,
+    required String locale,
   }) async {}
   // Launch-at-login is not what any of these tests exercise; the seam just
   // requires an answer. `unavailable` is the honest default for a fake.

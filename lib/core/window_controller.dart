@@ -227,11 +227,17 @@ abstract class WindowController {
   /// [saveHint] is `regions.isEmpty` — the actual condition the hint exists to
   /// address, rather than a summon count nobody can defend. It needs no new
   /// persistence and it stops the moment it stops being true.
+  ///
+  /// [locale] is the language tag the app resolved (`en`, `zh`, `zh-Hant`,
+  /// `zh-Hant-HK`), the resolver's answer as `toLanguageTag()` gives it. The
+  /// overlay's engine cannot read the choice for itself, so the language
+  /// rides with the grid: a settings change that moves one moves the other.
   Future<void> setOverlayGrid({
     required int cols,
     required int rows,
     required double gap,
     required bool saveHint,
+    required String locale,
   });
 
   /// [pressedAtMs] is Windows only: the time of the key press that asked for

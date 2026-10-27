@@ -49,6 +49,7 @@ class _RecordingWc implements WindowController {
     required int rows,
     required double gap,
     required bool saveHint,
+    required String locale,
   }) async {}
   @override
   Future<void> showOverlay({double? pressedAtMs}) async {}

@@ -161,5 +161,18 @@
   "shortcutRowListening": "{command}，等待输入组合键",
   "shortcutRowCollision": "{command}，{combo} 已被 {owner} 使用。再按一次即可在此使用，或按 Esc 取消。",
   "refusalKeypad": "Windows 无法在快捷键中使用小键盘的数字、小数点或 =。",
-  "refusalUnregistrable": "Windows 无法在快捷键中使用该按键。"
+  "refusalUnregistrable": "Windows 无法在快捷键中使用该按键。",
+  "onboardingTitle": "Orthant 需要无障碍权限",
+  "onboardingBody": "Orthant 借助 macOS 的无障碍功能来移动你的窗口。请在“隐私与安全 ▸ 无障碍”中启用“Orthant”，Orthant 会立即检测到。",
+  "onboardingOpenAccessibility": "打开无障碍设置",
+  "onboardingGranted": "已授权",
+  "onboardingWaiting": "正在等待授权…",
+  "readyTitle": "Orthant 已就绪",
+  "readySubtitle": "两种方式，把窗口放到你想要的位置。",
+  "readyGridCaption": "打开网格。在网格上拖动，就能选取任意区域，三分之一、三分之二都行。也可以用方向键移动，{shift} 加方向键扩展，{place} 放置。",
+  "readyDirectCaption": "直接将窗口放成一半、四分之一或全屏。无需瞄准，还可以添加自己的形状，比如第三个。",
+  "readyChangeShortcuts": "更改这些快捷键…",
+  "readyDone": "完成",
+  "readyNoShortcutSet": "未设置快捷键",
+  "readyUnavailableTooltip": "{system} 或其他应用已使用此组合键，因此 Orthant 收不到它。\n请在下方另选一个。"
 }

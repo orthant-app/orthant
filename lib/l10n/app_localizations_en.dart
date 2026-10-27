@@ -644,4 +644,49 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get refusalUnregistrable =>
       'Windows can\'t use that key in a shortcut.';
+
+  @override
+  String get onboardingTitle => 'Orthant needs Accessibility permission';
+
+  @override
+  String get onboardingBody =>
+      'Orthant moves your windows using macOS Accessibility. Enable “Orthant” under Privacy & Security ▸ Accessibility and Orthant will pick it up straight away.';
+
+  @override
+  String get onboardingOpenAccessibility => 'Open Accessibility Settings';
+
+  @override
+  String get onboardingGranted => 'Permission granted';
+
+  @override
+  String get onboardingWaiting => 'Waiting for permission…';
+
+  @override
+  String get readyTitle => 'Orthant is ready';
+
+  @override
+  String get readySubtitle => 'Two ways to put a window where you want it.';
+
+  @override
+  String readyGridCaption(String shift, String place) {
+    return 'Opens the grid. Drag across it to pick any block: thirds, two-thirds, anything. Or use the arrow keys, $shift to extend, $place to place.';
+  }
+
+  @override
+  String get readyDirectCaption =>
+      'Snaps straight to a half, a quarter, or full screen. No aiming, and you can add shapes of your own, like the third one.';
+
+  @override
+  String get readyChangeShortcuts => 'Change these shortcuts…';
+
+  @override
+  String get readyDone => 'Done';
+
+  @override
+  String get readyNoShortcutSet => 'No shortcut set';
+
+  @override
+  String readyUnavailableTooltip(String system) {
+    return '$system or another app already uses this combination, so it never reaches Orthant.\nPick a different one below.';
+  }
 }

@@ -636,6 +636,50 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get refusalUnregistrable => 'Windows 无法在快捷键中使用该按键。';
+
+  @override
+  String get onboardingTitle => 'Orthant 需要无障碍权限';
+
+  @override
+  String get onboardingBody =>
+      'Orthant 借助 macOS 的无障碍功能来移动你的窗口。请在“隐私与安全 ▸ 无障碍”中启用“Orthant”，Orthant 会立即检测到。';
+
+  @override
+  String get onboardingOpenAccessibility => '打开无障碍设置';
+
+  @override
+  String get onboardingGranted => '已授权';
+
+  @override
+  String get onboardingWaiting => '正在等待授权…';
+
+  @override
+  String get readyTitle => 'Orthant 已就绪';
+
+  @override
+  String get readySubtitle => '两种方式，把窗口放到你想要的位置。';
+
+  @override
+  String readyGridCaption(String shift, String place) {
+    return '打开网格。在网格上拖动，就能选取任意区域，三分之一、三分之二都行。也可以用方向键移动，$shift 加方向键扩展，$place 放置。';
+  }
+
+  @override
+  String get readyDirectCaption => '直接将窗口放成一半、四分之一或全屏。无需瞄准，还可以添加自己的形状，比如第三个。';
+
+  @override
+  String get readyChangeShortcuts => '更改这些快捷键…';
+
+  @override
+  String get readyDone => '完成';
+
+  @override
+  String get readyNoShortcutSet => '未设置快捷键';
+
+  @override
+  String readyUnavailableTooltip(String system) {
+    return '$system 或其他应用已使用此组合键，因此 Orthant 收不到它。\n请在下方另选一个。';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -1271,6 +1315,50 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get refusalUnregistrable => 'Windows 無法在快速鍵中使用該按鍵。';
+
+  @override
+  String get onboardingTitle => 'Orthant 需要輔助使用權限';
+
+  @override
+  String get onboardingBody =>
+      'Orthant 透過 macOS 的輔助使用功能來移動你的視窗。請在「隱私權與安全性 ▸ 輔助使用」中啟用「Orthant」，Orthant 會立即偵測到。';
+
+  @override
+  String get onboardingOpenAccessibility => '開啟輔助使用設定';
+
+  @override
+  String get onboardingGranted => '已授權';
+
+  @override
+  String get onboardingWaiting => '正在等待授權…';
+
+  @override
+  String get readyTitle => 'Orthant 已就緒';
+
+  @override
+  String get readySubtitle => '兩種方式，把視窗放到你想要的位置。';
+
+  @override
+  String readyGridCaption(String shift, String place) {
+    return '開啟格線。在格線上拖曳，就能選取任意區域，三分之一、三分之二都行。也可以用方向鍵移動，$shift 加方向鍵擴展，$place 放置。';
+  }
+
+  @override
+  String get readyDirectCaption => '直接將視窗放成一半、四分之一或全螢幕。不必瞄準，還可以新增自己的形狀，例如第三個。';
+
+  @override
+  String get readyChangeShortcuts => '更改這些快速鍵…';
+
+  @override
+  String get readyDone => '完成';
+
+  @override
+  String get readyNoShortcutSet => '未設定快速鍵';
+
+  @override
+  String readyUnavailableTooltip(String system) {
+    return '$system 或其他應用程式已使用此組合鍵，因此 Orthant 收不到它。\n請在下方另選一個。';
+  }
 }
 
 /// The translations for Chinese, as used in Hong Kong, using the Han script (`zh_Hant_HK`).
@@ -1906,4 +1994,48 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String get refusalUnregistrable => 'Windows 無法在快速鍵中使用該按鍵。';
+
+  @override
+  String get onboardingTitle => 'Orthant 需要輔助使用權限';
+
+  @override
+  String get onboardingBody =>
+      'Orthant 透過 macOS 的輔助使用功能來移動你的視窗。請在「私隱與保安 ▸ 輔助使用」中啟用「Orthant」，Orthant 會立即偵測到。';
+
+  @override
+  String get onboardingOpenAccessibility => '開啟輔助使用設定';
+
+  @override
+  String get onboardingGranted => '已授權';
+
+  @override
+  String get onboardingWaiting => '正在等待授權…';
+
+  @override
+  String get readyTitle => 'Orthant 已就緒';
+
+  @override
+  String get readySubtitle => '兩種方式，把視窗放到你想要的位置。';
+
+  @override
+  String readyGridCaption(String shift, String place) {
+    return '開啟格線。在格線上拖曳，就能選取任意區域，三分之一、三分之二都行。也可以用方向鍵移動，$shift 加方向鍵擴展，$place 放置。';
+  }
+
+  @override
+  String get readyDirectCaption => '直接將視窗放成一半、四分之一或全螢幕。不必瞄準，還可以新增自己的形狀，例如第三個。';
+
+  @override
+  String get readyChangeShortcuts => '更改這些快速鍵…';
+
+  @override
+  String get readyDone => '完成';
+
+  @override
+  String get readyNoShortcutSet => '未設定快速鍵';
+
+  @override
+  String readyUnavailableTooltip(String system) {
+    return '$system 或其他應用程式已使用此組合鍵，因此 Orthant 收不到它。\n請在下方另選一個。';
+  }
 }

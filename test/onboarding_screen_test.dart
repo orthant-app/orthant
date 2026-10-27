@@ -8,10 +8,15 @@ import 'package:orthant/core/window_controller.dart';
 import 'package:orthant/permission/permission_controller.dart';
 import 'package:orthant/permission/onboarding_screen.dart';
 
+import 'support/locales.dart';
+import 'support/localized_host.dart';
+import 'support/no_english.dart';
+
 class _FakeWc implements WindowController {
   int openSettingsCalls = 0;
+  bool granted = false;
   @override
-  Future<bool> checkPermission() async => false;
+  Future<bool> checkPermission() async => granted;
   @override
   Future<void> requestPermission() async {}
   @override
@@ -155,4 +160,83 @@ void main() {
           const Color(0xFFFFFFFF), reason: '$b');
     }
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  group('in the app\'s language', () {
+    // The English the screen has always shown, word for word: what the screen
+    // reads from the generated strings must come out as what it hard-coded.
+    testWidgets('English is exactly what it was', (tester) async {
+      await tester.pumpWidget(
+          MaterialApp(home: OnboardingScreen(controller: PermissionController(_FakeWc()))));
+      expect(find.text('Orthant needs Accessibility permission'), findsOneWidget);
+      expect(
+          find.text('Orthant moves your windows using macOS Accessibility. '
+              'Enable “Orthant” under Privacy & Security ▸ Accessibility '
+              'and Orthant will pick it up straight away.'),
+          findsOneWidget);
+      expect(find.text('Open Accessibility Settings'), findsOneWidget);
+      expect(find.text('Waiting for permission…'), findsOneWidget);
+    });
+
+    testWidgets('English says the permission is granted', (tester) async {
+      final wc = _FakeWc()..granted = true;
+      final c = PermissionController(wc);
+      await tester.pumpWidget(MaterialApp(home: OnboardingScreen(controller: c)));
+      await c.refresh();
+      await tester.pump();
+      expect(find.text('Permission granted'), findsOneWidget);
+      expect(find.text('Waiting for permission…'), findsNothing);
+    });
+
+    for (final locale in [kSimplified, kTraditional, kHongKong]) {
+      for (final granted in [false, true]) {
+        testWidgets(
+            '${locale.toLanguageTag()}, ${granted ? 'granted' : 'waiting'}: '
+            'no English is left, semantics included', (tester) async {
+          final wc = _FakeWc()..granted = granted;
+          final c = PermissionController(wc);
+          await tester.pumpWidget(localizedApp(
+              locale, OnboardingScreen(controller: c)));
+          await c.refresh();
+          await tester.pump();
+          expectNoEnglish(tester);
+        });
+      }
+    }
+
+    // The instruction names a screen of the operating system, so it is one
+    // whole message per language and each language copies Apple's own words;
+    // Hong Kong's macOS calls the pane something else than Taiwan's.
+    Future<void> pumpIn(WidgetTester tester, Locale locale) => tester.pumpWidget(
+        localizedApp(locale, OnboardingScreen(controller: PermissionController(_FakeWc()))));
+
+    testWidgets('Simplified Chinese names the panes as macOS does',
+        (tester) async {
+      await pumpIn(tester, kSimplified);
+      expect(find.textContaining('隐私与安全 ▸ 无障碍'), findsOneWidget);
+    });
+
+    testWidgets('Traditional Chinese names the panes as Taiwan\'s macOS does',
+        (tester) async {
+      await pumpIn(tester, kTraditional);
+      expect(find.textContaining('隱私權與安全性 ▸ 輔助使用'), findsOneWidget);
+      expect(find.textContaining('私隱與保安'), findsNothing);
+    });
+
+    testWidgets('Hong Kong names the privacy pane as its own macOS does',
+        (tester) async {
+      await pumpIn(tester, kHongKong);
+      expect(find.textContaining('私隱與保安 ▸ 輔助使用'), findsOneWidget);
+      expect(find.textContaining('隱私權與安全性'), findsNothing);
+    });
+
+    testWidgets('the button still opens the pane when it is in Chinese',
+        (tester) async {
+      final wc = _FakeWc();
+      await tester.pumpWidget(localizedApp(
+          kSimplified, OnboardingScreen(controller: PermissionController(wc))));
+      await tester.tap(find.byType(FilledButton));
+      await tester.pump();
+      expect(wc.openSettingsCalls, 1);
+    });
+  });
 }

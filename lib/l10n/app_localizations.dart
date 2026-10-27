@@ -1088,6 +1088,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Windows can\'t use that key in a shortcut.'**
   String get refusalUnregistrable;
+
+  /// The heading of the first-run window that asks for the macOS Accessibility permission. Accessibility is the name of that System Settings pane, so use Apple's word for it. Shown on macOS only.
+  ///
+  /// In en, this message translates to:
+  /// **'Orthant needs Accessibility permission'**
+  String get onboardingTitle;
+
+  /// The paragraph under the first-run heading. It is one whole message because its second sentence is an instruction that names two System Settings screens in order, joined by ▸: write each name exactly as Apple's own words for that language and region, since the Hong Kong and Taiwan versions of macOS name Privacy & Security differently. “Orthant” in quotation marks is the name of the row the user switches on. Shown on macOS only.
+  ///
+  /// In en, this message translates to:
+  /// **'Orthant moves your windows using macOS Accessibility. Enable “Orthant” under Privacy & Security ▸ Accessibility and Orthant will pick it up straight away.'**
+  String get onboardingBody;
+
+  /// The button of the first-run window that opens the macOS Accessibility pane. Accessibility is the name of that pane. It has no ellipsis, unlike the same button on the General tab. Shown on macOS only.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Accessibility Settings'**
+  String get onboardingOpenAccessibility;
+
+  /// Beside a green check mark at the foot of the first-run window, once the user has switched the permission on.
+  ///
+  /// In en, this message translates to:
+  /// **'Permission granted'**
+  String get onboardingGranted;
+
+  /// Beside a grey dots icon at the foot of the first-run window, until the user has switched the permission on. Ends with an ellipsis.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for permission…'**
+  String get onboardingWaiting;
+
+  /// The heading of the window shown once, straight after the user grants the permission. Orthant stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Orthant is ready'**
+  String get readyTitle;
+
+  /// The line under the heading of the ready window. The two ways are the two cards below it: the grid and the direct shortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Two ways to put a window where you want it.'**
+  String get readySubtitle;
+
+  /// The caption on the ready window's first card, which shows the keyboard shortcut that opens the grid. {shift} is the key that extends the selection and {place} the key that places the window, as the platform writes them (⇧ and ↩ on macOS, Shift and Enter on Windows); key names stay as written in every language. A block is a rectangle of grid cells.
+  ///
+  /// In en, this message translates to:
+  /// **'Opens the grid. Drag across it to pick any block: thirds, two-thirds, anything. Or use the arrow keys, {shift} to extend, {place} to place.'**
+  String readyGridCaption(String shift, String place);
+
+  /// The caption on the ready window's second card, which shows two direct shortcuts and, beside them, a drawing of a custom region. “The third one” is that third drawing, a region the built-in shortcuts cannot make.
+  ///
+  /// In en, this message translates to:
+  /// **'Snaps straight to a half, a quarter, or full screen. No aiming, and you can add shapes of your own, like the third one.'**
+  String get readyDirectCaption;
+
+  /// The link at the lower left of the ready window that opens the Shortcuts tab of Settings. Ends with an ellipsis.
+  ///
+  /// In en, this message translates to:
+  /// **'Change these shortcuts…'**
+  String get readyChangeShortcuts;
+
+  /// The button at the lower right of the ready window that closes it.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get readyDone;
+
+  /// Shown on the ready window's grid card in place of the key combination, when the user has removed the shortcut that opens the grid.
+  ///
+  /// In en, this message translates to:
+  /// **'No shortcut set'**
+  String get readyNoShortcutSet;
+
+  /// The tooltip on the warning icon beside a key combination on the ready window, when the system refused to give Orthant that combination. {system} is the operating system's name, macOS or Windows, and stays as written. The line break before the second sentence stays; “below” points at the link “Change these shortcuts…” under the cards.
+  ///
+  /// In en, this message translates to:
+  /// **'{system} or another app already uses this combination, so it never reaches Orthant.\nPick a different one below.'**
+  String readyUnavailableTooltip(String system);
 }
 
 class _AppLocalizationsDelegate

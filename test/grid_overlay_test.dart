@@ -5,8 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/geometry.dart';
+import 'package:orthant/l10n/app_localizations.dart';
+import 'package:orthant/l10n/strings.dart';
 import 'package:orthant/overlay/grid_overlay.dart';
 import 'package:orthant/overlay/grid_selection.dart';
+
+import 'support/locales.dart';
+import 'support/no_english.dart';
 
 void main() {
   const frame = WinRect(0, 0, 1200, 600);
@@ -738,6 +743,129 @@ void main() {
           'Row 1, column 1. Target: x 0, y 0, width 200, height 100 points.');
       semantics.dispose();
     }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+  });
+
+  group('in the language the overlay was told', () {
+    // The overlay engine points `appStrings` at the summon's language before it
+    // builds anything, so that is how a grid is put in one here.
+    tearDown(() => setAppStrings(kEnglish));
+
+    Future<GridOverlayState> selectOne(WidgetTester tester) async {
+      final key = GlobalKey<GridOverlayState>();
+      await tester.pumpWidget(
+          host(gridKey: key, saveHint: true, onSave: (_, _) {}));
+      key.currentState!.moveSelection(GridDirection.right);
+      await tester.pump();
+      return key.currentState!;
+    }
+
+    for (final locale in [kSimplified, kTraditional, kHongKong]) {
+      testWidgets('${locale.toLanguageTag()}: the label, value, hint, caption '
+          'and every command are Chinese', (tester) async {
+        setAppStrings(locale);
+        await selectOne(tester);
+        // The app's own name is the one Latin thing on this screen.
+        expectNoEnglish(tester, allow: {'Google', 'Chrome'});
+      });
+    }
+
+    testWidgets('the commands are the ARB\'s, one per direction', (tester) async {
+      setAppStrings(kTraditional);
+      final s = lookupAppLocalizations(kTraditional);
+      final semantics = tester.ensureSemantics();
+      await selectOne(tester);
+      for (final d in ['left', 'right', 'up', 'down']) {
+        expect(find.semantics.byLabel(s.overlayMove(d)), findsOne, reason: d);
+        expect(find.semantics.byLabel(s.overlayExtend(d)), findsOne, reason: d);
+      }
+      for (final label in [
+        s.overlayPlaceWindow,
+        s.overlayPlaceAndSave,
+        s.overlayCancelGrid,
+      ]) {
+        expect(find.semantics.byLabel(label), findsOne, reason: label);
+      }
+      expect(find.semantics.byLabel(s.overlayMove('left')),
+          isNot(find.semantics.byLabel(s.overlayExtend('left'))));
+      semantics.dispose();
+    });
+
+    testWidgets('the grid\'s label puts the app, then the columns and rows, '
+        'in the language\'s own words', (tester) async {
+      final semantics = tester.ensureSemantics();
+      for (final (locale, columnWord, rowWord) in [
+        (kSimplified, '列', '行'),
+        // Taiwan usage: a column is 欄 and a row is 列, the other way round
+        // from Simplified, so a character-converted file would be wrong.
+        (kTraditional, '欄', '列'),
+      ]) {
+        setAppStrings(locale);
+        final s = lookupAppLocalizations(locale);
+        await tester.pumpWidget(host());
+        expect(s.overlayColumns(6), contains(columnWord));
+        expect(s.overlayRows(6), contains(rowWord));
+        expect(
+            find.semantics.byLabel(s.overlayGridLabel(
+                'Google Chrome', s.overlayColumns(6), s.overlayRows(6))),
+            findsOne,
+            reason: locale.toLanguageTag());
+      }
+      semantics.dispose();
+    });
+
+    testWidgets('the target\'s numbers are formatted for the language, with '
+        'no grouping', (tester) async {
+      final semantics = tester.ensureSemantics();
+      // Two columns across 2560: the 1280 would read "1,280" if grouped.
+      final key = GlobalKey<GridOverlayState>();
+      await tester.pumpWidget(host(
+          gridKey: key,
+          cols: 2,
+          rows: 2,
+          displayFrame: const WinRect(0, 30, 2560, 2100)));
+      key.currentState!.moveSelection(GridDirection.right);
+      key.currentState!.moveSelection(GridDirection.right, extend: true);
+      key.currentState!.moveSelection(GridDirection.down, extend: true);
+      await tester.pump();
+      final grid = tester.getSemantics(find.bySemanticsLabel(RegExp('Window grid')));
+      expect(grid.getSemanticsData().value,
+          'Rows 1 to 2, columns 1 to 2. Target: x 0, y 30, width 2560, '
+          'height 2100 points.');
+      semantics.dispose();
+    });
+
+    testWidgets('a fractional target keeps one decimal, and a whole one none',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      final key = GlobalKey<GridOverlayState>();
+      await tester.pumpWidget(
+          host(gridKey: key, displayFrame: const WinRect(0, 0, 1000, 600)));
+      key.currentState!.moveSelection(GridDirection.right);
+      await tester.pump();
+      final grid = tester.getSemantics(find.bySemanticsLabel(RegExp('Window grid')));
+      expect(grid.getSemanticsData().value,
+          'Row 1, column 1. Target: x 0, y 0, width 166.7, height 100 points.');
+      semantics.dispose();
+    });
+
+    testWidgets('a single row and a range of rows read as different messages',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      final key = GlobalKey<GridOverlayState>();
+      await tester.pumpWidget(host(gridKey: key));
+      key.currentState!.moveSelection(GridDirection.right);
+      key.currentState!.moveSelection(GridDirection.right);
+      key.currentState!.moveSelection(GridDirection.right);
+      key.currentState!.moveSelection(GridDirection.down);
+      key.currentState!.moveSelection(GridDirection.down, extend: true);
+      key.currentState!.moveSelection(GridDirection.down, extend: true);
+      await tester.pump();
+      final grid = tester.getSemantics(find.bySemanticsLabel(RegExp('Window grid')));
+      expect(grid.getSemanticsData().value,
+          'Rows 2 to 4, column 3. Target: x 400, y 100, width 200, '
+          'height 300 points.');
+      semantics.dispose();
+    });
   });
 
   group('at a display scale of 1.5', () {

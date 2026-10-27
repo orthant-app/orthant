@@ -3,8 +3,13 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:orthant/l10n/app_localizations.dart';
+import 'package:orthant/l10n/strings.dart';
 import 'package:orthant/overlay/overlay_main.dart';
 import 'package:orthant/overlay/grid_overlay.dart';
+
+import 'support/locales.dart';
+import 'support/no_english.dart';
 
 /// The overlay engine's side of the channel.
 ///
@@ -46,6 +51,9 @@ void main() {
   });
 
   tearDown(() {
+    // A summon points the process-wide strings at its language; the next test
+    // starts from English as a fresh engine does.
+    setAppStrings(kEnglish);
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -484,5 +492,145 @@ void main() {
     await tester.pump();
     expect(sent.where((c) => c.method == 'firstFrame'), hasLength(1));
     expect(announced, isNotEmpty);
+  });
+
+  group('the language the summon carries', () {
+    // The overlay is a second engine: nothing reaches it but the summon, so the
+    // language is a field of that payload, and it has to be set before the
+    // first thing the summon says or draws.
+    Map<String, Object?> chinese(
+            {String tag = 'zh-Hant', bool active = true, int session = 1}) =>
+        {
+          ...summon(session: session, active: active),
+          'locale': tag,
+          'appName': '記事本',
+          'saveHint': true,
+        };
+
+    testWidgets('a Traditional Chinese summon draws and describes the first '
+        'frame in Chinese', (tester) async {
+      await tester.pumpWidget(const OverlayApp());
+      await send('summon', chinese());
+      await tester.pump();
+      expect(find.byType(GridOverlay), findsOneWidget);
+      expectNoEnglish(tester, allow: {'記事本'});
+    });
+
+    testWidgets('with no locale the first frame is English, as before',
+        (tester) async {
+      await tester.pumpWidget(const OverlayApp());
+      await send('summon', {...summon(), 'saveHint': true});
+      await tester.pump();
+      expect(find.text('⌘S  save this shape as a shortcut'), findsOneWidget);
+      final semantics = tester.ensureSemantics();
+      expect(find.semantics.byLabel('Window grid for TextEdit, 6 columns, 6 rows'),
+          findsOne);
+      semantics.dispose();
+    });
+
+    testWidgets('the announcements, opening first, are spoken in the summon\'s '
+        'language', (tester) async {
+      await tester.pumpWidget(const OverlayApp());
+      // The opening one is spoken inside the summon, before the frame that
+      // draws it: it proves the strings were set ahead of everything else.
+      await send('summon', chinese());
+      await tester.pump();
+      final zh = lookupAppLocalizations(kTraditional);
+      expect(announced, [
+        zh.overlayOpened('記事本', zh.overlayColumns(6), zh.overlayRows(6), 'Return'),
+      ]);
+      expectNoEnglishIn(announced, allow: {'記事本'});
+
+      announced.clear();
+      await send('moveSelection', {'sessionId': 1, 'direction': 'right'});
+      await send('commitCurrent', 1);
+      await tester.pump();
+      expect(announced.last, zh.overlayPlacingWindow);
+      await send('hidden');
+      await tester.pump();
+      expect(announced.where((m) => m == zh.overlayGridClosed), isEmpty,
+          reason: 'a placement is not a cancellation');
+
+      await send('summon', chinese(session: 2));
+      await tester.pump();
+      announced.clear();
+      await send('hidden');
+      await tester.pump();
+      expect(announced, [zh.overlayGridClosed]);
+      expectNoEnglishIn(announced, allow: {'記事本'});
+    });
+
+    testWidgets('without a locale the same three are exactly the English',
+        (tester) async {
+      await tester.pumpWidget(const OverlayApp());
+      await send('summon', summon());
+      await tester.pump();
+      expect(announced, [
+        'Grid open for TextEdit. 6 columns, 6 rows. Arrow keys move, '
+            'Shift and arrows extend, Return places, Escape cancels.',
+      ]);
+      announced.clear();
+      await send('moveSelection', {'sessionId': 1, 'direction': 'right'});
+      await send('commitCurrent', 1);
+      await tester.pump();
+      expect(announced.last, 'Placing window.');
+      await send('hidden');
+      await send('summon', summon(session: 2));
+      await tester.pump();
+      announced.clear();
+      await send('hidden');
+      await tester.pump();
+      expect(announced, ['Grid closed.']);
+    });
+
+    testWidgets('each summon names its language: a later one without a locale '
+        'goes back to English', (tester) async {
+      await tester.pumpWidget(const OverlayApp());
+      await send('summon', chinese());
+      await tester.pump();
+      await send('hidden');
+      await tester.pump();
+      announced.clear();
+      await send('summon', summon(session: 2));
+      await tester.pump();
+      expect(announced.single, startsWith('Grid open for TextEdit.'));
+    });
+
+    testWidgets('the Hong Kong tag reaches the Hong Kong file; Simplified is '
+        'not Traditional', (tester) async {
+      await tester.pumpWidget(const OverlayApp());
+      for (final (tag, locale) in [
+        ('zh', kSimplified),
+        ('zh-Hant', kTraditional),
+        ('zh-Hant-HK', kHongKong),
+      ]) {
+        await send('summon', chinese(tag: tag));
+        await tester.pump();
+        final s = lookupAppLocalizations(locale);
+        expect(announced.last,
+            s.overlayOpened('記事本', s.overlayColumns(6), s.overlayRows(6), 'Return'),
+            reason: tag);
+        await send('hidden');
+        await tester.pump();
+      }
+      expect(lookupAppLocalizations(kSimplified).overlayColumns(6),
+          isNot(lookupAppLocalizations(kTraditional).overlayColumns(6)),
+          reason: 'columns are 列 in Simplified and 欄 in Traditional');
+    });
+
+    testWidgets('a tag that names no language we ship, or is not a string, is '
+        'English', (tester) async {
+      await tester.pumpWidget(const OverlayApp());
+      var session = 1;
+      for (final bad in <Object?>['!!', '', 'ja-JP', 7]) {
+        announced.clear();
+        await send('summon', {...summon(session: session++), 'locale': bad});
+        await tester.pump();
+        expect(announced.single, startsWith('Grid open for TextEdit.'),
+            reason: '$bad');
+        await send('hidden');
+        await tester.pump();
+      }
+    });
   });
 }

@@ -312,30 +312,11 @@ void main() {
     'lib/overlay/overlay_main.dart',
   ].map((f) => File(f).readAsStringSync()).toList();
 
-  // Keys Dart already sends that the runner is yet to read. `setOverlayGrid`
-  // carries the app's language now; the runner starts reading it when the
-  // overlay is localized, which hands it on to each panel's engine. The test
-  // after this one fails the moment the runner reads one of them, so this set
-  // cannot outlive the work it stands in for.
-  const sentBeforeTheRunnerReads = {'locale'};
-
   test("every key the Windows controller and the overlay write, the runner "
       'reads', () {
     expect(
-        keys(writeKey, windowsSources)
-            .difference(runnerReads)
-            .difference(sentBeforeTheRunnerReads),
-        isEmpty,
+        keys(writeKey, windowsSources).difference(runnerReads), isEmpty,
         reason: 'Dart sends these and the runner ignores them');
-  });
-
-  test('a key the runner now reads is no longer excused above', () {
-    expect(sentBeforeTheRunnerReads.intersection(runnerReads), isEmpty,
-        reason: 'the runner reads these: delete them from '
-            'sentBeforeTheRunnerReads');
-    expect(keys(writeKey, windowsSources),
-        containsAll(sentBeforeTheRunnerReads),
-        reason: 'Dart stopped sending these: delete them from the set');
   });
 
   test("every key the Windows controller and the overlay read, the runner "
@@ -392,6 +373,32 @@ void main() {
     };
     expect(sends, hasLength(5));
     expect(reads, sends);
+  });
+
+  // The app's language is resolved once, in the main engine, and reaches each
+  // panel's own engine only inside the summon: Dart hands it to the runner
+  // with the grid's settings and the runner puts it in every payload. A seam
+  // that dropped it would leave the grid English for a Chinese reader, and no
+  // Dart test would notice.
+  test('the language crosses the runner: setOverlayGrid reads it and every '
+      'summon carries it', () {
+    expect(
+        RegExp(r'Field\([^;]*?,\s*"locale"\)').hasMatch(
+            span(cpp, 'method == "setOverlayGrid"', '} else if (method ==')),
+        isTrue,
+        reason: 'window_channel.cpp does not read setOverlayGrid\'s locale');
+    expect(
+        span(overlayCpp, 'flutter::EncodableMap WindowsOverlaySet::SummonPayload(',
+            '\n}\n'),
+        contains('EncodableValue("locale")'));
+  });
+
+  test('on macOS the same: the channel reads the locale and the summon '
+      'payload carries it', () {
+    expect(File('macos/Runner/MainFlutterWindow.swift').readAsStringSync(),
+        contains('a["locale"]'));
+    expect(File('macos/Runner/OverlayPanelSet.swift').readAsStringSync(),
+        contains('"locale":'));
   });
 
   test('Dart\'s shortcut ids end just below the runner\'s first grab id', () {

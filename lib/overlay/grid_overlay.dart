@@ -3,9 +3,11 @@ import 'dart:typed_data';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:intl/intl.dart' show NumberFormat;
 
 import '../core/geometry.dart';
 import '../core/grid_config.dart';
+import '../l10n/strings.dart';
 import 'grid_selection.dart';
 import 'overlay_copy.dart';
 
@@ -113,6 +115,16 @@ class GridOverlay extends StatefulWidget {
 const double _kPanelPadding = 9;
 const double _kChipRowHeight = 16;
 const double _kChipGap = 8;
+
+/// The word a direction goes by in the `select` messages. Spelt out here, not
+/// taken from `d.name`, so renaming the enum cannot silently turn every
+/// translation of "Move left" into "Move".
+String _directionKey(GridDirection d) => switch (d) {
+      GridDirection.left => 'left',
+      GridDirection.right => 'right',
+      GridDirection.up => 'up',
+      GridDirection.down => 'down',
+    };
 
 class GridOverlayState extends State<GridOverlay> {
   Cell? _anchor;
@@ -337,18 +349,33 @@ class GridOverlayState extends State<GridOverlay> {
       SemanticsService.sendAnnouncement(View.of(context), message,
           TextDirection.ltr, assertiveness: Assertiveness.assertive);
 
+  /// What the selection is, in words: which rows and columns, then where the
+  /// window would land. Every piece is an ARB message, so word order, plurals
+  /// and the unit are the language's own; the numbers go through [NumberFormat]
+  /// for the language, with no grouping separator (`0.#`: whole numbers bare,
+  /// one decimal otherwise), because a screen reader says "1,280" as a
+  /// thousand and a number.
   String get _selectionDescription {
+    final l10n = context.l10n;
     final b = _effectiveBlock;
     final t = _effectiveTarget;
-    if (b == null || t == null) return 'No cells selected.';
+    if (b == null || t == null) return l10n.overlayNoCellsSelected;
+    final format = NumberFormat('0.#', l10n.localeName);
+    // A target a hair below zero would read "-0": say 0.
+    String n(double v) {
+      final s = format.format(v);
+      return s == '-0' ? '0' : s;
+    }
+
     final row = b.r0 == b.r1
-        ? 'Row ${b.r0 + 1}' : 'Rows ${b.r0 + 1} to ${b.r1 + 1}';
+        ? l10n.overlayRowOne(b.r0 + 1)
+        : l10n.overlayRowRange(b.r0 + 1, b.r1 + 1);
     final col = b.c0 == b.c1
-        ? 'column ${b.c0 + 1}' : 'columns ${b.c0 + 1} to ${b.c1 + 1}';
-    String n(double v) =>
-        v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
-    return '$row, $col. Target: x ${n(t.x)}, y ${n(t.y)}, '
-        'width ${n(t.width)}, height ${n(t.height)} ${OverlayCopy.current.unit}.';
+        ? l10n.overlayColumnOne(b.c0 + 1)
+        : l10n.overlayColumnRange(b.c0 + 1, b.c1 + 1);
+    return l10n.overlaySelection(
+        row, col, n(t.x), n(t.y), n(t.width), n(t.height),
+        OverlayCopy.current.unit);
   }
 
   /// Flutter's macOS bridge dispatches the standard press action, but does
@@ -356,22 +383,26 @@ class GridOverlayState extends State<GridOverlay> {
   /// commands resident as pressable semantics nodes. Their boxes sit inside
   /// the painted grid; they add no pointer handlers or keyboard focus nodes.
   Widget _accessibleGrid(Widget child) {
+    final l10n = context.l10n;
     final selected = _effectiveBlock != null;
     final commands = <(String, VoidCallback?)>[
       for (final d in GridDirection.values)
-        ('Move ${d.name}', () => moveSelection(d)),
+        (l10n.overlayMove(_directionKey(d)), () => moveSelection(d)),
       for (final d in GridDirection.values)
-        ('Extend ${d.name}', () => moveSelection(d, extend: true)),
-      ('Place window', selected ? commitCurrent : null),
+        (
+          l10n.overlayExtend(_directionKey(d)),
+          () => moveSelection(d, extend: true)
+        ),
+      (l10n.overlayPlaceWindow, selected ? commitCurrent : null),
       if (widget.onSave != null)
-        ('Place window and save shortcut', selected ? saveCurrent : null),
-      ('Cancel grid', widget.onCancel),
+        (l10n.overlayPlaceAndSave, selected ? saveCurrent : null),
+      (l10n.overlayCancelGrid, widget.onCancel),
     ];
     return Semantics(
       container: true,
       explicitChildNodes: true,
-      label: 'Window grid for ${widget.appName}, '
-          '${widget.cols} columns, ${widget.rows} rows',
+      label: l10n.overlayGridLabel(widget.appName,
+          l10n.overlayColumns(widget.cols), l10n.overlayRows(widget.rows)),
       value: _selectionDescription,
       selected: selected,
       hint: OverlayCopy.current.gridHint,

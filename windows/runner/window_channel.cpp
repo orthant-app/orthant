@@ -252,7 +252,9 @@ void WindowChannel::HandleMethodCall(
     }
   } else if (method == "setOverlayGrid") {
     // Plain numbers from Dart's settings, included in every summon. saveHint
-    // defaults rather than being required, as on macOS.
+    // and locale default rather than being required, as on macOS: locale is
+    // the tag of the language Dart resolved ("en", "zh", "zh-Hant", ...),
+    // handed on to each panel's engine untouched and never parsed here.
     const auto cols = IntOf(Field(call.arguments(), "cols"));
     const auto rows = IntOf(Field(call.arguments(), "rows"));
     const auto* gap = Field(call.arguments(), "gap");
@@ -260,9 +262,13 @@ void WindowChannel::HandleMethodCall(
     const auto* save_hint = Field(call.arguments(), "saveHint");
     const auto* save_hint_value =
         save_hint ? std::get_if<bool>(save_hint) : nullptr;
+    const auto* locale = Field(call.arguments(), "locale");
+    const auto* locale_value =
+        locale ? std::get_if<std::string>(locale) : nullptr;
     if (cols && rows && gap_value) {
       overlays_->SetGrid(static_cast<int>(*cols), static_cast<int>(*rows),
-                         *gap_value, save_hint_value && *save_hint_value);
+                         *gap_value, save_hint_value && *save_hint_value,
+                         locale_value ? *locale_value : std::string("en"));
     }
     result->Success();
   } else if (method == "showOverlay") {

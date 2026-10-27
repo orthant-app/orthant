@@ -106,10 +106,13 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
            let cols = a["cols"] as? Int,
            let rows = a["rows"] as? Int,
            let gap = a["gap"] as? Double {
-          // saveHint defaults rather than being required: an older Dart side
-          // that does not send it still gets a working grid.
+          // saveHint and locale default rather than being required: an older
+          // Dart side that sends neither still gets a working grid, in English.
+          // The locale is the tag of the language Dart resolved (en, zh,
+          // zh-Hant, ...), passed on untouched: Swift never parses it.
           self.overlays?.setGrid(cols: cols, rows: rows, gap: gap,
-                                 saveHint: a["saveHint"] as? Bool ?? false)
+                                 saveHint: a["saveHint"] as? Bool ?? false,
+                                 locale: a["locale"] as? String ?? "en")
         }
         result(nil)
       case "showOverlay":

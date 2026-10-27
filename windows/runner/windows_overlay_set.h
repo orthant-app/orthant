@@ -117,7 +117,11 @@ class WindowsOverlaySet {
   // step (time sync after a wake) cannot make a fresh press look stale.
   static double PressTick(LONG message_time);
 
-  void SetGrid(int cols, int rows, double gap, bool save_hint);
+  // `locale` is the tag of the language Dart resolved ("en", "zh",
+  // "zh-Hant"), carried in every summon to the panel's engine, which is the
+  // only way it can learn it. Never parsed here.
+  void SetGrid(int cols, int rows, double gap, bool save_hint,
+               const std::string& locale);
   // `pressed_ms` is the key press that asked for this summon, carried with it
   // (PressTick), or 0 for a summon with no press (the tray). A summon that
   // reaches Show more than a second after its press is refused as stale.
@@ -246,6 +250,7 @@ class WindowsOverlaySet {
   int rows_ = 6;
   double gap_ = 0;
   bool save_hint_ = false;
+  std::string locale_ = "en";
 };
 
 #endif  // RUNNER_WINDOWS_OVERLAY_SET_H_

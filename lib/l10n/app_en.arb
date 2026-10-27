@@ -55,5 +55,197 @@
         "example": "1.1.2"
       }
     }
+  },
+  "overlaySaveHint": "{key}  save this shape as a shortcut",
+  "@overlaySaveHint": {
+    "description": "The small caption under the grid panel, shown until the user has a custom region. {key} is the chord that places the window and offers the shape as a shortcut, such as ⌘S or Ctrl+S, and stays as written. Two spaces follow it.",
+    "placeholders": {
+      "key": {
+        "type": "String"
+      }
+    }
+  },
+  "overlayGridHint": "Arrow keys move. Shift and arrow keys extend. {place} places the window. Escape cancels.",
+  "@overlayGridHint": {
+    "description": "The grid's accessibility hint, read by a screen reader after the grid's label and value. {place} is the key that places the window, such as Return or Enter. Key names stay in English in every language.",
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "overlayOpened": "Grid open for {target}. {columns}, {rows}. Arrow keys move, Shift and arrows extend, {place} places, Escape cancels.",
+  "@overlayOpened": {
+    "description": "Spoken by a screen reader when the grid opens. {target} is the name of the app whose window will be moved, or the text of \"the captured window\" when there is no name. {columns} and {rows} are the grid's size, such as \"6 columns\" and \"4 rows\". {place} is the key that places the window, such as Return or Enter. Key names stay in English in every language.",
+    "placeholders": {
+      "target": {
+        "type": "String"
+      },
+      "columns": {
+        "type": "String"
+      },
+      "rows": {
+        "type": "String"
+      },
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "overlayCapturedWindow": "the captured window",
+  "@overlayCapturedWindow": {
+    "description": "Stands in for the app's name in the spoken opening of the grid when the app has no name: the window the grid is about to move."
+  },
+  "overlayColumns": "{count, plural, =1{1 column} other{{count} columns}}",
+  "@overlayColumns": {
+    "description": "The number of columns in the grid, as a phrase in the grid's spoken label and its spoken opening. A column runs top to bottom.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "overlayRows": "{count, plural, =1{1 row} other{{count} rows}}",
+  "@overlayRows": {
+    "description": "The number of rows in the grid, as a phrase in the grid's spoken label and its spoken opening. A row runs left to right.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "overlayGridLabel": "Window grid for {app}, {columns}, {rows}",
+  "@overlayGridLabel": {
+    "description": "The grid's accessibility label, read first by a screen reader. {app} is the app whose window will be moved. {columns} and {rows} are the grid's size, such as \"6 columns\" and \"4 rows\".",
+    "placeholders": {
+      "app": {
+        "type": "String"
+      },
+      "columns": {
+        "type": "String"
+      },
+      "rows": {
+        "type": "String"
+      }
+    }
+  },
+  "overlayGridClosed": "Grid closed.",
+  "@overlayGridClosed": {
+    "description": "Spoken by a screen reader when the grid is dismissed without placing a window."
+  },
+  "overlayPlacingWindow": "Placing window.",
+  "@overlayPlacingWindow": {
+    "description": "Spoken by a screen reader when the user places the window from the grid."
+  },
+  "overlayNoCellsSelected": "No cells selected.",
+  "@overlayNoCellsSelected": {
+    "description": "The grid's accessibility value while nothing is selected."
+  },
+  "overlayRowOne": "Row {row}",
+  "@overlayRowOne": {
+    "description": "Part of the grid's spoken selection: one row is selected. {row} counts from 1, from the top. Joined by the next messages into a sentence.",
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "overlayRowRange": "Rows {first} to {last}",
+  "@overlayRowRange": {
+    "description": "Part of the grid's spoken selection: several rows are selected. {first} and {last} count from 1, from the top.",
+    "placeholders": {
+      "first": {
+        "type": "int"
+      },
+      "last": {
+        "type": "int"
+      }
+    }
+  },
+  "overlayColumnOne": "column {column}",
+  "@overlayColumnOne": {
+    "description": "Part of the grid's spoken selection: one column is selected. {column} counts from 1, from the left. It follows the row text after a comma.",
+    "placeholders": {
+      "column": {
+        "type": "int"
+      }
+    }
+  },
+  "overlayColumnRange": "columns {first} to {last}",
+  "@overlayColumnRange": {
+    "description": "Part of the grid's spoken selection: several columns are selected. {first} and {last} count from 1, from the left.",
+    "placeholders": {
+      "first": {
+        "type": "int"
+      },
+      "last": {
+        "type": "int"
+      }
+    }
+  },
+  "overlaySelection": "{rowText}, {columnText}. Target: x {x}, y {y}, width {width}, height {height} {unit}.",
+  "@overlaySelection": {
+    "description": "The grid's accessibility value and its spoken announcement when the selection changes. {rowText} and {columnText} are the selected rows and columns, such as \"Row 2\" and \"columns 1 to 2\". x and y are the left and top of the window's target position, and width and height its size; all four are already formatted numbers. {unit} is \"points\" or \"pixels\", the next two messages, and applies to all four numbers.",
+    "placeholders": {
+      "rowText": {
+        "type": "String"
+      },
+      "columnText": {
+        "type": "String"
+      },
+      "x": {
+        "type": "String"
+      },
+      "y": {
+        "type": "String"
+      },
+      "width": {
+        "type": "String"
+      },
+      "height": {
+        "type": "String"
+      },
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "overlayUnitPoints": "points",
+  "@overlayUnitPoints": {
+    "description": "The unit of the target position and size the grid speaks on macOS: points, the screen's logical units. Used where {unit} appears in the selection sentence."
+  },
+  "overlayUnitPixels": "pixels",
+  "@overlayUnitPixels": {
+    "description": "The unit of the target position and size the grid speaks on Windows: physical screen pixels. Used where {unit} appears in the selection sentence."
+  },
+  "overlayMove": "{direction, select, left{Move left} right{Move right} up{Move up} down{Move down} other{Move}}",
+  "@overlayMove": {
+    "description": "The name of a button in the grid's accessibility tree that moves the selection one cell. {direction} is left, right, up or down.",
+    "placeholders": {
+      "direction": {
+        "type": "String"
+      }
+    }
+  },
+  "overlayExtend": "{direction, select, left{Extend left} right{Extend right} up{Extend up} down{Extend down} other{Extend}}",
+  "@overlayExtend": {
+    "description": "The name of a button in the grid's accessibility tree that grows the selection by one cell. {direction} is left, right, up or down.",
+    "placeholders": {
+      "direction": {
+        "type": "String"
+      }
+    }
+  },
+  "overlayPlaceWindow": "Place window",
+  "@overlayPlaceWindow": {
+    "description": "The name of a button in the grid's accessibility tree that moves the captured window to the selection."
+  },
+  "overlayPlaceAndSave": "Place window and save shortcut",
+  "@overlayPlaceAndSave": {
+    "description": "The name of a button in the grid's accessibility tree that moves the captured window to the selection and offers the selection as a new shortcut."
+  },
+  "overlayCancelGrid": "Cancel grid",
+  "@overlayCancelGrid": {
+    "description": "The name of a button in the grid's accessibility tree that closes the grid without moving anything."
   }
 }

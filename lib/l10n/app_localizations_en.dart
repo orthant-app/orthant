@@ -44,4 +44,135 @@ class AppLocalizationsEn extends AppLocalizations {
   String trayTooltipUpdate(String version) {
     return 'Orthant: update $version available';
   }
+
+  @override
+  String overlaySaveHint(String key) {
+    return '$key  save this shape as a shortcut';
+  }
+
+  @override
+  String overlayGridHint(String place) {
+    return 'Arrow keys move. Shift and arrow keys extend. $place places the window. Escape cancels.';
+  }
+
+  @override
+  String overlayOpened(
+    String target,
+    String columns,
+    String rows,
+    String place,
+  ) {
+    return 'Grid open for $target. $columns, $rows. Arrow keys move, Shift and arrows extend, $place places, Escape cancels.';
+  }
+
+  @override
+  String get overlayCapturedWindow => 'the captured window';
+
+  @override
+  String overlayColumns(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count columns',
+      one: '1 column',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String overlayRows(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count rows',
+      one: '1 row',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String overlayGridLabel(String app, String columns, String rows) {
+    return 'Window grid for $app, $columns, $rows';
+  }
+
+  @override
+  String get overlayGridClosed => 'Grid closed.';
+
+  @override
+  String get overlayPlacingWindow => 'Placing window.';
+
+  @override
+  String get overlayNoCellsSelected => 'No cells selected.';
+
+  @override
+  String overlayRowOne(int row) {
+    return 'Row $row';
+  }
+
+  @override
+  String overlayRowRange(int first, int last) {
+    return 'Rows $first to $last';
+  }
+
+  @override
+  String overlayColumnOne(int column) {
+    return 'column $column';
+  }
+
+  @override
+  String overlayColumnRange(int first, int last) {
+    return 'columns $first to $last';
+  }
+
+  @override
+  String overlaySelection(
+    String rowText,
+    String columnText,
+    String x,
+    String y,
+    String width,
+    String height,
+    String unit,
+  ) {
+    return '$rowText, $columnText. Target: x $x, y $y, width $width, height $height $unit.';
+  }
+
+  @override
+  String get overlayUnitPoints => 'points';
+
+  @override
+  String get overlayUnitPixels => 'pixels';
+
+  @override
+  String overlayMove(String direction) {
+    String _temp0 = intl.Intl.selectLogic(direction, {
+      'left': 'Move left',
+      'right': 'Move right',
+      'up': 'Move up',
+      'down': 'Move down',
+      'other': 'Move',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String overlayExtend(String direction) {
+    String _temp0 = intl.Intl.selectLogic(direction, {
+      'left': 'Extend left',
+      'right': 'Extend right',
+      'up': 'Extend up',
+      'down': 'Extend down',
+      'other': 'Extend',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get overlayPlaceWindow => 'Place window';
+
+  @override
+  String get overlayPlaceAndSave => 'Place window and save shortcut';
+
+  @override
+  String get overlayCancelGrid => 'Cancel grid';
 }

@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/geometry.dart';
+import '../l10n/app_localizations.dart';
+import '../l10n/languages.dart';
+import '../l10n/strings.dart';
 import 'grid_overlay.dart';
 import 'grid_selection.dart';
 import 'overlay_copy.dart';
@@ -36,6 +39,11 @@ class _OverlayAppState extends State<OverlayApp> {
   /// wide enough to type into. Dropped, the keys are silent: an arrow does
   /// nothing and the place key behind it commits nothing.
   final _pending = <void Function(GridOverlayState)>[];
+
+  /// The language this overlay speaks and draws in, as the main engine
+  /// resolved it and sent it with the summon. English until a summon says
+  /// otherwise (before the first one nothing is on screen to read).
+  Locale _locale = const Locale('en');
 
   int? _sessionId;
   WinRect? _frame;
@@ -80,6 +88,16 @@ class _OverlayAppState extends State<OverlayApp> {
     switch (call.method) {
       case 'summon':
         final a = (call.arguments as Map).cast<String, dynamic>();
+        // The language first, before anything is said or drawn: the opening
+        // announcement below and the frame the `setState` builds both read it.
+        // The main engine sends the tag of a locale it already resolved, and
+        // resolving it again here is what makes whatever arrives (an older
+        // native side sends none, a damaged one something unreadable) land on
+        // a language we ship.
+        final tag = a['locale'];
+        _locale = resolveAppLocale(
+            [parseLanguageTag(tag is String ? tag : 'en')]);
+        setAppStrings(_locale);
         _sessionId = a['sessionId'] as int;
         _warming = a['warm'] == true;
         _triggerAtMs = _warming ? null : (a['triggerMs'] as num).toDouble();
@@ -163,7 +181,7 @@ class _OverlayAppState extends State<OverlayApp> {
         // that never pass through Dart's cancel — so this is the one place a
         // cancellation can be spoken. The active panel speaks for the set.
         if (_visible && _active && !_placing && !_warming) {
-          GridOverlayState.announce(context, 'Grid closed.');
+          GridOverlayState.announce(context, appStrings.overlayGridClosed);
         }
         _placing = false;
         _warming = false;
@@ -223,7 +241,7 @@ class _OverlayAppState extends State<OverlayApp> {
   void _notePlacing(int sessionId) {
     if (sessionId != _sessionId || _warming) return;
     _placing = true;
-    GridOverlayState.announce(context, 'Placing window.');
+    GridOverlayState.announce(context, appStrings.overlayPlacingWindow);
   }
 
   @override
@@ -234,6 +252,9 @@ class _OverlayAppState extends State<OverlayApp> {
     final rows = _rows;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      locale: _locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       home: Scaffold(
         backgroundColor: Colors.transparent,
         body: (!_visible || frame == null || sessionId == null)

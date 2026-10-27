@@ -146,6 +146,42 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         } else {
           result(nil)
         }
+      // The languages the OS prefers, ignoring any choice made for this app.
+      // `AppleLanguages` is one key read from two places: the user's global
+      // domain holds the system list, and this app's own domain holds a
+      // per-app choice (the one System Settings ▸ General ▸ Language & Region ▸
+      // Applications edits, and the one "setLanguageOverride" writes).
+      // The ordinary readers (`UserDefaults.standard.array(forKey:)`, and
+      // `Locale.preferredLanguages`, which follows the app's choice because
+      // that is how the per-app setting takes effect) would answer with that
+      // choice once one is stored, and "System" would mean "what I last
+      // picked". Hence the global domain by name; `Locale.preferredLanguages`
+      // is only the fallback for a Mac whose global domain holds no list.
+      // Read every time, never cached.
+      case "systemLanguages":
+        let global = UserDefaults.standard
+          .persistentDomain(forName: UserDefaults.globalDomain)?["AppleLanguages"]
+          as? [String]
+        result(global ?? Locale.preferredLanguages)
+      // The language chosen for this app: its own domain's first
+      // `AppleLanguages` entry, whole (`zh-Hant-HK`, region kept). Nil for
+      // System, which is the key being absent. The app's domain by name, for
+      // the reason above: a read through the search list would answer with the
+      // global list for a user who never chose anything.
+      case "languageOverride":
+        let own = Bundle.main.bundleIdentifier.flatMap {
+          UserDefaults.standard.persistentDomain(forName: $0)
+        }
+        result((own?["AppleLanguages"] as? [String])?.first)
+      // A non-empty tag stores a choice; anything else (the null Dart sends
+      // for System) removes it, so the app follows the OS again.
+      case "setLanguageOverride":
+        if let tag = call.arguments as? String, !tag.isEmpty {
+          UserDefaults.standard.set([tag], forKey: "AppleLanguages")
+        } else {
+          UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+        }
+        result(nil)
       // Read from the running bundle, never from a Dart constant or a build-time
       // define: those drift from what actually shipped, and a version display that
       // can be wrong about itself is worse than none. `Bundle.main` is the only

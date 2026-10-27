@@ -1,6 +1,7 @@
 import 'dart:async' show Timer, unawaited;
 import 'dart:io' show Platform;
 import 'dart:isolate' show Isolate;
+import 'dart:ui' show Locale, PlatformDispatcher;
 
 import 'package:flutter/foundation.dart'
     show ValueListenable, debugPrint, kReleaseMode, visibleForTesting;
@@ -12,6 +13,7 @@ import 'windows_accent.dart';
 import 'windows_app_icon.dart';
 import 'windows_capture.dart';
 import 'windows_keys.dart';
+import 'windows_language_store.dart';
 import 'windows_login_item.dart';
 import 'windows_placement.dart';
 import 'windows_updater.dart';
@@ -47,7 +49,9 @@ class WindowsWindowController implements WindowController {
       this._exePath,
       this._openStartupApps,
       this._updater,
-      this._releaseName);
+      this._releaseName,
+      this._systemLocales,
+      this._languageStore);
 
   /// The one way to obtain the controller in production.
   ///
@@ -100,7 +104,9 @@ class WindowsWindowController implements WindowController {
         () => Platform.resolvedExecutable,
         openStartupAppsSettings,
         updater,
-        kReleaseName);
+        kReleaseName,
+        _platformLocales,
+        const RegistryLanguageStore());
   }
 
   /// [readAppIconPng] blocks, so it runs on an isolate of its own.
@@ -123,6 +129,8 @@ class WindowsWindowController implements WindowController {
     bool Function()? openStartupApps,
     WindowsUpdater? updater,
     String releaseName = '',
+    List<Locale> Function()? systemLocales,
+    LanguageStore? languageStore,
   }) =>
       WindowsWindowController._(
           readVersion,
@@ -145,7 +153,9 @@ class WindowsWindowController implements WindowController {
                         build: 0,
                         servicePack: 0
                       )),
-          releaseName);
+          releaseName,
+          systemLocales ?? _platformLocales,
+          languageStore ?? const _NoLanguageStore());
 
   final VersionReader _readVersion;
   final Win32Desktop _desktop;
@@ -177,6 +187,14 @@ class WindowsWindowController implements WindowController {
 
   /// The tag's own name in a release build ([kReleaseName]), else empty.
   final String _releaseName;
+
+  /// The OS's preferred languages, for [systemLocales].
+  final List<Locale> Function() _systemLocales;
+
+  /// The stored language choice ([RegistryLanguageStore]).
+  final LanguageStore _languageStore;
+
+  static List<Locale> _platformLocales() => PlatformDispatcher.instance.locales;
 
   /// Icons by executable path, null for an app that has none to read. Read
   /// once per app per run: an executable's icon does not change while it
@@ -689,6 +707,19 @@ class WindowsWindowController implements WindowController {
 
   @override
   ValueListenable<AvailableUpdate?> get availableUpdate => _updater.found;
+
+  // Windows has no per-app language setting, so the dispatcher's list is the
+  // system's and the choice is Orthant's own registry value. Neither goes
+  // near the runner.
+  @override
+  Future<List<Locale>> systemLocales() async => _systemLocales();
+
+  @override
+  Future<String?> languageOverride() async => _languageStore.read();
+
+  @override
+  Future<void> setLanguageOverride(String? tag) async =>
+      _languageStore.write(tag);
 }
 
 /// No WinSparkle at all, for a suite that names none: it never starts.
@@ -716,6 +747,15 @@ class _NoSparkle implements SparkleApi {
   void init() {}
   @override
   void checkWithUi() {}
+}
+
+/// No stored language choice, for a suite that names no store.
+class _NoLanguageStore implements LanguageStore {
+  const _NoLanguageStore();
+  @override
+  String? read() => null;
+  @override
+  void write(String? tag) {}
 }
 
 /// Nothing stored, with [_NoSparkle].

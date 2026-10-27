@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show Locale, PlatformDispatcher;
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart';
@@ -7,6 +8,7 @@ import 'package:orthant/core/channel.dart';
 import 'package:orthant/core/geometry.dart';
 import 'package:orthant/core/window_controller.dart';
 import 'package:orthant/core/window_controller_windows.dart';
+import 'package:orthant/core/windows_language_store.dart';
 import 'package:orthant/core/windows_login_item.dart';
 import 'package:orthant/core/windows_updater.dart';
 import 'package:orthant/core/windows_window_ops.dart';
@@ -71,6 +73,21 @@ class _Store implements UpdateStore {
   void writeFound(AvailableUpdate? update) => found = update;
   @override
   String? readSkipped() => null;
+}
+
+/// The stored language choice, held in memory.
+class _Language implements LanguageStore {
+  String? stored;
+  final List<String?> writes = [];
+
+  @override
+  String? read() => stored;
+
+  @override
+  void write(String? tag) {
+    writes.add(tag);
+    stored = tag;
+  }
 }
 
 class _ThrowingDesktop extends FakeDesktop {
@@ -203,6 +220,63 @@ void main() {
     expect(await withReader(() => throw StateError('advapi32 went away'))
         .accentColor(), isNull, reason: 'display data never throws');
     expect(calls, isEmpty);
+  });
+
+  group('language', () {
+    WindowsWindowController withLanguage(
+            {List<Locale> Function()? systemLocales, LanguageStore? store}) =>
+        WindowsWindowController.forTest(
+            readVersion: () => null,
+            desktop: NoWindows(),
+            placer: NoWindows(),
+            systemLocales: systemLocales,
+            languageStore: store);
+
+    test('the system languages are the OS list, in its order', () async {
+      final wanted = [
+        Locale.fromSubtags(
+            languageCode: 'zh', scriptCode: 'Hant', countryCode: 'TW'),
+        const Locale('en', 'US'),
+      ];
+      expect(await withLanguage(systemLocales: () => wanted).systemLocales(),
+          wanted);
+      expect(calls, isEmpty, reason: 'the runner knows nothing about it');
+    });
+
+    test('with no function injected they are the platform dispatcher\'s',
+        () async {
+      expect(await withLanguage().systemLocales(),
+          PlatformDispatcher.instance.locales);
+    });
+
+    test('the stored choice round trips as the whole tag', () async {
+      final store = _Language();
+      final c = withLanguage(store: store);
+      expect(await c.languageOverride(), isNull);
+      await c.setLanguageOverride('zh-Hant-HK');
+      expect(store.stored, 'zh-Hant-HK');
+      expect(await c.languageOverride(), 'zh-Hant-HK');
+      await c.setLanguageOverride('en');
+      expect(await c.languageOverride(), 'en');
+      expect(calls, isEmpty, reason: 'Windows keeps this in the registry');
+    });
+
+    test('System is null, which clears the stored choice', () async {
+      final store = _Language()..stored = 'zh-Hans';
+      final c = withLanguage(store: store);
+      await c.setLanguageOverride(null);
+      expect(store.writes, [null]);
+      expect(await c.languageOverride(), isNull);
+    });
+
+    test('a garbage stored value is returned as it is', () async {
+      // Task 2's resolver reads an unparsable choice as System; this seam
+      // neither validates nor repairs what the user's registry holds.
+      for (final garbage in ['!!', 'klingon-QQ-x', ' zh ']) {
+        final c = withLanguage(store: _Language()..stored = garbage);
+        expect(await c.languageOverride(), garbage);
+      }
+    });
   });
 
   group('launch at login', () {

@@ -53,6 +53,13 @@ class _FakeWc implements WindowController {
   Future<AccentColors?> accentColor() async => null;
 
   @override
+  Future<List<Locale>> systemLocales() async => const [];
+  @override
+  Future<String?> languageOverride() async => null;
+  @override
+  Future<void> setLanguageOverride(String? tag) async {}
+
+  @override
   Future<AppVersion> appVersion() async => const AppVersion('1.0.0', '1');
 
   @override

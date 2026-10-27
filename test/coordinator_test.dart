@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show Locale;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -136,6 +137,14 @@ class _FakeWc implements WindowController {
     events.add('accent answered');
     return accent;
   }
+
+  @override
+  Future<List<Locale>> systemLocales() async => const [];
+  @override
+  Future<String?> languageOverride() async => null;
+  @override
+  Future<void> setLanguageOverride(String? tag) async =>
+      calls.add('setLanguageOverride');
 
   @override
   Future<AppVersion> appVersion() async => version;

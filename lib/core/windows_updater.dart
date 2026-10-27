@@ -10,6 +10,7 @@ import 'package:win32/win32.dart';
 import 'package:xml/xml.dart';
 
 import 'window_controller.dart';
+import 'windows_registry.dart';
 
 /// The feed a Windows build checks: the stable Windows feed on the project's
 /// own domain, as macOS's `SUFeedURL` is, so hosting can move without
@@ -539,64 +540,12 @@ class RegistryUpdateStore implements UpdateStore {
   @override
   String? readSkipped() => _read(kUpdaterRegistryPath, 'SkipThisVersion');
 
-  String? _read(String key, String value) {
-    Pointer<Utf16>? keyPtr;
-    Pointer<Utf16>? valuePtr;
-    Pointer<Uint32>? size;
-    Pointer<Uint16>? data;
-    try {
-      keyPtr = key.toNativeUtf16();
-      valuePtr = value.toNativeUtf16();
-      size = calloc<Uint32>()..value = 512;
-      data = calloc<Uint16>(256);
-      final result = RegGetValue(HKEY_CURRENT_USER, PCWSTR(keyPtr),
-          PCWSTR(valuePtr), RRF_RT_REG_SZ, null, data.cast(), size);
-      if (result != ERROR_SUCCESS) return null;
-      return data.cast<Utf16>().toDartString().trim();
-    } catch (_) {
-      return null;
-    } finally {
-      if (data != null) calloc.free(data);
-      if (size != null) calloc.free(size);
-      if (valuePtr != null) calloc.free(valuePtr);
-      if (keyPtr != null) calloc.free(keyPtr);
-    }
-  }
+  String? _read(String key, String value) => readUserString(key, value);
 
-  void _write(String value, String text) {
-    Pointer<Utf16>? keyPtr;
-    Pointer<Utf16>? valuePtr;
-    Pointer<Utf16>? dataPtr;
-    try {
-      keyPtr = kUpdateSettingsPath.toNativeUtf16();
-      valuePtr = value.toNativeUtf16();
-      dataPtr = text.toNativeUtf16();
-      // REG_SZ counts its bytes with the terminator.
-      RegSetKeyValue(HKEY_CURRENT_USER, PCWSTR(keyPtr), PCWSTR(valuePtr),
-          REG_SZ, dataPtr, (text.length + 1) * 2);
-    } catch (_) {
-      // Unwritten: read back as it was.
-    } finally {
-      if (dataPtr != null) calloc.free(dataPtr);
-      if (valuePtr != null) calloc.free(valuePtr);
-      if (keyPtr != null) calloc.free(keyPtr);
-    }
-  }
+  void _write(String value, String text) =>
+      writeUserString(kUpdateSettingsPath, value, text);
 
-  void _delete(String value) {
-    Pointer<Utf16>? keyPtr;
-    Pointer<Utf16>? valuePtr;
-    try {
-      keyPtr = kUpdateSettingsPath.toNativeUtf16();
-      valuePtr = value.toNativeUtf16();
-      RegDeleteKeyValue(HKEY_CURRENT_USER, PCWSTR(keyPtr), PCWSTR(valuePtr));
-    } catch (_) {
-      // Left: read back as it was.
-    } finally {
-      if (valuePtr != null) calloc.free(valuePtr);
-      if (keyPtr != null) calloc.free(keyPtr);
-    }
-  }
+  void _delete(String value) => deleteUserValue(kUpdateSettingsPath, value);
 }
 
 /// [FeedFetch] over WinINet, the HTTP stack WinSparkle itself uses, so the

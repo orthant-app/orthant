@@ -1,7 +1,7 @@
 import 'dart:async' show Timer, unawaited;
 import 'dart:io' show Platform;
 import 'dart:isolate' show Isolate;
-import 'dart:ui' show Locale, PlatformDispatcher;
+import 'dart:ui' show Locale;
 
 import 'package:flutter/foundation.dart'
     show ValueListenable, debugPrint, kReleaseMode, visibleForTesting;
@@ -17,6 +17,7 @@ import 'windows_keys.dart';
 import 'windows_language_store.dart';
 import 'windows_login_item.dart';
 import 'windows_placement.dart';
+import 'windows_system_languages.dart';
 import 'windows_updater.dart';
 import 'windows_version_resource.dart';
 import 'windows_win32_ops.dart';
@@ -33,6 +34,26 @@ import 'windows_window_ops.dart';
 @visibleForTesting
 String updaterLanguage(List<Locale> systemLocales, String? choice) =>
     winSparkleLanguage(resolveAppLocale(systemLocales, choice: choice));
+
+/// Starts [updater] in Orthant's language ([updaterLanguage] of what
+/// [systemLocales] and [languageStore] say now). [systemLocales] is the very
+/// function the controller answers `systemLocales()` from: one source for
+/// both, which on Windows is the OS itself ([readSystemLocales]) and never
+/// `PlatformDispatcher.locales`, which is empty until `main()` first awaits.
+@visibleForTesting
+bool startUpdater(
+  WindowsUpdater updater, {
+  required String build,
+  required String display,
+  required void Function() onShutdownRequested,
+  required List<Locale> Function() systemLocales,
+  required LanguageStore languageStore,
+}) =>
+    updater.start(
+        build: build,
+        display: display,
+        onShutdownRequested: onShutdownRequested,
+        language: updaterLanguage(systemLocales(), languageStore.read()));
 
 /// The Windows backend of the seam.
 ///
@@ -76,6 +97,7 @@ class WindowsWindowController implements WindowController {
   /// installer, asks the app to quit.
   static WindowsWindowController start({void Function()? onUpdaterShutdown}) {
     final win32 = FfiWin32WindowOps();
+    const languageStore = RegistryLanguageStore();
     final updater = WindowsUpdater(
         FfiSparkleApi(), const RegistryUpdateStore(), winInetGet,
         feedUrl: kUpdateFeedUrl,
@@ -84,14 +106,14 @@ class WindowsWindowController implements WindowController {
         log: _log);
     final version = readFixedFileVersion();
     try {
-      updater.start(
+      startUpdater(updater,
           build: version?.build ?? '',
           display: kReleaseName.isNotEmpty
               ? kReleaseName
               : version?.short ?? '',
           onShutdownRequested: onUpdaterShutdown ?? () {},
-          language: updaterLanguage(
-              _platformLocales(), const RegistryLanguageStore().read()));
+          systemLocales: readSystemLocales,
+          languageStore: languageStore);
     } catch (e) {
       // A missing or broken WinSparkle.dll costs updates, never the launch:
       // the tray comes up after this.
@@ -120,8 +142,8 @@ class WindowsWindowController implements WindowController {
         openStartupAppsSettings,
         updater,
         kReleaseName,
-        _platformLocales,
-        const RegistryLanguageStore());
+        readSystemLocales,
+        languageStore);
   }
 
   /// [readAppIconPng] blocks, so it runs on an isolate of its own.
@@ -169,7 +191,7 @@ class WindowsWindowController implements WindowController {
                         servicePack: 0
                       )),
           releaseName,
-          systemLocales ?? _platformLocales,
+          systemLocales ?? () => const <Locale>[],
           languageStore ?? const _NoLanguageStore());
 
   final VersionReader _readVersion;
@@ -203,13 +225,12 @@ class WindowsWindowController implements WindowController {
   /// The tag's own name in a release build ([kReleaseName]), else empty.
   final String _releaseName;
 
-  /// The OS's preferred languages, for [systemLocales].
+  /// The OS's preferred languages, for [systemLocales] and the updater's
+  /// language: [readSystemLocales] in production, nothing in a suite.
   final List<Locale> Function() _systemLocales;
 
   /// The stored language choice ([RegistryLanguageStore]).
   final LanguageStore _languageStore;
-
-  static List<Locale> _platformLocales() => PlatformDispatcher.instance.locales;
 
   /// Icons by executable path, null for an app that has none to read. Read
   /// once per app per run: an executable's icon does not change while it
@@ -725,9 +746,10 @@ class WindowsWindowController implements WindowController {
   @override
   ValueListenable<AvailableUpdate?> get availableUpdate => _updater.found;
 
-  // Windows has no per-app language setting, so the dispatcher's list is the
-  // system's and the choice is Orthant's own registry value. Neither goes
-  // near the runner.
+  // Windows has no per-app language setting, so the OS's list is the system's
+  // (asked of Windows itself, not of the dispatcher, which is empty until
+  // main() first awaits) and the choice is Orthant's own registry value.
+  // Neither goes near the runner.
   @override
   Future<List<Locale>> systemLocales() async => _systemLocales();
 

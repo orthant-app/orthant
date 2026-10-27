@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:ui' show Locale, PlatformDispatcher;
+import 'dart:ui' show Locale;
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart';
@@ -245,10 +245,11 @@ void main() {
       expect(calls, isEmpty, reason: 'the runner knows nothing about it');
     });
 
-    test('with no function injected they are the platform dispatcher\'s',
-        () async {
-      expect(await withLanguage().systemLocales(),
-          PlatformDispatcher.instance.locales);
+    test('with no function injected a suite has no OS to ask: none', () async {
+      // Never the platform dispatcher's list, which on Windows is empty until
+      // main() first awaits (the embedder sends the locales after it starts
+      // the engine); production asks Windows itself (readSystemLocales).
+      expect(await withLanguage().systemLocales(), isEmpty);
     });
 
     test('the stored choice round trips as the whole tag', () async {
@@ -330,6 +331,75 @@ void main() {
       for (final stored in ['', '  ', '!!', 'klingon-QQ-x']) {
         expect(updaterLanguage(chinese, stored), 'zh-CN', reason: '"$stored"');
       }
+    });
+  });
+
+  group('one source for the system languages', () {
+    // On Windows the dispatcher's list is empty during main()'s synchronous
+    // start, where the updater is configured and the first language is read,
+    // so both ask the OS through one injected function (production:
+    // readSystemLocales) and neither asks the dispatcher.
+    final taiwan = [const Locale('zh', 'TW'), const Locale('en', 'US')];
+
+    ({WindowsUpdater updater, _Sparkle api}) fresh() {
+      final api = _Sparkle();
+      return (
+        updater: WindowsUpdater(api, _Store(),
+            (url) => Future.error(StateError('no feed in this test')),
+            feedUrl: 'f',
+            publicKey: 'k',
+            system: () => (major: 10, minor: 0, build: 22631, servicePack: 0)),
+        api: api,
+      );
+    }
+
+    bool start(WindowsUpdater updater, List<Locale> Function() source,
+            [LanguageStore? store]) =>
+        startUpdater(updater,
+            build: '8',
+            display: '1.1.0',
+            onShutdownRequested: () {},
+            systemLocales: source,
+            languageStore: store ?? _Language());
+
+    test('the updater\'s language comes from the injected source', () {
+      final t = fresh();
+      expect(start(t.updater, () => taiwan), isTrue);
+      expect(t.api.calls, ['lang zh-TW', 'automatic false', 'init']);
+    });
+
+    test('the controller\'s systemLocales() is the same source, read afresh',
+        () async {
+      var reads = 0;
+      List<Locale> source() {
+        reads++;
+        return taiwan;
+      }
+
+      final t = fresh();
+      start(t.updater, source);
+      expect(reads, 1, reason: 'the updater read it');
+      final c = WindowsWindowController.forTest(
+          readVersion: () => null,
+          desktop: NoWindows(),
+          placer: NoWindows(),
+          systemLocales: source);
+      expect(await c.systemLocales(), taiwan);
+      expect(reads, 2, reason: 'and so does the controller, every time');
+      expect(updaterLanguage(await c.systemLocales(), null), 'zh-TW');
+    });
+
+    test('a source that says nothing is English, not WinSparkle\'s guess', () {
+      final t = fresh();
+      start(t.updater, () => const []);
+      expect(t.api.calls, ['lang en', 'automatic false', 'init']);
+    });
+
+    test('a language chosen in Settings still beats the source', () {
+      final t = fresh();
+      start(t.updater, () => [const Locale('en', 'US')],
+          _Language()..stored = 'zh-Hant');
+      expect(t.api.calls.first, 'lang zh-TW');
     });
   });
 

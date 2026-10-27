@@ -1,5 +1,6 @@
 {
   "@@locale": "zh",
   "l10nProbeLocale": "zh",
-  "l10nProbeScript": "Hans"
+  "l10nProbeScript": "Hans",
+  "languageNativeName": "简体中文"
 }

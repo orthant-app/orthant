@@ -13,4 +13,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get l10nProbeScript => 'Latn';
+
+  @override
+  String get languageNativeName => 'English';
 }

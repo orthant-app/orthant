@@ -7,5 +7,9 @@
   "l10nProbeScript": "Latn",
   "@l10nProbeScript": {
     "description": "Never shown. Tests use it to prove each language resolves to its own file."
+  },
+  "languageNativeName": "English",
+  "@languageNativeName": {
+    "description": "This language's own name, shown in the language picker whatever the UI language is."
   }
 }

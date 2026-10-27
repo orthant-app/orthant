@@ -13,6 +13,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get l10nProbeScript => 'Hans';
+
+  @override
+  String get languageNativeName => '简体中文';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -24,6 +27,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get l10nProbeScript => 'Hant';
+
+  @override
+  String get languageNativeName => '繁體中文';
 }
 
 /// The translations for Chinese, as used in Hong Kong, using the Han script (`zh_Hant_HK`).
@@ -35,4 +41,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String get l10nProbeScript => 'Hant';
+
+  @override
+  String get languageNativeName => '繁體中文';
 }

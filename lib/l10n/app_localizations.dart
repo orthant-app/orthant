@@ -115,6 +115,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Latn'**
   String get l10nProbeScript;
+
+  /// This language's own name, shown in the language picker whatever the UI language is.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get languageNativeName;
 }
 
 class _AppLocalizationsDelegate

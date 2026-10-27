@@ -65,6 +65,10 @@ abstract class SparkleApi {
   void setAppDetails(String company, String app, String version);
   void setAppBuildVersion(String build);
   void setAutomaticCheck(bool on);
+
+  /// The language of WinSparkle's own windows, as a tag it knows (`en`,
+  /// `zh-CN`, `zh-TW`). WinSparkle takes it only before [init].
+  void setLang(String language);
   void setShutdownRequestCallback(void Function() onRequest);
 
   /// The user chose "Skip this version" in WinSparkle's offer.
@@ -277,10 +281,16 @@ class WindowsUpdater {
   /// WinSparkle's window calls this version. Without a key WinSparkle accepts
   /// it never starts: WinSparkle would then fall back to a key in the
   /// executable's resources, of which this one has none.
+  ///
+  /// [language] is Orthant's own resolved language as WinSparkle spells it
+  /// (`winSparkleLanguage`), given even when the user left it on System: left
+  /// to detect one itself, WinSparkle would show a language Orthant does not
+  /// have. Only null (nothing resolved, a suite) sets none.
   bool start({
     required String build,
     required String display,
     required void Function() onShutdownRequested,
+    String? language,
   }) {
     if (_running) return true;
     final number = int.tryParse(build);
@@ -296,6 +306,8 @@ class WindowsUpdater {
     }
     _api.setAppDetails('Orthant', 'Orthant', display);
     _api.setAppBuildVersion(build);
+    // Before init, as WinSparkle requires: its windows are built from it then.
+    if (language != null) _api.setLang(language);
     // Off before init, so WinSparkle never starts its own schedule, nor asks
     // at a second launch whether to.
     _api.setAutomaticCheck(false);
@@ -461,6 +473,9 @@ class FfiSparkleApi implements SparkleApi {
   @override
   void setAutomaticCheck(bool on) => _lib.lookupFunction<_IntNative, _IntDart>(
       'win_sparkle_set_automatic_check_for_updates')(on ? 1 : 0);
+
+  @override
+  void setLang(String language) => _utf8('win_sparkle_set_lang', language);
 
   /// WinSparkle calls these from a thread of its own; a listener posts each
   /// to this isolate.

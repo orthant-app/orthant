@@ -32,6 +32,8 @@ class _Sparkle implements SparkleApi {
   @override
   void setAutomaticCheck(bool on) => calls.add('automatic $on');
   @override
+  void setLang(String language) => calls.add('lang $language');
+  @override
   void setShutdownRequestCallback(void Function() onRequest) {}
   @override
   void setSkippedCallback(void Function() onSkipped) {}
@@ -275,6 +277,58 @@ void main() {
       for (final garbage in ['!!', 'klingon-QQ-x', ' zh ']) {
         final c = withLanguage(store: _Language()..stored = garbage);
         expect(await c.languageOverride(), garbage);
+      }
+    });
+  });
+
+  group('the language WinSparkle is given', () {
+    // Always Orthant's own resolved language, System included: left to detect
+    // one itself, WinSparkle would give a Japanese Windows an English Orthant
+    // with a Japanese update window (spec, "Windows").
+    Locale zh(String script, [String? country]) => Locale.fromSubtags(
+        languageCode: 'zh', scriptCode: script, countryCode: country);
+
+    test('System follows the OS list as the app does, in order', () {
+      expect(updaterLanguage([const Locale('en', 'US')], null), 'en');
+      expect(updaterLanguage([const Locale('zh', 'CN')], null), 'zh-CN');
+      expect(updaterLanguage([zh('Hans', 'CN')], null), 'zh-CN');
+      expect(updaterLanguage([zh('Hant', 'TW')], null), 'zh-TW');
+      expect(
+          updaterLanguage([
+            const Locale('ja', 'JP'),
+            const Locale('en', 'US'),
+            zh('Hant', 'TW'),
+          ], null),
+          'en',
+          reason: 'English ranks above Traditional Chinese here');
+    });
+
+    test('Hong Kong has no WinSparkle language of its own: Traditional', () {
+      expect(updaterLanguage([const Locale('zh', 'HK')], null), 'zh-TW');
+      expect(updaterLanguage([zh('Hant', 'HK')], null), 'zh-TW');
+    });
+
+    test('a system with nothing Orthant has gets English, not WinSparkle\'s '
+        'guess', () {
+      expect(updaterLanguage([const Locale('ja', 'JP')], null), 'en');
+      expect(updaterLanguage(const [], null), 'en');
+    });
+
+    test('a language chosen in Settings beats the system\'s', () {
+      final english = [const Locale('en', 'US')];
+      expect(updaterLanguage(english, 'zh-Hant'), 'zh-TW');
+      expect(updaterLanguage(english, 'zh-Hans'), 'zh-CN');
+      expect(updaterLanguage(english, 'zh-Hant-HK'), 'zh-TW');
+      expect(updaterLanguage([zh('Hant', 'TW')], 'zh-Hans'), 'zh-CN');
+      expect(updaterLanguage([const Locale('zh', 'CN')], 'en'), 'en');
+    });
+
+    test('an empty or unreadable stored value is no choice at all', () {
+      // The registry read can hand back '' for an empty value, and the
+      // coordinator reads that as System too.
+      final chinese = [const Locale('zh', 'CN')];
+      for (final stored in ['', '  ', '!!', 'klingon-QQ-x']) {
+        expect(updaterLanguage(chinese, stored), 'zh-CN', reason: '"$stored"');
       }
     });
   });

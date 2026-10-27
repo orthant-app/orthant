@@ -6,6 +6,7 @@ import 'dart:ui' show Locale, PlatformDispatcher;
 import 'package:flutter/foundation.dart'
     show ValueListenable, debugPrint, kReleaseMode, visibleForTesting;
 import 'package:flutter/services.dart';
+import '../l10n/languages.dart';
 import 'channel.dart';
 import 'geometry.dart';
 import 'window_controller.dart';
@@ -20,6 +21,18 @@ import 'windows_updater.dart';
 import 'windows_version_resource.dart';
 import 'windows_win32_ops.dart';
 import 'windows_window_ops.dart';
+
+/// The language WinSparkle's windows are shown in: Orthant's own resolved
+/// language for the OS's [systemLocales] and the stored [choice] (the registry
+/// value, null for System), spelled as WinSparkle knows it (`zh-CN`, `zh-TW`).
+///
+/// Always the resolved one, System included: left to detect a language itself,
+/// WinSparkle would pick ones Orthant does not have, so that a Japanese Windows
+/// got an English Orthant with a Japanese update window. An empty or
+/// unreadable [choice] resolves as System, as it does for the app.
+@visibleForTesting
+String updaterLanguage(List<Locale> systemLocales, String? choice) =>
+    winSparkleLanguage(resolveAppLocale(systemLocales, choice: choice));
 
 /// The Windows backend of the seam.
 ///
@@ -76,7 +89,9 @@ class WindowsWindowController implements WindowController {
           display: kReleaseName.isNotEmpty
               ? kReleaseName
               : version?.short ?? '',
-          onShutdownRequested: onUpdaterShutdown ?? () {});
+          onShutdownRequested: onUpdaterShutdown ?? () {},
+          language: updaterLanguage(
+              _platformLocales(), const RegistryLanguageStore().read()));
     } catch (e) {
       // A missing or broken WinSparkle.dll costs updates, never the launch:
       // the tray comes up after this.
@@ -739,6 +754,8 @@ class _NoSparkle implements SparkleApi {
   void setAppBuildVersion(String build) {}
   @override
   void setAutomaticCheck(bool on) {}
+  @override
+  void setLang(String language) {}
   @override
   void setShutdownRequestCallback(void Function() onRequest) {}
   @override

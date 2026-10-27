@@ -4,6 +4,10 @@ import 'package:orthant/core/window_controller.dart';
 import 'package:orthant/settings/about_pane.dart';
 import 'package:orthant/settings/platform_theme.dart';
 
+import 'support/locales.dart';
+import 'support/localized_host.dart';
+import 'support/no_english.dart';
+
 void main() {
   Widget host(
     AppVersion version, {
@@ -175,6 +179,70 @@ void main() {
 
       expect(tester.takeException(), isNull, reason: 'no overflow');
       expect(find.byType(SingleChildScrollView), findsOneWidget);
+    });
+  });
+
+  group('AboutPane in Chinese', () {
+    const words = {
+      'zh': (
+        version: '版本 1.0.0 (2)',
+        available: '有可用的新版本 Orthant 1.0.4。',
+        update: '更新…',
+        check: '检查更新…',
+        automatic: '自动检查更新',
+        tagline: '基于网格的窗口管理工具。',
+      ),
+      'zh-Hant': (
+        version: '版本 1.0.0 (2)',
+        available: '有可用的新版本 Orthant 1.0.4。',
+        update: '更新…',
+        check: '檢查更新…',
+        automatic: '自動檢查更新',
+        tagline: '以格線為基礎的視窗管理工具。',
+      ),
+    };
+
+    for (final locale in [kSimplified, kTraditional, kHongKong]) {
+      final w = words[locale == kSimplified ? 'zh' : 'zh-Hant']!;
+
+      testWidgets('${locale.toLanguageTag()}: every line is in the language, '
+          'with an update offered', (tester) async {
+        await tester.pumpWidget(localizedApp(
+          locale,
+          AboutPane(
+            version: const AppVersion('1.0.0', '2'),
+            onCheckForUpdates: () {},
+            availableUpdate: '1.0.4',
+          ),
+        ));
+        expect(find.text('Orthant'), findsOneWidget);
+        expect(find.text(w.version), findsOneWidget);
+        expect(find.text(w.available), findsOneWidget);
+        expect(find.text(w.update), findsOneWidget);
+        expect(find.text(w.check), findsOneWidget);
+        expect(find.text(w.automatic), findsOneWidget);
+        expect(find.text(w.tagline), findsOneWidget);
+        expectNoEnglish(tester);
+      },
+          variant: const TargetPlatformVariant({
+            TargetPlatform.macOS,
+            TargetPlatform.windows,
+          }));
+    }
+
+    testWidgets('the buttons still work in Chinese', (tester) async {
+      var calls = 0;
+      await tester.pumpWidget(localizedApp(
+        kSimplified,
+        AboutPane(
+          version: const AppVersion('1.0.0', '2'),
+          onCheckForUpdates: () => calls++,
+          availableUpdate: '1.0.4',
+        ),
+      ));
+      await tester.tap(find.text('更新…'));
+      await tester.tap(find.text('检查更新…'));
+      expect(calls, 2);
     });
   });
 }

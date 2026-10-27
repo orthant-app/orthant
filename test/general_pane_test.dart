@@ -8,6 +8,8 @@ import 'package:orthant/settings/platform_theme.dart';
 import 'package:orthant/settings/settings.dart';
 
 import 'support/carbon_terms.dart';
+import 'support/locales.dart';
+import 'support/localized_host.dart';
 
 void main() {
   late List<Settings> changes;
@@ -114,5 +116,57 @@ void main() {
 
     await tester.pumpWidget(host(const Settings(gaps: false, gapSize: 8)));
     expect(find.text('6 × 6'), findsOneWidget);
+  });
+
+  group('what a screen reader hears on the steppers', () {
+    Set<String> stepperLabels(WidgetTester tester) => {
+          for (final node
+              in find.semantics.byPredicate((_) => true).evaluate())
+            if (node.label.contains(RegExp(r'[,，]')) &&
+                node.label.contains(RegExp(r'[0-9]')))
+              node.label,
+        };
+
+    testWidgets('English: caption and value, then the direction',
+        (tester) async {
+      await tester.pumpWidget(host(const Settings(gaps: true)));
+      expect(stepperLabels(tester), containsAll({
+        'Columns 6, increase',
+        'Columns 6, decrease',
+        'Rows 6, increase',
+        'Rows 6, decrease',
+        'Size 8 pt, increase',
+        'Size 8 pt, decrease',
+      }));
+    });
+
+    testWidgets('Chinese: the same, one whole message each', (tester) async {
+      for (final (locale, columns, rows, up, down) in [
+        (kSimplified, '列数', '行数', '增加', '减少'),
+        (kTraditional, '欄數', '列數', '增加', '減少'),
+      ]) {
+        await tester.pumpWidget(localizedApp(
+          locale,
+          SizedBox(
+            width: 560,
+            child: GeneralPane(
+              settings: const Settings(gaps: true),
+              onSettingsChanged: (_) {},
+              permissionGranted: true,
+              loginStatus: LoginItemStatus.disabled,
+              bindings: macDefaults,
+            ),
+          ),
+        ));
+        expect(stepperLabels(tester), containsAll({
+          '$columns 6，$up',
+          '$columns 6，$down',
+          '$rows 6，$up',
+          '$rows 6，$down',
+          '大小 8 pt，$up',
+          '大小 8 pt，$down',
+        }));
+      }
+    });
   });
 }

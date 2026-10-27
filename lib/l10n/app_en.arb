@@ -351,5 +351,247 @@
         "example": "Shift"
       }
     }
+  },
+  "settingsTabGeneral": "General",
+  "@settingsTabGeneral": {
+    "description": "The Settings window's first tab, for everything that is not a keyboard shortcut. On macOS it is also the name of a System Settings pane, so use Apple's word for General."
+  },
+  "settingsTabShortcuts": "Shortcuts",
+  "@settingsTabShortcuts": {
+    "description": "The Settings window's second tab, the list of keyboard shortcuts."
+  },
+  "settingsTabAbout": "About",
+  "@settingsTabAbout": {
+    "description": "The Settings window's third tab, showing the version and the update check."
+  },
+  "settingsTabLabel": "{tab} tab",
+  "@settingsTabLabel": {
+    "description": "What a screen reader calls one tab of the Settings window. Never drawn on screen. {tab} is the tab's name, written by the three messages above.",
+    "placeholders": {
+      "tab": {
+        "type": "String",
+        "example": "General"
+      }
+    }
+  },
+  "generalGroupAccessibility": "Accessibility",
+  "@generalGroupAccessibility": {
+    "description": "The label of the General tab's row that shows whether Orthant has the macOS Accessibility permission. It is the name of a macOS Privacy & Security pane, so use Apple's word for Accessibility. Shown on macOS only."
+  },
+  "generalGroupOpenGrid": "Open grid",
+  "@generalGroupOpenGrid": {
+    "description": "The label of the General tab's row that shows the shortcut which opens the grid."
+  },
+  "generalGroupGrid": "Grid",
+  "@generalGroupGrid": {
+    "description": "The label of the General tab's group of two steppers that set the grid's columns and rows."
+  },
+  "generalGroupGaps": "Gaps",
+  "@generalGroupGaps": {
+    "description": "The label of the General tab's group that sets the space left between windows and the screen's edge when a window is placed."
+  },
+  "generalGroupStartup": "Startup",
+  "@generalGroupStartup": {
+    "description": "The label of the General tab's group holding the launch-at-login checkbox."
+  },
+  "generalColumns": "Columns",
+  "@generalColumns": {
+    "description": "The caption of the General tab's stepper for the number of columns in the grid. A column runs top to bottom. Keep it short: the caption has room for about five characters."
+  },
+  "generalRows": "Rows",
+  "@generalRows": {
+    "description": "The caption of the General tab's stepper for the number of rows in the grid. A row runs left to right. Keep it short: the caption has room for about five characters."
+  },
+  "generalGapSize": "Size",
+  "@generalGapSize": {
+    "description": "The caption of the General tab's stepper for how large a gap is, beside the unit (pt on macOS, px on Windows)."
+  },
+  "generalLeaveGaps": "Leave gaps",
+  "@generalLeaveGaps": {
+    "description": "The label of the General tab's checkbox that turns gaps between placed windows and the screen's edge on or off."
+  },
+  "generalResetGridAndGaps": "Reset Grid & Gaps",
+  "@generalResetGridAndGaps": {
+    "description": "The button at the foot of the General tab that puts the grid size and the gaps back to their defaults. It changes nothing else, and the name says so."
+  },
+  "generalAccessibilityGranted": "Granted",
+  "@generalAccessibilityGranted": {
+    "description": "Beside a green dot on the General tab, when Orthant has the macOS Accessibility permission. Shown on macOS only."
+  },
+  "generalAccessibilityNotGranted": "Not granted. Shortcuts and the grid do nothing",
+  "@generalAccessibilityNotGranted": {
+    "description": "Beside a warning dot on the General tab, when Orthant lacks the macOS Accessibility permission. It has no final full stop in English. Shown on macOS only."
+  },
+  "generalOpenAccessibilitySettings": "Open Accessibility Settings…",
+  "@generalOpenAccessibilitySettings": {
+    "description": "The button under the missing-permission warning that opens the macOS Accessibility pane. Accessibility is the name of that pane. Shown on macOS only."
+  },
+  "generalSummonUnavailable": "{system} or another app already uses this combination, so it never reaches Orthant.",
+  "@generalSummonUnavailable": {
+    "description": "The tooltip on the warning icon beside the grid shortcut on the General tab, when the system refused to give Orthant that key combination. {system} is the operating system's name, macOS or Windows, and stays as written.",
+    "placeholders": {
+      "system": {
+        "type": "String",
+        "example": "macOS"
+      }
+    }
+  },
+  "generalChange": "Change…",
+  "@generalChange": {
+    "description": "The link beside the grid shortcut on the General tab that opens the Shortcuts tab, where it is changed."
+  },
+  "shortcutNotSet": "Not set",
+  "@shortcutNotSet": {
+    "description": "Shown where a command has no keyboard shortcut yet, such as the grid shortcut on the General tab."
+  },
+  "generalLaunchAtLogin": "Launch at login",
+  "@generalLaunchAtLogin": {
+    "description": "The label of the General tab's checkbox that starts Orthant when the user signs in, on macOS and on Windows."
+  },
+  "generalLoginUnrecognisedMac": "macOS reported a login-item state Orthant does not recognise. Switching this on may still work.",
+  "@generalLoginUnrecognisedMac": {
+    "description": "A note under the Launch at login checkbox on macOS, when the system answered with a state Orthant does not know. macOS stays as written."
+  },
+  "generalLoginUnrecognisedWindows": "Windows reported a startup state Orthant does not recognise. Switching this on may still work.",
+  "@generalLoginUnrecognisedWindows": {
+    "description": "A note under the Launch at login checkbox on Windows, when the system answered with a state Orthant does not know. Windows stays as written."
+  },
+  "generalLoginTurnedOffMac13": "Turned off in System Settings ▸ General ▸ Login Items, so Orthant will not start automatically.",
+  "@generalLoginTurnedOffMac13": {
+    "description": "A note under the Launch at login checkbox on macOS 13 and 14, when the user has switched Orthant off in System Settings. One whole sentence: it names three System Settings screens in order, joined by ▸, and each name is copied exactly from Apple's own words for that macOS version. The macOS 15 and later version is the next message."
+  },
+  "generalLoginTurnedOffMac15": "Turned off in System Settings ▸ General ▸ Login Items & Extensions, so Orthant will not start automatically.",
+  "@generalLoginTurnedOffMac15": {
+    "description": "A note under the Launch at login checkbox on macOS 15 and later, when the user has switched Orthant off in System Settings. One whole sentence: it names three System Settings screens in order, joined by ▸, and each name is copied exactly from Apple's own words for macOS 15 and later, where the last screen is called Login Items & Extensions."
+  },
+  "generalLoginTurnedOffWindows": "Turned off in Settings ▸ Apps ▸ Startup, so Orthant will not start automatically.",
+  "@generalLoginTurnedOffWindows": {
+    "description": "A note under the Launch at login checkbox on Windows, when the user has switched Orthant off in Windows Settings. One whole sentence: it names three Windows Settings screens in order, joined by ▸, and each name is copied exactly from that Windows language's own Settings."
+  },
+  "generalOpenLoginItemsMac13": "Open Login Items…",
+  "@generalOpenLoginItemsMac13": {
+    "description": "The link under the macOS note that opens the System Settings pane for Login Items, on macOS 13 and 14. It names that pane exactly as the previous note does."
+  },
+  "generalOpenLoginItemsMac15": "Open Login Items & Extensions…",
+  "@generalOpenLoginItemsMac15": {
+    "description": "The link under the macOS note that opens the System Settings pane for Login Items & Extensions, on macOS 15 and later. It names that pane exactly as the previous note does."
+  },
+  "generalOpenStartupApps": "Open Startup Apps…",
+  "@generalOpenStartupApps": {
+    "description": "The link under the Windows note that opens the Windows Settings page for startup apps (Settings, Apps, Startup)."
+  },
+  "generalStepperValue": "{caption} {value}",
+  "@generalStepperValue": {
+    "description": "What a screen reader says for a stepper that has no unit: its caption, then its value, such as \"Columns 6\". Never drawn on screen.",
+    "placeholders": {
+      "caption": {
+        "type": "String",
+        "example": "Columns"
+      },
+      "value": {
+        "type": "int",
+        "example": "6"
+      }
+    }
+  },
+  "generalStepperValueUnit": "{caption} {value} {unit}",
+  "@generalStepperValueUnit": {
+    "description": "What a screen reader says for a stepper that has a unit: its caption, its value and the unit, such as \"Size 8 pt\". {unit} is pt on macOS and px on Windows and stays as written. Never drawn on screen.",
+    "placeholders": {
+      "caption": {
+        "type": "String",
+        "example": "Size"
+      },
+      "value": {
+        "type": "int",
+        "example": "8"
+      },
+      "unit": {
+        "type": "String",
+        "example": "pt"
+      }
+    }
+  },
+  "stepperIncrease": "{label}, increase",
+  "@stepperIncrease": {
+    "description": "What a screen reader calls the up arrow of a stepper. {label} is what the stepper announces (its caption and value), such as \"Columns 6\". Never drawn on screen.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Columns 6"
+      }
+    }
+  },
+  "stepperDecrease": "{label}, decrease",
+  "@stepperDecrease": {
+    "description": "What a screen reader calls the down arrow of a stepper. {label} is what the stepper announces (its caption and value), such as \"Columns 6\". Never drawn on screen.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Columns 6"
+      }
+    }
+  },
+  "gridPreviewCaptionGaps": "{gap, plural, =1{{cols} × {rows} · up to 1 {unit} gap} other{{cols} × {rows} · up to {gap} {unit} gaps}}",
+  "@gridPreviewCaptionGaps": {
+    "description": "The caption under the grid preview on the General tab when gaps are on: the grid's size and the largest gap a placement keeps (it shrinks for a window too small to keep it). {cols} and {rows} are the grid's size, and the × between them stays. {gap} is the gap, a whole number, and {unit} is pt on macOS and px on Windows and stays as written.",
+    "placeholders": {
+      "cols": {
+        "type": "int",
+        "example": "6"
+      },
+      "rows": {
+        "type": "int",
+        "example": "6"
+      },
+      "gap": {
+        "type": "int",
+        "example": "8"
+      },
+      "unit": {
+        "type": "String",
+        "example": "pt"
+      }
+    }
+  },
+  "recordingPressKeys": "Press keys…",
+  "@recordingPressKeys": {
+    "description": "Shown inside a shortcut field while it listens for a key combination and no modifier key is held yet."
+  },
+  "aboutVersion": "Version {version}",
+  "@aboutVersion": {
+    "description": "The version line on the About tab. {version} is the release name, such as 1.1.2 or 1.1.2-beta.1, or the version with its build number in brackets for a development build.",
+    "placeholders": {
+      "version": {
+        "type": "String",
+        "example": "1.1.2"
+      }
+    }
+  },
+  "aboutUpdateAvailable": "Orthant {name} is available.",
+  "@aboutUpdateAvailable": {
+    "description": "A line on the About tab when an update check found a newer release, above the Update button. {name} is the new version, such as 1.1.3. Orthant stays as written.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "1.1.3"
+      }
+    }
+  },
+  "aboutUpdate": "Update…",
+  "@aboutUpdate": {
+    "description": "The button on the About tab that opens the updater's offer, shown only while an update is waiting."
+  },
+  "aboutCheckForUpdates": "Check for Updates…",
+  "@aboutCheckForUpdates": {
+    "description": "The button on the About tab that checks for a new version of the app."
+  },
+  "aboutAutomaticChecks": "Check for updates automatically",
+  "@aboutAutomaticChecks": {
+    "description": "The label of the About tab's checkbox that lets the app look for new versions on its own schedule."
+  },
+  "aboutTagline": "A grid-based window manager.",
+  "@aboutTagline": {
+    "description": "The one-line description of the app at the foot of the About tab. It names no operating system."
   }
 }

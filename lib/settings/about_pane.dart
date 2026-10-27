@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/window_controller.dart';
+import '../l10n/strings.dart';
 import 'mac_controls.dart';
 import 'platform_theme.dart';
 
@@ -70,6 +71,7 @@ class AboutPane extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final l = context.l10n;
     // Centre in the *viewport*, and scroll when the viewport is too short for
     // the content. `minHeight` has to come from the incoming constraints, not
     // a constant: a `SingleChildScrollView` sizes its child to the child's own
@@ -124,26 +126,26 @@ class AboutPane extends StatelessWidget {
                       // labelSecondary, never labelTertiary: tertiary is macOS's
                       // *disabled* weight at 2.4:1, and this text is not disabled.
                       // The Shortcuts pane already paid for that confusion once.
-                      'Version ${version.display}',
+                      l.aboutVersion(version.display),
                       style: TextStyle(fontSize: 13, color: t.labelSecondary),
                     ),
                   ],
                   if (availableUpdate case final name?) ...[
                     const SizedBox(height: 16),
                     Text(
-                      'Orthant $name is available.',
+                      l.aboutUpdateAvailable(name),
                       style: TextStyle(fontSize: 13, color: t.labelPrimary),
                     ),
                     const SizedBox(height: 8),
                     MacPushButton(
-                      label: 'Update…',
+                      label: l.aboutUpdate,
                       tokens: t,
                       onPressed: onCheckForUpdates,
                     ),
                   ],
                   const SizedBox(height: 20),
                   MacPushButton(
-                    label: 'Check for Updates…',
+                    label: l.aboutCheckForUpdates,
                     tokens: t,
                     onPressed: onCheckForUpdates,
                   ),
@@ -159,7 +161,7 @@ class AboutPane extends StatelessWidget {
                   // But suppressing the ask is only defensible if the answer is
                   // reachable somewhere, and until now it was not.
                   MacCheckbox(
-                    label: 'Check for updates automatically',
+                    label: l.aboutAutomaticChecks,
                     tokens: t,
                     value: automaticChecks,
                     onChanged: onAutomaticChecksChanged,
@@ -169,7 +171,7 @@ class AboutPane extends StatelessWidget {
                     // No platform named. Windows is the planned second target
                     // (spec §8), and "for macOS" is a line that would be wrong
                     // the day that ships while still looking perfectly fine.
-                    'A grid-based window manager.',
+                    l.aboutTagline,
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 12, color: t.labelSecondary),
                   ),

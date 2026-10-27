@@ -237,6 +237,157 @@ class AppLocalizationsZh extends AppLocalizations {
   String keyListAnyModifier(String a, String b, String c, String d) {
     return '$a、$b、$c 或 $d';
   }
+
+  @override
+  String get settingsTabGeneral => '通用';
+
+  @override
+  String get settingsTabShortcuts => '快捷键';
+
+  @override
+  String get settingsTabAbout => '关于';
+
+  @override
+  String settingsTabLabel(String tab) {
+    return '$tab标签页';
+  }
+
+  @override
+  String get generalGroupAccessibility => '无障碍';
+
+  @override
+  String get generalGroupOpenGrid => '打开网格';
+
+  @override
+  String get generalGroupGrid => '网格';
+
+  @override
+  String get generalGroupGaps => '间距';
+
+  @override
+  String get generalGroupStartup => '启动';
+
+  @override
+  String get generalColumns => '列数';
+
+  @override
+  String get generalRows => '行数';
+
+  @override
+  String get generalGapSize => '大小';
+
+  @override
+  String get generalLeaveGaps => '留出间距';
+
+  @override
+  String get generalResetGridAndGaps => '重置网格与间距';
+
+  @override
+  String get generalAccessibilityGranted => '已授权';
+
+  @override
+  String get generalAccessibilityNotGranted => '未授权。快捷键和网格不会起作用。';
+
+  @override
+  String get generalOpenAccessibilitySettings => '打开无障碍设置…';
+
+  @override
+  String generalSummonUnavailable(String system) {
+    return '$system 或其他应用已使用此组合键，因此 Orthant 收不到它。';
+  }
+
+  @override
+  String get generalChange => '更改…';
+
+  @override
+  String get shortcutNotSet => '未设置';
+
+  @override
+  String get generalLaunchAtLogin => '登录时启动';
+
+  @override
+  String get generalLoginUnrecognisedMac =>
+      'macOS 报告了 Orthant 无法识别的登录项状态。仍可尝试开启。';
+
+  @override
+  String get generalLoginUnrecognisedWindows =>
+      'Windows 报告了 Orthant 无法识别的启动状态。仍可尝试开启。';
+
+  @override
+  String get generalLoginTurnedOffMac13 =>
+      '已在“系统设置 ▸ 通用 ▸ 登录项”中关闭，因此 Orthant 不会自动启动。';
+
+  @override
+  String get generalLoginTurnedOffMac15 =>
+      '已在“系统设置 ▸ 通用 ▸ 登录项与扩展”中关闭，因此 Orthant 不会自动启动。';
+
+  @override
+  String get generalLoginTurnedOffWindows =>
+      '已在“设置 ▸ 应用 ▸ 启动”中关闭，因此 Orthant 不会自动启动。';
+
+  @override
+  String get generalOpenLoginItemsMac13 => '打开登录项…';
+
+  @override
+  String get generalOpenLoginItemsMac15 => '打开登录项与扩展…';
+
+  @override
+  String get generalOpenStartupApps => '打开启动应用…';
+
+  @override
+  String generalStepperValue(String caption, int value) {
+    return '$caption $value';
+  }
+
+  @override
+  String generalStepperValueUnit(String caption, int value, String unit) {
+    return '$caption $value $unit';
+  }
+
+  @override
+  String stepperIncrease(String label) {
+    return '$label，增加';
+  }
+
+  @override
+  String stepperDecrease(String label) {
+    return '$label，减少';
+  }
+
+  @override
+  String gridPreviewCaptionGaps(int cols, int rows, int gap, String unit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      gap,
+      locale: localeName,
+      other: '$cols × $rows · 间距最多 $gap $unit',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get recordingPressKeys => '按下按键…';
+
+  @override
+  String aboutVersion(String version) {
+    return '版本 $version';
+  }
+
+  @override
+  String aboutUpdateAvailable(String name) {
+    return '有可用的新版本 Orthant $name。';
+  }
+
+  @override
+  String get aboutUpdate => '更新…';
+
+  @override
+  String get aboutCheckForUpdates => '检查更新…';
+
+  @override
+  String get aboutAutomaticChecks => '自动检查更新';
+
+  @override
+  String get aboutTagline => '基于网格的窗口管理工具。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -472,6 +623,157 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String keyListAnyModifier(String a, String b, String c, String d) {
     return '$a、$b、$c 或 $d';
   }
+
+  @override
+  String get settingsTabGeneral => '一般';
+
+  @override
+  String get settingsTabShortcuts => '快速鍵';
+
+  @override
+  String get settingsTabAbout => '關於';
+
+  @override
+  String settingsTabLabel(String tab) {
+    return '$tab標籤頁';
+  }
+
+  @override
+  String get generalGroupAccessibility => '輔助使用';
+
+  @override
+  String get generalGroupOpenGrid => '開啟格線';
+
+  @override
+  String get generalGroupGrid => '格線';
+
+  @override
+  String get generalGroupGaps => '間距';
+
+  @override
+  String get generalGroupStartup => '啟動';
+
+  @override
+  String get generalColumns => '欄數';
+
+  @override
+  String get generalRows => '列數';
+
+  @override
+  String get generalGapSize => '大小';
+
+  @override
+  String get generalLeaveGaps => '留出間距';
+
+  @override
+  String get generalResetGridAndGaps => '重設格線與間距';
+
+  @override
+  String get generalAccessibilityGranted => '已授權';
+
+  @override
+  String get generalAccessibilityNotGranted => '未授權。快速鍵和格線不會有作用。';
+
+  @override
+  String get generalOpenAccessibilitySettings => '開啟輔助使用設定…';
+
+  @override
+  String generalSummonUnavailable(String system) {
+    return '$system 或其他應用程式已使用此組合鍵，因此 Orthant 收不到它。';
+  }
+
+  @override
+  String get generalChange => '更改…';
+
+  @override
+  String get shortcutNotSet => '未設定';
+
+  @override
+  String get generalLaunchAtLogin => '登入時啟動';
+
+  @override
+  String get generalLoginUnrecognisedMac =>
+      'macOS 回報了 Orthant 無法辨識的登入項目狀態。仍可嘗試開啟。';
+
+  @override
+  String get generalLoginUnrecognisedWindows =>
+      'Windows 回報了 Orthant 無法辨識的啟動狀態。仍可嘗試開啟。';
+
+  @override
+  String get generalLoginTurnedOffMac13 =>
+      '已在「系統設定 ▸ 一般 ▸ 登入項目」中關閉，因此 Orthant 不會自動啟動。';
+
+  @override
+  String get generalLoginTurnedOffMac15 =>
+      '已在「系統設定 ▸ 一般 ▸ 登入項目與延伸功能」中關閉，因此 Orthant 不會自動啟動。';
+
+  @override
+  String get generalLoginTurnedOffWindows =>
+      '已在「設定 ▸ 應用程式 ▸ 啟動」中關閉，因此 Orthant 不會自動啟動。';
+
+  @override
+  String get generalOpenLoginItemsMac13 => '開啟登入項目…';
+
+  @override
+  String get generalOpenLoginItemsMac15 => '開啟登入項目與延伸功能…';
+
+  @override
+  String get generalOpenStartupApps => '開啟啟動應用程式…';
+
+  @override
+  String generalStepperValue(String caption, int value) {
+    return '$caption $value';
+  }
+
+  @override
+  String generalStepperValueUnit(String caption, int value, String unit) {
+    return '$caption $value $unit';
+  }
+
+  @override
+  String stepperIncrease(String label) {
+    return '$label，增加';
+  }
+
+  @override
+  String stepperDecrease(String label) {
+    return '$label，減少';
+  }
+
+  @override
+  String gridPreviewCaptionGaps(int cols, int rows, int gap, String unit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      gap,
+      locale: localeName,
+      other: '$cols × $rows · 間距最多 $gap $unit',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get recordingPressKeys => '按下按鍵…';
+
+  @override
+  String aboutVersion(String version) {
+    return '版本 $version';
+  }
+
+  @override
+  String aboutUpdateAvailable(String name) {
+    return '有可用的新版本 Orthant $name。';
+  }
+
+  @override
+  String get aboutUpdate => '更新…';
+
+  @override
+  String get aboutCheckForUpdates => '檢查更新…';
+
+  @override
+  String get aboutAutomaticChecks => '自動檢查更新';
+
+  @override
+  String get aboutTagline => '以格線為基礎的視窗管理工具。';
 }
 
 /// The translations for Chinese, as used in Hong Kong, using the Han script (`zh_Hant_HK`).
@@ -707,4 +1009,155 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   String keyListAnyModifier(String a, String b, String c, String d) {
     return '$a、$b、$c 或 $d';
   }
+
+  @override
+  String get settingsTabGeneral => '一般';
+
+  @override
+  String get settingsTabShortcuts => '快速鍵';
+
+  @override
+  String get settingsTabAbout => '關於';
+
+  @override
+  String settingsTabLabel(String tab) {
+    return '$tab標籤頁';
+  }
+
+  @override
+  String get generalGroupAccessibility => '輔助使用';
+
+  @override
+  String get generalGroupOpenGrid => '開啟格線';
+
+  @override
+  String get generalGroupGrid => '格線';
+
+  @override
+  String get generalGroupGaps => '間距';
+
+  @override
+  String get generalGroupStartup => '啟動';
+
+  @override
+  String get generalColumns => '欄數';
+
+  @override
+  String get generalRows => '列數';
+
+  @override
+  String get generalGapSize => '大小';
+
+  @override
+  String get generalLeaveGaps => '留出間距';
+
+  @override
+  String get generalResetGridAndGaps => '重設格線與間距';
+
+  @override
+  String get generalAccessibilityGranted => '已授權';
+
+  @override
+  String get generalAccessibilityNotGranted => '未授權。快速鍵和格線不會有作用。';
+
+  @override
+  String get generalOpenAccessibilitySettings => '開啟輔助使用設定…';
+
+  @override
+  String generalSummonUnavailable(String system) {
+    return '$system 或其他應用程式已使用此組合鍵，因此 Orthant 收不到它。';
+  }
+
+  @override
+  String get generalChange => '更改…';
+
+  @override
+  String get shortcutNotSet => '未設定';
+
+  @override
+  String get generalLaunchAtLogin => '登入時啟動';
+
+  @override
+  String get generalLoginUnrecognisedMac =>
+      'macOS 回報了 Orthant 無法辨識的登入項目狀態。仍可嘗試開啟。';
+
+  @override
+  String get generalLoginUnrecognisedWindows =>
+      'Windows 回報了 Orthant 無法辨識的啟動狀態。仍可嘗試開啟。';
+
+  @override
+  String get generalLoginTurnedOffMac13 =>
+      '已在「系統設定 ▸ 一般 ▸ 登入項目」中關閉，因此 Orthant 不會自動啟動。';
+
+  @override
+  String get generalLoginTurnedOffMac15 =>
+      '已在「系統設定 ▸ 一般 ▸ 登入項目與延伸功能」中關閉，因此 Orthant 不會自動啟動。';
+
+  @override
+  String get generalLoginTurnedOffWindows =>
+      '已在「設定 ▸ 應用程式 ▸ 啟動」中關閉，因此 Orthant 不會自動啟動。';
+
+  @override
+  String get generalOpenLoginItemsMac13 => '開啟登入項目…';
+
+  @override
+  String get generalOpenLoginItemsMac15 => '開啟登入項目與延伸功能…';
+
+  @override
+  String get generalOpenStartupApps => '開啟啟動應用程式…';
+
+  @override
+  String generalStepperValue(String caption, int value) {
+    return '$caption $value';
+  }
+
+  @override
+  String generalStepperValueUnit(String caption, int value, String unit) {
+    return '$caption $value $unit';
+  }
+
+  @override
+  String stepperIncrease(String label) {
+    return '$label，增加';
+  }
+
+  @override
+  String stepperDecrease(String label) {
+    return '$label，減少';
+  }
+
+  @override
+  String gridPreviewCaptionGaps(int cols, int rows, int gap, String unit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      gap,
+      locale: localeName,
+      other: '$cols × $rows · 間距最多 $gap $unit',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get recordingPressKeys => '按下按鍵…';
+
+  @override
+  String aboutVersion(String version) {
+    return '版本 $version';
+  }
+
+  @override
+  String aboutUpdateAvailable(String name) {
+    return '有可用的新版本 Orthant $name。';
+  }
+
+  @override
+  String get aboutUpdate => '更新…';
+
+  @override
+  String get aboutCheckForUpdates => '檢查更新…';
+
+  @override
+  String get aboutAutomaticChecks => '自動檢查更新';
+
+  @override
+  String get aboutTagline => '以格線為基礎的視窗管理工具。';
 }

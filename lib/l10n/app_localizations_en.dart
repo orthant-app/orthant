@@ -239,4 +239,157 @@ class AppLocalizationsEn extends AppLocalizations {
   String keyListAnyModifier(String a, String b, String c, String d) {
     return '$a, $b, $c or $d';
   }
+
+  @override
+  String get settingsTabGeneral => 'General';
+
+  @override
+  String get settingsTabShortcuts => 'Shortcuts';
+
+  @override
+  String get settingsTabAbout => 'About';
+
+  @override
+  String settingsTabLabel(String tab) {
+    return '$tab tab';
+  }
+
+  @override
+  String get generalGroupAccessibility => 'Accessibility';
+
+  @override
+  String get generalGroupOpenGrid => 'Open grid';
+
+  @override
+  String get generalGroupGrid => 'Grid';
+
+  @override
+  String get generalGroupGaps => 'Gaps';
+
+  @override
+  String get generalGroupStartup => 'Startup';
+
+  @override
+  String get generalColumns => 'Columns';
+
+  @override
+  String get generalRows => 'Rows';
+
+  @override
+  String get generalGapSize => 'Size';
+
+  @override
+  String get generalLeaveGaps => 'Leave gaps';
+
+  @override
+  String get generalResetGridAndGaps => 'Reset Grid & Gaps';
+
+  @override
+  String get generalAccessibilityGranted => 'Granted';
+
+  @override
+  String get generalAccessibilityNotGranted =>
+      'Not granted. Shortcuts and the grid do nothing';
+
+  @override
+  String get generalOpenAccessibilitySettings => 'Open Accessibility Settings…';
+
+  @override
+  String generalSummonUnavailable(String system) {
+    return '$system or another app already uses this combination, so it never reaches Orthant.';
+  }
+
+  @override
+  String get generalChange => 'Change…';
+
+  @override
+  String get shortcutNotSet => 'Not set';
+
+  @override
+  String get generalLaunchAtLogin => 'Launch at login';
+
+  @override
+  String get generalLoginUnrecognisedMac =>
+      'macOS reported a login-item state Orthant does not recognise. Switching this on may still work.';
+
+  @override
+  String get generalLoginUnrecognisedWindows =>
+      'Windows reported a startup state Orthant does not recognise. Switching this on may still work.';
+
+  @override
+  String get generalLoginTurnedOffMac13 =>
+      'Turned off in System Settings ▸ General ▸ Login Items, so Orthant will not start automatically.';
+
+  @override
+  String get generalLoginTurnedOffMac15 =>
+      'Turned off in System Settings ▸ General ▸ Login Items & Extensions, so Orthant will not start automatically.';
+
+  @override
+  String get generalLoginTurnedOffWindows =>
+      'Turned off in Settings ▸ Apps ▸ Startup, so Orthant will not start automatically.';
+
+  @override
+  String get generalOpenLoginItemsMac13 => 'Open Login Items…';
+
+  @override
+  String get generalOpenLoginItemsMac15 => 'Open Login Items & Extensions…';
+
+  @override
+  String get generalOpenStartupApps => 'Open Startup Apps…';
+
+  @override
+  String generalStepperValue(String caption, int value) {
+    return '$caption $value';
+  }
+
+  @override
+  String generalStepperValueUnit(String caption, int value, String unit) {
+    return '$caption $value $unit';
+  }
+
+  @override
+  String stepperIncrease(String label) {
+    return '$label, increase';
+  }
+
+  @override
+  String stepperDecrease(String label) {
+    return '$label, decrease';
+  }
+
+  @override
+  String gridPreviewCaptionGaps(int cols, int rows, int gap, String unit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      gap,
+      locale: localeName,
+      other: '$cols × $rows · up to $gap $unit gaps',
+      one: '$cols × $rows · up to 1 $unit gap',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get recordingPressKeys => 'Press keys…';
+
+  @override
+  String aboutVersion(String version) {
+    return 'Version $version';
+  }
+
+  @override
+  String aboutUpdateAvailable(String name) {
+    return 'Orthant $name is available.';
+  }
+
+  @override
+  String get aboutUpdate => 'Update…';
+
+  @override
+  String get aboutCheckForUpdates => 'Check for Updates…';
+
+  @override
+  String get aboutAutomaticChecks => 'Check for updates automatically';
+
+  @override
+  String get aboutTagline => 'A grid-based window manager.';
 }

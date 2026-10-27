@@ -8,6 +8,9 @@ import 'package:orthant/shortcuts/bindings.dart';
 import 'package:orthant/core/key_chord.dart';
 
 import 'support/carbon_terms.dart';
+import 'support/locales.dart';
+import 'support/localized_host.dart';
+import 'support/no_english.dart';
 
 void main() {
   Future<List<KeyChord>> pump(
@@ -37,6 +40,24 @@ void main() {
   testWidgets('says nothing is held until something is', (tester) async {
     await pump(tester);
     expect(find.text('Press keys…'), findsOneWidget);
+  });
+
+  testWidgets('and says so in the language of the app', (tester) async {
+    for (final (locale, prompt) in [
+      (kSimplified, '按下按键…'),
+      (kTraditional, '按下按鍵…'),
+      (kHongKong, '按下按鍵…'),
+    ]) {
+      await tester.pumpWidget(localizedApp(
+        locale,
+        Center(
+          child: RecordingField(onCombo: (_) {}, onCancel: () {}),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text(prompt), findsOneWidget);
+      expectNoEnglish(tester);
+    }
   });
 
   testWidgets('draws the modifiers as they are held', (tester) async {

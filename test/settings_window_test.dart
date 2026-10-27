@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/window_controller.dart';
+import 'package:orthant/l10n/strings.dart';
 import 'package:orthant/settings/platform_theme.dart';
 import 'package:orthant/settings/region_picker_sheet.dart';
 import 'package:orthant/settings/settings.dart';
@@ -11,6 +12,9 @@ import 'package:orthant/shortcuts/shortcut_command.dart';
 import 'package:orthant/shortcuts/command_ref.dart';
 
 import 'support/carbon_terms.dart';
+import 'support/locales.dart';
+import 'support/localized_host.dart';
+import 'support/no_english.dart';
 
 void main() {
   Widget host({
@@ -26,11 +30,15 @@ void main() {
     CustomRegion? pendingRegion,
     VoidCallback? onPendingConsumed,
     void Function(RegionDraft)? onRegionSaved,
+    // Pinned false: the Login Items sentences asserted below were written
+    // against macOS 13 and 14, and keep their words.
+    bool loginItemsHasExtensions = false,
   }) =>
       MaterialApp(
         theme: orthantTheme(Brightness.light),
         home: SettingsWindow(
           initialTab: initialTab,
+          loginItemsHasExtensions: loginItemsHasExtensions,
           settings: settings,
           bindings: bindings ?? macDefaults,
           loginStatus: loginStatus,
@@ -345,5 +353,82 @@ void main() {
     await tester.tap(find.text('Left half'));
     await tester.pumpAndSettle();
     expect(find.text('Reset Shortcuts'), findsNothing);
+  });
+
+  testWidgets('macOS 15 and later: the approval text names Login Items & '
+      'Extensions', (tester) async {
+    await tester.pumpWidget(host(
+        loginStatus: LoginItemStatus.requiresApproval,
+        loginItemsHasExtensions: true));
+    expect(find.textContaining('Login Items & Extensions, so Orthant'),
+        findsOneWidget);
+    expect(find.text('Open Login Items & Extensions…'), findsOneWidget);
+  });
+
+  group('in Chinese', () {
+    tearDown(() => setAppStrings(kEnglish));
+
+    /// The window itself, with the Chinese delegates in scope.
+    Widget zhWindow(Locale locale, SettingsTab tab) => localizedApp(
+          locale,
+          SettingsWindow(
+            initialTab: tab,
+            settings: const Settings(gaps: true),
+            bindings: macDefaults,
+            loginStatus: LoginItemStatus.requiresApproval,
+            permissionGranted: false,
+            onSettingsChanged: (_) {},
+            onRebound: (_) {},
+            version: const AppVersion('1.1.2', '12'),
+            availableUpdate: '1.1.3',
+          ),
+        );
+
+    const tabNames = {
+      'zh': ['通用', '快捷键', '关于'],
+      'zh-Hant': ['一般', '快速鍵', '關於'],
+      'zh-Hant-HK': ['一般', '快速鍵', '關於'],
+    };
+
+    for (final locale in [kSimplified, kTraditional, kHongKong]) {
+      final names = tabNames[locale.toLanguageTag()]!;
+
+      testWidgets('${locale.toLanguageTag()}: the tab bar is named in the '
+          'language, for the eye and for a screen reader', (tester) async {
+        setAppStrings(locale);
+        await tester.pumpWidget(zhWindow(locale, SettingsTab.general));
+        for (final name in names) {
+          expect(find.text(name), findsWidgets);
+        }
+        // The whole label is one message with the tab's name in it.
+        final suffix = locale == kSimplified ? '标签页' : '標籤頁';
+        for (final name in names) {
+          expect(find.bySemanticsLabel('$name$suffix'), findsOneWidget);
+        }
+      });
+
+      for (final tab in [SettingsTab.general, SettingsTab.about]) {
+        testWidgets('${locale.toLanguageTag()}: the window on $tab has no '
+            'English in it, tab bar included', (tester) async {
+          setAppStrings(locale);
+          await tester.pumpWidget(zhWindow(locale, tab));
+          await tester.pumpAndSettle();
+          expectNoEnglish(tester);
+        },
+            variant: const TargetPlatformVariant({
+              TargetPlatform.macOS,
+              TargetPlatform.windows,
+            }));
+      }
+    }
+
+    testWidgets('switching tabs keeps speaking Chinese', (tester) async {
+      setAppStrings(kSimplified);
+      await tester.pumpWidget(zhWindow(kSimplified, SettingsTab.general));
+      await tester.tap(find.text('关于'));
+      await tester.pumpAndSettle();
+      expect(find.text('检查更新…'), findsWidgets);
+      expect(find.text('Check for Updates…'), findsNothing);
+    });
   });
 }

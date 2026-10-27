@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'app/coordinator.dart';
+import 'core/os_version.dart';
 import 'core/window_controller_factory.dart';
 import 'l10n/app_localizations.dart';
 import 'overlay/overlay_main.dart';
@@ -29,6 +30,13 @@ void overlayMain() => runOverlayApp();
 /// The app's one coordinator. Everything that used to be a top-level global in
 /// this file now lives on it — see [OrthantCoordinator] for why.
 late final OrthantCoordinator app;
+
+/// Whether this Mac names the Login Items pane "Login Items & Extensions",
+/// which macOS 15 did. A version that cannot be read is taken as the newer
+/// one. Read once: the OS does not change under a running app, and Windows
+/// never looks at it.
+final bool _loginItemsHasExtensions =
+    (macOSMajorVersion(Platform.operatingSystemVersion) ?? 15) >= 15;
 
 /// Quits on Windows. Windows keeps a dead icon in the tray until the pointer
 /// sweeps it if the process exits without removing it, so destroy() is
@@ -222,6 +230,7 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
               unavailable: app.unavailable,
               permissionGranted: app.permissions.granted,
               loginStatus: app.loginStatus,
+              loginItemsHasExtensions: _loginItemsHasExtensions,
               onSettingsChanged: app.settingsChanged,
               onSetLoginItem: app.setLoginItem,
               onOpenLoginItems: app.wc.openLoginItemsSettings,

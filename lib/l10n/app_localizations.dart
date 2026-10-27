@@ -434,6 +434,252 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{a}, {b}, {c} or {d}'**
   String keyListAnyModifier(String a, String b, String c, String d);
+
+  /// The Settings window's first tab, for everything that is not a keyboard shortcut. On macOS it is also the name of a System Settings pane, so use Apple's word for General.
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get settingsTabGeneral;
+
+  /// The Settings window's second tab, the list of keyboard shortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcuts'**
+  String get settingsTabShortcuts;
+
+  /// The Settings window's third tab, showing the version and the update check.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get settingsTabAbout;
+
+  /// What a screen reader calls one tab of the Settings window. Never drawn on screen. {tab} is the tab's name, written by the three messages above.
+  ///
+  /// In en, this message translates to:
+  /// **'{tab} tab'**
+  String settingsTabLabel(String tab);
+
+  /// The label of the General tab's row that shows whether Orthant has the macOS Accessibility permission. It is the name of a macOS Privacy & Security pane, so use Apple's word for Accessibility. Shown on macOS only.
+  ///
+  /// In en, this message translates to:
+  /// **'Accessibility'**
+  String get generalGroupAccessibility;
+
+  /// The label of the General tab's row that shows the shortcut which opens the grid.
+  ///
+  /// In en, this message translates to:
+  /// **'Open grid'**
+  String get generalGroupOpenGrid;
+
+  /// The label of the General tab's group of two steppers that set the grid's columns and rows.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid'**
+  String get generalGroupGrid;
+
+  /// The label of the General tab's group that sets the space left between windows and the screen's edge when a window is placed.
+  ///
+  /// In en, this message translates to:
+  /// **'Gaps'**
+  String get generalGroupGaps;
+
+  /// The label of the General tab's group holding the launch-at-login checkbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Startup'**
+  String get generalGroupStartup;
+
+  /// The caption of the General tab's stepper for the number of columns in the grid. A column runs top to bottom. Keep it short: the caption has room for about five characters.
+  ///
+  /// In en, this message translates to:
+  /// **'Columns'**
+  String get generalColumns;
+
+  /// The caption of the General tab's stepper for the number of rows in the grid. A row runs left to right. Keep it short: the caption has room for about five characters.
+  ///
+  /// In en, this message translates to:
+  /// **'Rows'**
+  String get generalRows;
+
+  /// The caption of the General tab's stepper for how large a gap is, beside the unit (pt on macOS, px on Windows).
+  ///
+  /// In en, this message translates to:
+  /// **'Size'**
+  String get generalGapSize;
+
+  /// The label of the General tab's checkbox that turns gaps between placed windows and the screen's edge on or off.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave gaps'**
+  String get generalLeaveGaps;
+
+  /// The button at the foot of the General tab that puts the grid size and the gaps back to their defaults. It changes nothing else, and the name says so.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Grid & Gaps'**
+  String get generalResetGridAndGaps;
+
+  /// Beside a green dot on the General tab, when Orthant has the macOS Accessibility permission. Shown on macOS only.
+  ///
+  /// In en, this message translates to:
+  /// **'Granted'**
+  String get generalAccessibilityGranted;
+
+  /// Beside a warning dot on the General tab, when Orthant lacks the macOS Accessibility permission. It has no final full stop in English. Shown on macOS only.
+  ///
+  /// In en, this message translates to:
+  /// **'Not granted. Shortcuts and the grid do nothing'**
+  String get generalAccessibilityNotGranted;
+
+  /// The button under the missing-permission warning that opens the macOS Accessibility pane. Accessibility is the name of that pane. Shown on macOS only.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Accessibility Settings…'**
+  String get generalOpenAccessibilitySettings;
+
+  /// The tooltip on the warning icon beside the grid shortcut on the General tab, when the system refused to give Orthant that key combination. {system} is the operating system's name, macOS or Windows, and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'{system} or another app already uses this combination, so it never reaches Orthant.'**
+  String generalSummonUnavailable(String system);
+
+  /// The link beside the grid shortcut on the General tab that opens the Shortcuts tab, where it is changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Change…'**
+  String get generalChange;
+
+  /// Shown where a command has no keyboard shortcut yet, such as the grid shortcut on the General tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get shortcutNotSet;
+
+  /// The label of the General tab's checkbox that starts Orthant when the user signs in, on macOS and on Windows.
+  ///
+  /// In en, this message translates to:
+  /// **'Launch at login'**
+  String get generalLaunchAtLogin;
+
+  /// A note under the Launch at login checkbox on macOS, when the system answered with a state Orthant does not know. macOS stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'macOS reported a login-item state Orthant does not recognise. Switching this on may still work.'**
+  String get generalLoginUnrecognisedMac;
+
+  /// A note under the Launch at login checkbox on Windows, when the system answered with a state Orthant does not know. Windows stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Windows reported a startup state Orthant does not recognise. Switching this on may still work.'**
+  String get generalLoginUnrecognisedWindows;
+
+  /// A note under the Launch at login checkbox on macOS 13 and 14, when the user has switched Orthant off in System Settings. One whole sentence: it names three System Settings screens in order, joined by ▸, and each name is copied exactly from Apple's own words for that macOS version. The macOS 15 and later version is the next message.
+  ///
+  /// In en, this message translates to:
+  /// **'Turned off in System Settings ▸ General ▸ Login Items, so Orthant will not start automatically.'**
+  String get generalLoginTurnedOffMac13;
+
+  /// A note under the Launch at login checkbox on macOS 15 and later, when the user has switched Orthant off in System Settings. One whole sentence: it names three System Settings screens in order, joined by ▸, and each name is copied exactly from Apple's own words for macOS 15 and later, where the last screen is called Login Items & Extensions.
+  ///
+  /// In en, this message translates to:
+  /// **'Turned off in System Settings ▸ General ▸ Login Items & Extensions, so Orthant will not start automatically.'**
+  String get generalLoginTurnedOffMac15;
+
+  /// A note under the Launch at login checkbox on Windows, when the user has switched Orthant off in Windows Settings. One whole sentence: it names three Windows Settings screens in order, joined by ▸, and each name is copied exactly from that Windows language's own Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Turned off in Settings ▸ Apps ▸ Startup, so Orthant will not start automatically.'**
+  String get generalLoginTurnedOffWindows;
+
+  /// The link under the macOS note that opens the System Settings pane for Login Items, on macOS 13 and 14. It names that pane exactly as the previous note does.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Login Items…'**
+  String get generalOpenLoginItemsMac13;
+
+  /// The link under the macOS note that opens the System Settings pane for Login Items & Extensions, on macOS 15 and later. It names that pane exactly as the previous note does.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Login Items & Extensions…'**
+  String get generalOpenLoginItemsMac15;
+
+  /// The link under the Windows note that opens the Windows Settings page for startup apps (Settings, Apps, Startup).
+  ///
+  /// In en, this message translates to:
+  /// **'Open Startup Apps…'**
+  String get generalOpenStartupApps;
+
+  /// What a screen reader says for a stepper that has no unit: its caption, then its value, such as "Columns 6". Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'{caption} {value}'**
+  String generalStepperValue(String caption, int value);
+
+  /// What a screen reader says for a stepper that has a unit: its caption, its value and the unit, such as "Size 8 pt". {unit} is pt on macOS and px on Windows and stays as written. Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'{caption} {value} {unit}'**
+  String generalStepperValueUnit(String caption, int value, String unit);
+
+  /// What a screen reader calls the up arrow of a stepper. {label} is what the stepper announces (its caption and value), such as "Columns 6". Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'{label}, increase'**
+  String stepperIncrease(String label);
+
+  /// What a screen reader calls the down arrow of a stepper. {label} is what the stepper announces (its caption and value), such as "Columns 6". Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'{label}, decrease'**
+  String stepperDecrease(String label);
+
+  /// The caption under the grid preview on the General tab when gaps are on: the grid's size and the largest gap a placement keeps (it shrinks for a window too small to keep it). {cols} and {rows} are the grid's size, and the × between them stays. {gap} is the gap, a whole number, and {unit} is pt on macOS and px on Windows and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'{gap, plural, =1{{cols} × {rows} · up to 1 {unit} gap} other{{cols} × {rows} · up to {gap} {unit} gaps}}'**
+  String gridPreviewCaptionGaps(int cols, int rows, int gap, String unit);
+
+  /// Shown inside a shortcut field while it listens for a key combination and no modifier key is held yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Press keys…'**
+  String get recordingPressKeys;
+
+  /// The version line on the About tab. {version} is the release name, such as 1.1.2 or 1.1.2-beta.1, or the version with its build number in brackets for a development build.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String aboutVersion(String version);
+
+  /// A line on the About tab when an update check found a newer release, above the Update button. {name} is the new version, such as 1.1.3. Orthant stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Orthant {name} is available.'**
+  String aboutUpdateAvailable(String name);
+
+  /// The button on the About tab that opens the updater's offer, shown only while an update is waiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Update…'**
+  String get aboutUpdate;
+
+  /// The button on the About tab that checks for a new version of the app.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for Updates…'**
+  String get aboutCheckForUpdates;
+
+  /// The label of the About tab's checkbox that lets the app look for new versions on its own schedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates automatically'**
+  String get aboutAutomaticChecks;
+
+  /// The one-line description of the app at the foot of the About tab. It names no operating system.
+  ///
+  /// In en, this message translates to:
+  /// **'A grid-based window manager.'**
+  String get aboutTagline;
 }
 
 class _AppLocalizationsDelegate

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/geometry.dart';
+import '../l10n/strings.dart';
 import 'platform_theme.dart';
 
 /// A miniature of the overlay grid, fed by the grid *and* the gap controls.
@@ -72,7 +73,8 @@ class GridPreview extends StatelessWidget {
               // `gapForPlacement` measures the block, "up to" is now literally
               // what a user gets: bigger selections keep more of it.
               gap > 0
-                  ? '$cols × $rows · up to ${gap.toInt()} $unit gaps'
+                  ? context.l10n.gridPreviewCaptionGaps(
+                      cols, rows, gap.toInt(), unit)
                   : '$cols × $rows',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 10.5, color: t.labelTertiary),

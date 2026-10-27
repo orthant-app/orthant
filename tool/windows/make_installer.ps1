@@ -84,6 +84,15 @@ $banner = @($said | Where-Object { $_ -match '^Inno Setup \d+ ' })[0]
 if ($banner -notmatch '^Inno Setup 6 ') { Fail "ISCC.exe at $iscc says '$(if ($banner) { $banner } else { $said[0] })', not Inno Setup 6" }
 $uninstaller = Join-Path (Split-Path $iscc) 'unins000.exe'
 $isccVersion = if (Test-Path $uninstaller) { ([string](Get-Item $uninstaller).VersionInfo.ProductVersion).Trim() } else { '6' }
+# ChineseSimplified.isl (BOM-less UTF-8) targets Inno Setup 6.5.0 and later
+# (windows/installer/orthant.iss), and an older Inno would garble its Chinese,
+# so there is a floor. A version that cannot be read (the '6' above, or a
+# ProductVersion of another shape) is not failed on.
+$isccFloor = [version]'6.5.0'
+$isccParsed = $null
+if ([version]::TryParse($isccVersion, [ref]$isccParsed) -and $isccParsed -lt $isccFloor) {
+  Fail "Inno Setup $isccVersion at $iscc is older than $isccFloor, which the installer's Chinese language files need: install Inno Setup $isccFloor or newer, or set ISCC to one"
+}
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $bundleFull = (Resolve-Path $Bundle).Path

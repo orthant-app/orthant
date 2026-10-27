@@ -32,6 +32,13 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # gen-l10n's generated AppLocalizations needs the delegates and the Material
+  # and Cupertino strings for the languages we ship; intl is what it formats
+  # with. Pinned exactly, like every other dependency here.
+  flutter_localizations:
+    sdk: flutter
+  intl: 0.20.3
+
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
@@ -70,6 +77,9 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+
+  # Runs gen-l10n (config in l10n.yaml) as part of every flutter build/test.
+  generate: true
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

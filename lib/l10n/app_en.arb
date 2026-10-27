@@ -1,0 +1,11 @@
+{
+  "@@locale": "en",
+  "l10nProbeLocale": "en",
+  "@l10nProbeLocale": {
+    "description": "Never shown. Tests use it to prove each language resolves to its own file."
+  },
+  "l10nProbeScript": "Latn",
+  "@l10nProbeScript": {
+    "description": "Never shown. Tests use it to prove each language resolves to its own file."
+  }
+}

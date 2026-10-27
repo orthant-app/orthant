@@ -181,8 +181,19 @@ void main() {
         'language and script supplies (the Hong Kong fold)', () {
       expect(r('zh-Hant', ['en-US', 'zh-Hant-HK']), kHongKong);
       expect(r('zh-Hant', ['zh-HK']), kHongKong);
-      // The first preferred locale has no variant, a later one does.
-      expect(r('zh-Hant', ['zh-TW', 'zh-HK']), kHongKong);
+    });
+
+    test('the fold is strict in order: only the first preferred locale of the '
+        'choice\'s language and script can supply a region', () {
+      // Taiwan ranks first and Orthant has no Taiwan variant, so the choice
+      // stays plain: a later zh-HK never supplies a region, which keeps the
+      // picked language agreeing with System and with macOS's own naming.
+      expect(r('zh-Hant', ['zh-TW', 'zh-HK']), kTraditional);
+      expect(r('zh-Hant', ['zh-HK', 'zh-TW']), kHongKong);
+      // A locale of another language or script ahead of it is skipped.
+      expect(r('zh-Hant', ['zh-CN', 'en-US', 'zh-HK']), kHongKong);
+      // A region-less first match supplies none, and nothing below it can.
+      expect(r('zh-Hant', ['zh-Hant', 'zh-HK']), kTraditional);
     });
 
     test('the fold needs the same script: script beats region', () {

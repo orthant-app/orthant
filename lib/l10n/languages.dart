@@ -115,10 +115,13 @@ Locale? _bestMatch(Locale wanted, List<Locale> supported) {
 /// can beat it. With no match at all the answer is [fallback].
 ///
 /// A region-less choice takes its region from the system, which is how picking
-/// Traditional Chinese on a Mac whose preferred languages include `zh-HK` gets
-/// the Hong Kong variant: a preferred locale of the choice's language and
-/// script whose region [supported] has a variant for supplies it. Script beats
-/// region here as everywhere, so a Simplified choice never takes it.
+/// Traditional Chinese on a Mac whose first preferred Traditional Chinese is
+/// `zh-HK` gets the Hong Kong variant: the first preferred locale of the
+/// choice's language and script supplies its region if [supported] has a
+/// variant for it, and otherwise the choice stays plain. A later preferred
+/// locale never supplies one, so `[zh-TW, zh-HK]` is Taiwan's Traditional, as
+/// System shows. Script beats region here as everywhere, so a Simplified choice
+/// never takes it.
 ///
 /// The result is an element of [supported] exactly as given (Simplified is
 /// `Locale('zh')`), because the main engine sends its `toLanguageTag()` to the
@@ -145,7 +148,12 @@ Locale resolveAppLocale(
 }
 
 /// The variant of [chosen]'s language and script that the first of [preferred]
-/// with a region [supported] has a variant for points at, or null.
+/// of that language and script points at, or null.
+///
+/// Strict in order, like the rest of the resolver: only that first locale can
+/// supply a region. If it has none, or [supported] has no variant for it, the
+/// answer is null and a later `zh-HK` below a `zh-TW` is not consulted, so the
+/// picked language agrees with what System shows on the same machine.
 Locale? _withSystemRegion(
   Locale chosen,
   List<Locale> preferred,
@@ -153,16 +161,18 @@ Locale? _withSystemRegion(
 ) {
   final group = normalizeLocale(chosen);
   for (final p in preferred) {
+    if (!_covers(chosen, p)) continue;
     final region = normalizeLocale(p).countryCode;
-    if (region == null) continue;
+    if (region == null) return null;
     final variant = _bestMatch(p, supported);
-    if (variant == null) continue;
+    if (variant == null) return null;
     final v = normalizeLocale(variant);
     if (v.countryCode == region &&
         v.languageCode == group.languageCode &&
         v.scriptCode == group.scriptCode) {
       return variant;
     }
+    return null;
   }
   return null;
 }

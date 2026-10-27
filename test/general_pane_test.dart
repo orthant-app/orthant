@@ -261,6 +261,32 @@ void main() {
       });
     }
 
+    testWidgets('draws each language in its own locale, so the CJK font picks '
+        'its own glyph forms even on an English UI', (tester) async {
+      const hans = Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans');
+      const hant = Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant');
+      Text textIn(Finder of, String words) => tester.widget<Text>(
+          find.descendant(of: of, matching: find.text(words)));
+
+      // The closed button, for a stored choice.
+      await pump(tester, pane(choice: 'zh-Hant'), locale: kEnglish);
+      expect(textIn(button, '繁體中文').locale, hant);
+      await pump(tester, pane(choice: 'zh-Hans'), locale: kEnglish);
+      expect(textIn(button, '简体中文').locale, hans);
+
+      // The entries.
+      await pump(tester, pane(choice: 'en', onChanged: (_) {}),
+          locale: kEnglish);
+      expect(textIn(button, 'English').locale, isNull);
+      await open(tester);
+      Text entry(String words) =>
+          textIn(find.widgetWithText(MenuItemButton, words), words);
+      expect(entry('简体中文').locale, hans);
+      expect(entry('繁體中文').locale, hant);
+      expect(entry('English').locale, isNull);
+      expect(entry('System').locale, isNull);
+    });
+
     testWidgets('System is what a fresh install shows', (tester) async {
       await pump(tester, pane());
       expect(find.descendant(of: button, matching: find.text('System')),

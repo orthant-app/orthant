@@ -27,6 +27,7 @@ class MacPopUpButton<T> extends StatelessWidget {
     required this.onChanged,
     required this.tokens,
     this.semanticLabel,
+    this.localeOf,
   });
 
   /// The entry that is selected, matched to [items] by `==`. A value no entry
@@ -48,6 +49,14 @@ class MacPopUpButton<T> extends StatelessWidget {
   /// is named by the selected entry alone, which is right where the visible
   /// label next to it is the name.
   final String? semanticLabel;
+
+  /// The locale an entry's words are drawn in, by the entry's value; null (the
+  /// function or its answer) keeps the app's. A language named in its own
+  /// script needs it: Han characters share code points across Chinese, Japanese
+  /// and Korean, so under an English UI the font may draw 简体中文 and 繁體中文
+  /// with the wrong glyph forms. It also tells a screen reader which language
+  /// to speak each entry in.
+  final Locale? Function(T value)? localeOf;
 
   @override
   Widget build(BuildContext context) => _PopUp<T>(this);
@@ -136,7 +145,10 @@ class _PopUpState<T> extends State<_PopUp<T>> {
             onPressed: () => _pick(_b.items[i].$1),
             child: Semantics(
               selected: i == selected,
-              child: Text(_b.items[i].$2),
+              child: Text(
+                _b.items[i].$2,
+                locale: _b.localeOf?.call(_b.items[i].$1),
+              ),
             ),
           ),
       ],
@@ -146,6 +158,9 @@ class _PopUpState<T> extends State<_PopUp<T>> {
             Expanded(
               child: Text(
                 shown,
+                locale: selected < 0
+                    ? null
+                    : _b.localeOf?.call(_b.items[selected].$1),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 12.5, color: t.labelPrimary),

@@ -461,6 +461,7 @@ class GeneralPane extends StatelessWidget {
           onChanged: onLanguageChanged,
           tokens: t,
           semanticLabel: l.generalGroupLanguage,
+          localeOf: _entryLocale,
         ),
         const SizedBox(height: 6),
         SizedBox(
@@ -477,6 +478,12 @@ class GeneralPane extends StatelessWidget {
       ],
     );
   }
+
+  /// The locale an entry of the Language picker is drawn in: its own, so the
+  /// font gives 简体中文 and 繁體中文 their own glyph forms whatever the UI's
+  /// language is. System and English keep the UI's.
+  static Locale? _entryLocale(String? tag) =>
+      tag == null || tag == 'en' ? null : parseLanguageTag(tag);
 
   Widget _loginRow(PlatformTokens t, AppLocalizations l) {
     // Only `enabled` renders as on: `unavailable` means the OS would not say,

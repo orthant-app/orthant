@@ -26,6 +26,7 @@ void main() {
     String? value,
     bool enabled = true,
     String? semanticLabel = 'Language',
+    Locale? Function(String?)? localeOf,
   }) {
     chosen = [];
     return MaterialApp(
@@ -37,6 +38,7 @@ void main() {
             items: items,
             tokens: PlatformTokens.macLight,
             semanticLabel: semanticLabel,
+            localeOf: localeOf,
             onChanged: enabled ? chosen.add : null,
           ),
         ),
@@ -99,6 +101,61 @@ void main() {
       expect(find.text(other), findsNothing, reason: '$other is not selected');
     }
     expect(find.byType(MenuItemButton), findsNothing);
+  });
+
+  group('localeOf', () {
+    const hans = Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans');
+    const hant = Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant');
+    Locale? own(String? tag) => switch (tag) {
+          'zh-Hans' => hans,
+          'zh-Hant' => hant,
+          _ => null,
+        };
+
+    /// The [Text] showing [words] under [of].
+    Text textIn(WidgetTester tester, Finder of, String words) =>
+        tester.widget<Text>(
+            find.descendant(of: of, matching: find.text(words)));
+
+    testWidgets('draws each entry of the open menu in the locale it names',
+        (tester) async {
+      await tester.pumpWidget(host(value: 'en', localeOf: own));
+      await openByTap(tester);
+      Locale? entry(String words) => textIn(
+              tester, find.widgetWithText(MenuItemButton, words), words)
+          .locale;
+      expect(entry('简体中文'), hans);
+      expect(entry('繁體中文'), hant);
+      expect(entry('English'), isNull, reason: 'no locale, the UI\'s own');
+      expect(entry('System'), isNull);
+    });
+
+    testWidgets('draws the closed button in the selected entry\'s locale',
+        (tester) async {
+      await tester.pumpWidget(host(value: 'zh-Hant', localeOf: own));
+      expect(
+          textIn(tester, find.byType(MacPopUpButton<String?>), '繁體中文')
+              .locale,
+          hant);
+      await tester.pumpWidget(host(value: null, localeOf: own));
+      expect(
+          textIn(tester, find.byType(MacPopUpButton<String?>), 'System')
+              .locale,
+          isNull);
+    });
+
+    testWidgets('without it nothing carries a locale', (tester) async {
+      await tester.pumpWidget(host(value: 'zh-Hans'));
+      expect(
+          textIn(tester, find.byType(MacPopUpButton<String?>), '简体中文')
+              .locale,
+          isNull);
+      await openByTap(tester);
+      expect(
+          textIn(tester, find.widgetWithText(MenuItemButton, '繁體中文'), '繁體中文')
+              .locale,
+          isNull);
+    });
   });
 
   testWidgets('a null value is an entry like any other', (tester) async {

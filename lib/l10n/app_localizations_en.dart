@@ -270,6 +270,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get generalGroupStartup => 'Startup';
 
   @override
+  String get generalGroupLanguage => 'Language';
+
+  @override
+  String get languageSystem => 'System';
+
+  @override
+  String get generalLanguageUpdaterNote =>
+      'The update window changes language the next time Orthant starts.';
+
+  @override
   String get generalColumns => 'Columns';
 
   @override

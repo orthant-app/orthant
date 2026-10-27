@@ -268,6 +268,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get generalGroupStartup => '启动';
 
   @override
+  String get generalGroupLanguage => '语言';
+
+  @override
+  String get languageSystem => '跟随系统';
+
+  @override
+  String get generalLanguageUpdaterNote => '更新窗口会在下次启动 Orthant 时切换语言。';
+
+  @override
   String get generalColumns => '列数';
 
   @override
@@ -654,6 +663,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get generalGroupStartup => '啟動';
 
   @override
+  String get generalGroupLanguage => '語言';
+
+  @override
+  String get languageSystem => '跟隨系統';
+
+  @override
+  String get generalLanguageUpdaterNote => '更新視窗會在下次啟動 Orthant 時切換語言。';
+
+  @override
   String get generalColumns => '欄數';
 
   @override
@@ -1038,6 +1056,15 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String get generalGroupStartup => '啟動';
+
+  @override
+  String get generalGroupLanguage => '語言';
+
+  @override
+  String get languageSystem => '跟隨系統';
+
+  @override
+  String get generalLanguageUpdaterNote => '更新視窗會在下次啟動 Orthant 時切換語言。';
 
   @override
   String get generalColumns => '欄數';

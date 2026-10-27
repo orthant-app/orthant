@@ -231,6 +231,8 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
               permissionGranted: app.permissions.granted,
               loginStatus: app.loginStatus,
               loginItemsHasExtensions: _loginItemsHasExtensions,
+              languageChoice: app.languageChoice,
+              onLanguageChanged: app.setLanguageChoice,
               onSettingsChanged: app.settingsChanged,
               onSetLoginItem: app.setLoginItem,
               onOpenLoginItems: app.wc.openLoginItemsSettings,

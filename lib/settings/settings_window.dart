@@ -46,6 +46,8 @@ class SettingsWindow extends StatefulWidget {
     this.permissionGranted = true,
     this.loginStatus = LoginItemStatus.unavailable,
     this.loginItemsHasExtensions = true,
+    this.languageChoice,
+    this.onLanguageChanged,
     this.onSetLoginItem,
     this.onOpenLoginItems,
     this.onOpenAccessibility,
@@ -83,6 +85,11 @@ class SettingsWindow extends StatefulWidget {
   /// Whether this macOS names its pane "Login Items & Extensions" (15 and
   /// later) rather than "Login Items". See [GeneralPane.loginItemsHasExtensions].
   final bool loginItemsHasExtensions;
+
+  /// The language picked in Settings and the way to change it. See
+  /// [GeneralPane.languageChoice].
+  final String? languageChoice;
+  final ValueChanged<String?>? onLanguageChanged;
 
   /// What the running bundle reports itself to be, for the About pane. An
   /// unknown version renders no version line rather than a half-formed one.
@@ -179,6 +186,8 @@ class _SettingsWindowState extends State<SettingsWindow> {
                   permissionGranted: widget.permissionGranted,
                   loginStatus: widget.loginStatus,
                   loginItemsHasExtensions: widget.loginItemsHasExtensions,
+                  languageChoice: widget.languageChoice,
+                  onLanguageChanged: widget.onLanguageChanged,
                   bindings: widget.bindings,
                   summonUnavailable: widget.unavailable.contains(
                     const BuiltIn(ShortcutCommand.showGrid),

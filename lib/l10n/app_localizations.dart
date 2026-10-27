@@ -489,6 +489,24 @@ abstract class AppLocalizations {
   /// **'Startup'**
   String get generalGroupStartup;
 
+  /// The label of the General tab's last group, which holds the pop-up button that picks the language Orthant shows. Also the name a screen reader gives that button.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get generalGroupLanguage;
+
+  /// The first entry of the language pop-up button on the General tab, and what it shows by default: follow the language of the operating system. Use the wording your language's own settings screens use for "follow the system". The other entries are language names, each written in its own language and never translated.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get languageSystem;
+
+  /// A note under the language pop-up button on the General tab. The window that offers and installs updates belongs to the operating system's updater and takes the new language only when Orthant is next started, unlike the rest of Orthant, which changes at once. Orthant stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'The update window changes language the next time Orthant starts.'**
+  String get generalLanguageUpdaterNote;
+
   /// The caption of the General tab's stepper for the number of columns in the grid. A column runs top to bottom. Keep it short: the caption has room for about five characters.
   ///
   /// In en, this message translates to:

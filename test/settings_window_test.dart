@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/window_controller.dart';
 import 'package:orthant/l10n/strings.dart';
+import 'package:orthant/settings/mac_popup_button.dart';
 import 'package:orthant/settings/platform_theme.dart';
 import 'package:orthant/settings/region_picker_sheet.dart';
 import 'package:orthant/settings/settings.dart';
@@ -429,6 +430,39 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('检查更新…'), findsWidgets);
       expect(find.text('Check for Updates…'), findsNothing);
+    });
+  });
+
+  group('the language choice', () {
+    Widget window({String? choice, ValueChanged<String?>? onChanged}) =>
+        MaterialApp(
+          theme: orthantTheme(Brightness.light),
+          home: SettingsWindow(
+            settings: const Settings(),
+            bindings: macDefaults,
+            onSettingsChanged: (_) {},
+            onRebound: (_) {},
+            languageChoice: choice,
+            onLanguageChanged: onChanged,
+          ),
+        );
+
+    testWidgets('reaches General, and a pick leaves through the window',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(600, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final picked = <String?>[];
+      await tester.pumpWidget(window(choice: 'zh-Hans', onChanged: picked.add));
+      await tester.pumpAndSettle();
+
+      final button = find.byType(MacPopUpButton<String?>);
+      expect(find.descendant(of: button, matching: find.text('简体中文')),
+          findsOneWidget);
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(MenuItemButton, 'English'));
+      await tester.pumpAndSettle();
+      expect(picked, ['en']);
     });
   });
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../core/key_words.dart';
 import '../core/window_controller.dart';
 import '../l10n/app_localizations.dart';
+import '../l10n/languages.dart';
 import '../l10n/strings.dart';
 import '../shortcuts/bindings.dart';
 import '../shortcuts/command_ref.dart';
@@ -12,6 +13,7 @@ import 'grid_preview.dart';
 import 'keycap.dart';
 import 'mac_controls.dart';
 import 'mac_control.dart';
+import 'mac_popup_button.dart';
 import 'mac_stepper.dart';
 import 'platform_theme.dart';
 import 'settings.dart';
@@ -88,6 +90,8 @@ class GeneralPane extends StatelessWidget {
     required this.loginStatus,
     required this.bindings,
     this.loginItemsHasExtensions = true,
+    this.languageChoice,
+    this.onLanguageChanged,
     this.summonUnavailable = false,
     this.onEditShortcuts,
     this.onSetLoginItem,
@@ -123,6 +127,14 @@ class GeneralPane extends StatelessWidget {
   /// screen the user will actually find. Unknown is read as the newer one, the
   /// state of most Macs by now. Windows ignores it.
   final bool loginItemsHasExtensions;
+
+  /// The language the user picked, as the tag that is stored (`zh-Hant-HK`
+  /// stays that); null is System. The picker shows the entry it belongs to.
+  final String? languageChoice;
+
+  /// The user picked an entry other than the one shown: a language's tag, or
+  /// null for System.
+  final ValueChanged<String?>? onLanguageChanged;
   final void Function(bool)? onSetLoginItem;
   final VoidCallback? onOpenLoginItems;
   final VoidCallback? onOpenAccessibility;
@@ -188,6 +200,8 @@ class GeneralPane extends StatelessWidget {
             _gridAndGaps(t, l),
             _hairline(t),
             _group(t, l.generalGroupStartup, [_loginRow(t, l)]),
+            _hairline(t),
+            _group(t, l.generalGroupLanguage, [_languageRow(t, l)]),
           ],
         ),
       ),
@@ -422,6 +436,43 @@ class GeneralPane extends StatelessWidget {
           label: l.generalOpenAccessibilitySettings,
           tokens: t,
           onPressed: onOpenAccessibility,
+        ),
+      ],
+    );
+  }
+
+  /// System, then one entry per translation Orthant has, each named in its own
+  /// language ([languageOptions]), so a new ARB file adds an entry with no
+  /// change here. The stored choice is shown as the entry it belongs to
+  /// ([optionTagFor]); the button reports nothing for choosing that entry
+  /// again, which is what keeps a Hong Kong choice made in System Settings
+  /// from being rewritten as plain Traditional Chinese.
+  Widget _languageRow(PlatformTokens t, AppLocalizations l) {
+    final options = languageOptions();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        MacPopUpButton<String?>(
+          value: optionTagFor(languageChoice, options),
+          items: [
+            (null, l.languageSystem),
+            for (final option in options) (option.tag, option.name),
+          ],
+          onChanged: onLanguageChanged,
+          tokens: t,
+          semanticLabel: l.generalGroupLanguage,
+        ),
+        const SizedBox(height: 6),
+        SizedBox(
+          width: 320,
+          child: Text(
+            l.generalLanguageUpdaterNote,
+            style: TextStyle(
+              fontSize: 11.5,
+              height: 1.45,
+              color: t.labelSecondary,
+            ),
+          ),
         ),
       ],
     );

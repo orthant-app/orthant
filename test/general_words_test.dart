@@ -66,7 +66,9 @@ void main() {
       await pumpPane(tester, LoginItemStatus.disabled);
       expect(find.text('Accessibility'), findsOneWidget);
       expect(find.text('Granted'), findsOneWidget);
-      expect(find.byType(Divider), findsNWidgets(3));
+      // Five groups with a hairline between each pair; the Language group
+      // is the fifth, and made it four.
+      expect(find.byType(Divider), findsNWidgets(4));
       await pumpPane(tester, LoginItemStatus.disabled, granted: false);
       expect(find.text('Not granted. Shortcuts and the grid do nothing'),
           findsOneWidget);
@@ -105,7 +107,7 @@ void main() {
       await pumpPane(tester, LoginItemStatus.disabled);
       expect(find.text('Accessibility'), findsNothing);
       expect(find.text('Granted'), findsNothing);
-      expect(find.byType(Divider), findsNWidgets(2),
+      expect(find.byType(Divider), findsNWidgets(3),
           reason: 'its hairline goes with it');
       // Even if a caller passed false, there is nothing on Windows to grant.
       await pumpPane(tester, LoginItemStatus.disabled, granted: false);

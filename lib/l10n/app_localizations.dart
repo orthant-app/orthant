@@ -411,6 +411,18 @@ abstract class AppLocalizations {
   /// **'Num Enter'**
   String get keyNumEnter;
 
+  /// The Escape key as macOS shortcut hints write it, lowercase as the key is printed on Mac keyboards, in the Shortcuts hint "Listening… press a combination, or esc to cancel." Chinese keeps the English word, because that is what the key says.
+  ///
+  /// In en, this message translates to:
+  /// **'esc'**
+  String get keyMacEscape;
+
+  /// The Return key as the grid names it on macOS, as the key that places the window, in the grid's accessibility hint and spoken announcement ("Return places the window"). Windows says Enter. Chinese keeps the English word, because that is what the key says.
+  ///
+  /// In en, this message translates to:
+  /// **'Return'**
+  String get keyMacReturn;
+
   /// A key on the numeric keypad, as written in shortcuts on both macOS and Windows, such as Num 5 or Num /. {key} is the character on the key. Use the legend printed on the keypad.
   ///
   /// In en, this message translates to:

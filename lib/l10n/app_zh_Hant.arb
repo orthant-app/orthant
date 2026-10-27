@@ -49,6 +49,8 @@
   "keyDelete": "Del",
   "keyNumLock": "Num Lock",
   "keyNumEnter": "Num Enter",
+  "keyMacEscape": "esc",
+  "keyMacReturn": "Return",
   "keyNumpad": "Num {key}",
   "keyListAnyModifier": "{a}、{b}、{c} 或 {d}"
 }

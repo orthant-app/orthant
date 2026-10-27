@@ -14,12 +14,12 @@ import 'support/strg_strings.dart';
 
 /// [actual] holds exactly the words [expected] does, field by field.
 ///
-/// `KeyWords.windows` is built from the strings on every read, so two reads
-/// are two objects and `same` would fail on a correct answer. `KeyWords` has no
-/// `==` of its own, because nothing in the app compares two of them; what these
-/// tests mean by "the Windows words, not macOS's" is every field agreeing, and
-/// every field is a value (strings, a list of records, a map) that `equals`
-/// compares deeply.
+/// `KeyWords.windows` and `KeyWords.macOS` are built from the strings on every
+/// read, so two reads are two objects and `same` would fail on a correct
+/// answer. `KeyWords` has no `==` of its own, because nothing in the app
+/// compares two of them; what these tests mean by "this platform's words, not
+/// the other's" is every field agreeing, and every field is a value (strings, a
+/// list of records, a map) that `equals` compares deeply.
 void expectSameWords(KeyWords actual, KeyWords expected) {
   expect(actual.modifiers, expected.modifiers);
   expect(actual.joiner, expected.joiner);
@@ -65,6 +65,10 @@ class _Tagged extends AppLocalizationsEn {
   String get keyNumLock => '<keyNumLock>';
   @override
   String get keyNumEnter => '<keyNumEnter>';
+  @override
+  String get keyMacEscape => '<keyMacEscape>';
+  @override
+  String get keyMacReturn => '<keyMacReturn>';
 }
 
 /// What each platform calls the keys of a shortcut. macOS's words are pinned
@@ -73,7 +77,7 @@ void main() {
   final all = Modifiers.ctrl | Modifiers.alt | Modifiers.shift | Modifiers.meta;
 
   test('macOS keeps the glyphs and the order it has always used', () {
-    const w = KeyWords.macOS;
+    final w = KeyWords.macOS;
     expect(w.modifierNames(all), ['⌃', '⌥', '⇧', '⌘']);
     expect(w.modifierNames(Modifiers.meta | Modifiers.ctrl), ['⌃', '⌘']);
     expect(w.modifierNames(Modifiers.none), isEmpty);
@@ -135,7 +139,7 @@ void main() {
   test('every other platform reads as macOS, where the app began', () {
     for (final p in TargetPlatform.values) {
       if (p == TargetPlatform.windows) continue;
-      expect(KeyWords.of(p), same(KeyWords.macOS), reason: '$p');
+      expectSameWords(KeyWords.of(p), KeyWords.macOS);
     }
     expectSameWords(KeyWords.of(TargetPlatform.windows), KeyWords.windows);
   });
@@ -145,7 +149,7 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     expectSameWords(KeyWords.current, KeyWords.windows);
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
-    expect(KeyWords.current, same(KeyWords.macOS));
+    expectSameWords(KeyWords.current, KeyWords.macOS);
   });
 
   test('the settings window and the overlay name the same keys', () {
@@ -182,13 +186,17 @@ void main() {
           ['Win', 'Ctrl', 'Alt', 'Shift']);
     });
 
-    test('macOS keeps its glyphs in any language; only its list is a sentence',
-        () {
+    test('macOS keeps its glyphs in any language; its esc and its list follow '
+        'the strings', () {
       appStrings = StrgStrings();
-      const w = KeyWords.macOS;
+      final w = KeyWords.macOS;
       expect(w.modifierNames(all), ['⌃', '⌥', '⇧', '⌘']);
-      expect(w.escape, 'esc');
+      expect(w.join(['⌃', '⌥', '←']), '⌃⌥←');
+      expect(w.escape, 'Abbruch');
       expect(w.anyModifier, '⌃, ⌥, ⇧ oder ⌘');
+      // And back: the next read follows the language again.
+      setAppStrings(kEnglish);
+      expect(KeyWords.macOS.escape, 'esc');
     });
 
     for (final locale in [kSimplified, kTraditional, kHongKong]) {
@@ -201,6 +209,9 @@ void main() {
         expect(w.modifiers, english.modifiers);
         expect(w.named, english.named);
         expect(w.escape, english.escape);
+        // macOS's two words are English in Chinese too.
+        expect(KeyWords.macOS.escape, 'esc');
+        expect(OverlayCopy.macOS.place, 'Return');
         // The one thing with a word in it is the list a sentence makes.
         expect(w.anyModifier, contains('或'));
         expect(w.anyModifier, contains('、'));
@@ -225,6 +236,15 @@ void main() {
       });
     });
 
+    test('macOS\'s two words come from their own messages', () {
+      appStrings = _Tagged();
+      expect(KeyWords.macOS.escape, '<keyMacEscape>');
+      expect(OverlayCopy.macOS.place, '<keyMacReturn>');
+      // Not Windows' words: each platform reads its own.
+      expect(KeyWords.windows.escape, '<keyEsc>');
+      expect(OverlayCopy.windows.place, '<keyEnter>');
+    });
+
     test('the strings carry every legend the English words had', () {
       // The words object and the ARB are two spellings of one set; if a legend
       // is renamed on one side only, this is where it shows.
@@ -240,6 +260,7 @@ void main() {
           'Esc', 'Home', 'End', 'PgUp', 'PgDn', 'Del', 'Num Lock', 'Num Enter',
         ],
       );
+      expect([s.keyMacEscape, s.keyMacReturn], ['esc', 'Return']);
       expect(s.keyNumpad('/'), 'Num /');
       expect(s.keyListAnyModifier('a', 'b', 'c', 'd'), 'a, b, c or d');
     });

@@ -8,6 +8,18 @@ import 'support/locales.dart';
 import 'support/no_english.dart';
 import 'support/strg_strings.dart';
 
+/// [actual] says exactly what [expected] does.
+///
+/// Both platforms' copy is built from the strings on every read, so two reads
+/// are two objects and `same` would fail on a correct answer. `OverlayCopy` has
+/// no `==`, because nothing in the app compares two of them; its three fields
+/// are values, so comparing them is what "the same words" means.
+void expectSameCopy(OverlayCopy actual, OverlayCopy expected) {
+  expect(actual.place, expected.place);
+  expect(actual.save, expected.save);
+  expect(actual.pixels, expected.pixels);
+}
+
 /// The overlay names three things that differ by platform: the key that
 /// places, the chord that places and saves, and what a global coordinate is
 /// counted in. macOS's words are pinned byte for byte, because they are what
@@ -48,16 +60,19 @@ void main() {
     expect(c.save, 'STRG+S');
     expect(c.saveHint, startsWith('STRG+S  '));
     expect(c.gridHint, contains('Eingabe places the window'));
-    // macOS names its keys with glyphs and words that no language changes.
+    // macOS's glyph chord is a constant; its Return is a string of its own,
+    // not Windows' Enter.
     final m = OverlayCopy.of(TargetPlatform.macOS);
-    expect(m.place, 'Return');
+    expect(m.place, 'Zeilenumbruch');
     expect(m.save, '⌘S');
+    expect(m.gridHint, contains('Zeilenumbruch places the window'));
+    expect(m.opened('TextEdit', 6, 4), contains('Zeilenumbruch places,'));
   });
 
   test('every other platform reads as macOS, where the overlay began', () {
     for (final p in TargetPlatform.values) {
       if (p == TargetPlatform.windows) continue;
-      expect(OverlayCopy.of(p), same(OverlayCopy.macOS), reason: '$p');
+      expectSameCopy(OverlayCopy.of(p), OverlayCopy.macOS);
     }
   });
 

@@ -223,6 +223,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get keyNumEnter => 'Num Enter';
 
   @override
+  String get keyMacEscape => 'esc';
+
+  @override
+  String get keyMacReturn => 'Return';
+
+  @override
   String keyNumpad(String key) {
     return 'Num $key';
   }
@@ -452,6 +458,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get keyNumEnter => 'Num Enter';
 
   @override
+  String get keyMacEscape => 'esc';
+
+  @override
+  String get keyMacReturn => 'Return';
+
+  @override
   String keyNumpad(String key) {
     return 'Num $key';
   }
@@ -679,6 +691,12 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String get keyNumEnter => 'Num Enter';
+
+  @override
+  String get keyMacEscape => 'esc';
+
+  @override
+  String get keyMacReturn => 'Return';
 
   @override
   String keyNumpad(String key) {

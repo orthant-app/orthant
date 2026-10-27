@@ -312,6 +312,14 @@
   "@keyNumEnter": {
     "description": "The Enter key on the numeric keypad, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key."
   },
+  "keyMacEscape": "esc",
+  "@keyMacEscape": {
+    "description": "The Escape key as macOS shortcut hints write it, lowercase as the key is printed on Mac keyboards, in the Shortcuts hint \"Listening… press a combination, or esc to cancel.\" Chinese keeps the English word, because that is what the key says."
+  },
+  "keyMacReturn": "Return",
+  "@keyMacReturn": {
+    "description": "The Return key as the grid names it on macOS, as the key that places the window, in the grid's accessibility hint and spoken announcement (\"Return places the window\"). Windows says Enter. Chinese keeps the English word, because that is what the key says."
+  },
   "keyNumpad": "Num {key}",
   "@keyNumpad": {
     "description": "A key on the numeric keypad, as written in shortcuts on both macOS and Windows, such as Num 5 or Num /. {key} is the character on the key. Use the legend printed on the keypad.",

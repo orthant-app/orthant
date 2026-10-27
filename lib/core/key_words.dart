@@ -13,12 +13,14 @@ import 'key_chord.dart';
 /// labels those and this names only what differs. macOS's words are exactly
 /// what 1.0.x shows.
 ///
-/// Windows' words are translatable strings (`keyCtrl`, `keyEnter`, ...), read
-/// from `appStrings` each time [windows] is asked for, so they follow the
-/// language the app is shown in. They are the legends printed on the keys, and
-/// every language shipped so far keeps them in English; a language whose
-/// keyboards print `STRG` can say so without a code change. macOS's words are
-/// glyphs, which no language changes, and stay constants.
+/// The words that are not glyphs are translatable strings, read from
+/// `appStrings` each time [windows] or [macOS] is asked for, so they follow the
+/// language the app is shown in: Windows' (`keyCtrl`, `keyEnter`, ...) and
+/// macOS's two, `esc` and Return (`keyMacEscape`, `keyMacReturn`; Return is in
+/// `OverlayCopy`). They are the legends printed on the keys, and every language
+/// shipped so far keeps them in English; a language whose keyboards print
+/// `STRG` can say so without a code change. macOS's modifiers are glyphs
+/// (⌃⌥⇧⌘), which no language changes, and stay constants.
 ///
 /// Free of any widget tree on purpose: the tray, which has none, labels the
 /// grid's chord with these, and so does the settings window.
@@ -55,8 +57,12 @@ class KeyWords {
   /// usage.
   final Map<int, String> named;
 
-  static const macOS = KeyWords._(
-    modifiers: [
+  /// The words macOS uses: the glyphs are constants, `esc` is the language's.
+  ///
+  /// A getter for the same reason [windows] is: a language change reaches the
+  /// next read. Do not hold on to the result across one.
+  static KeyWords get macOS => KeyWords._(
+    modifiers: const [
       (flag: Modifiers.ctrl, name: '⌃'),
       (flag: Modifiers.alt, name: '⌥'),
       (flag: Modifiers.shift, name: '⇧'),
@@ -67,9 +73,9 @@ class KeyWords {
     // tray_manager 0.5.3 sets no key equivalent on macOS, so the combo goes
     // inline in the label (`main.dart`).
     menuGap: '   ',
-    escape: 'esc',
+    escape: appStrings.keyMacEscape,
     system: 'macOS',
-    named: {},
+    named: const {},
   );
 
   /// The words Windows uses, in the language of [appStrings] as it is now.

@@ -14,8 +14,10 @@ import '../l10n/strings.dart';
 ///
 /// The sentences are ARB messages, so they are in the language this engine was
 /// last told (`appStrings`, which each summon points at the summon's language),
-/// and the key words are placeholders in them: they are printed on the
-/// keyboard in English, so they stay English in every language.
+/// and the key words are placeholders in them. Those are the keys' legends,
+/// strings of their own (`keyMacReturn`, `KeyWords.windows`), and they stay
+/// English in every language shipped so far because the keyboards print them
+/// that way.
 class OverlayCopy {
   const OverlayCopy._({
     required this.place,
@@ -32,7 +34,14 @@ class OverlayCopy {
   /// Whether a coordinate is a physical pixel (Windows) rather than a point.
   final bool pixels;
 
-  static const macOS = OverlayCopy._(place: 'Return', save: '⌘S', pixels: false);
+  /// macOS's words: the Return legend places, and the glyph chord ⌘S saves.
+  /// Return is the language's (`keyMacReturn`) and ⌘S, being glyphs, is not,
+  /// so this is a getter like [windows].
+  static OverlayCopy get macOS => OverlayCopy._(
+    place: appStrings.keyMacReturn,
+    save: '⌘S',
+    pixels: false,
+  );
 
   /// Windows' words: the Enter legend places, and the Ctrl legend joined to S
   /// the way Windows joins every combo (`Ctrl+S`) saves. They come from

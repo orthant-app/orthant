@@ -225,6 +225,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get keyNumEnter => 'Num Enter';
 
   @override
+  String get keyMacEscape => 'esc';
+
+  @override
+  String get keyMacReturn => 'Return';
+
+  @override
   String keyNumpad(String key) {
     return 'Num $key';
   }

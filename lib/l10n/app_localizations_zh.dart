@@ -488,6 +488,154 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get regionSheetSaveLabel => '保存区域';
+
+  @override
+  String get commandOpenGrid => '打开网格';
+
+  @override
+  String get commandLeftHalf => '左半屏';
+
+  @override
+  String get commandRightHalf => '右半屏';
+
+  @override
+  String get commandTopHalf => '上半屏';
+
+  @override
+  String get commandBottomHalf => '下半屏';
+
+  @override
+  String get commandTopLeft => '左上四分之一';
+
+  @override
+  String get commandTopRight => '右上四分之一';
+
+  @override
+  String get commandBottomLeft => '左下四分之一';
+
+  @override
+  String get commandBottomRight => '右下四分之一';
+
+  @override
+  String get commandMaximize => '最大化';
+
+  @override
+  String get commandCenter => '居中';
+
+  @override
+  String get shortcutsTitle => '快捷键';
+
+  @override
+  String get shortcutsSubtitle => '打开网格，或将最前面的窗口直接放到它所在显示器的某个区域。';
+
+  @override
+  String get shortcutsGroupBuiltIn => '内置';
+
+  @override
+  String get shortcutsGroupRegions => '你的区域';
+
+  @override
+  String shortcutsRegionsHint(String key) {
+    return '为内置项没有的形状绑定快捷键。可在此绘制，也可在网格中选中后按 $key。';
+  }
+
+  @override
+  String get shortcutsNotGranted => '在 Orthant 获得无障碍权限之前，这些快捷键都不会生效。你仍然可以更改它们。';
+
+  @override
+  String shortcutsListening(String escape) {
+    return '正在录制…按下组合键，或按 $escape 取消。';
+  }
+
+  @override
+  String shortcutsHint(String modifiers) {
+    return '点击快捷键即可更改。组合键须包含 $modifiers 之一。';
+  }
+
+  @override
+  String shortcutsCollision(String combo, String owner) {
+    return '$combo 已被 $owner 使用。再按一次即可在此使用。';
+  }
+
+  @override
+  String get shortcutsUseHere => '在此使用';
+
+  @override
+  String shortcutsDisplaced(String command, String combo) {
+    return '$command 不再使用 $combo。';
+  }
+
+  @override
+  String get shortcutsUndo => '撤销';
+
+  @override
+  String shortcutsRegionDeleted(String name) {
+    return '已删除 $name。';
+  }
+
+  @override
+  String get shortcutsResetDone => '所有快捷键已恢复为默认设置。';
+
+  @override
+  String get shortcutsReset => '重置快捷键';
+
+  @override
+  String get shortcutsAddRegion => '添加区域…';
+
+  @override
+  String get shortcutsAddRegionLabel => '添加区域';
+
+  @override
+  String shortcutsEditRegion(String name) {
+    return '编辑 $name';
+  }
+
+  @override
+  String get shortcutsClickToSet => '点击以设置';
+
+  @override
+  String get shortcutsRemove => '移除快捷键';
+
+  @override
+  String shortcutsRemoveLabel(String command) {
+    return '移除 $command 的快捷键';
+  }
+
+  @override
+  String shortcutsUnavailableTooltip(String system) {
+    return '$system 或其他应用已使用此组合键，因此 Orthant 收不到它。\n点击该快捷键可另选一个。';
+  }
+
+  @override
+  String shortcutRowBound(String command, String combo) {
+    return '$command，$combo';
+  }
+
+  @override
+  String shortcutRowUnbound(String command) {
+    return '$command，未设置快捷键';
+  }
+
+  @override
+  String shortcutRowUnavailable(String command, String combo) {
+    return '$command，$combo，不可用';
+  }
+
+  @override
+  String shortcutRowListening(String command) {
+    return '$command，等待输入组合键';
+  }
+
+  @override
+  String shortcutRowCollision(String command, String combo, String owner) {
+    return '$command，$combo 已被 $owner 使用。再按一次即可在此使用，或按 Esc 取消。';
+  }
+
+  @override
+  String get refusalKeypad => 'Windows 无法在快捷键中使用小键盘的数字、小数点或 =。';
+
+  @override
+  String get refusalUnregistrable => 'Windows 无法在快捷键中使用该按键。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -974,6 +1122,155 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get regionSheetSaveLabel => '儲存區域';
+
+  @override
+  String get commandOpenGrid => '開啟格線';
+
+  @override
+  String get commandLeftHalf => '左半部';
+
+  @override
+  String get commandRightHalf => '右半部';
+
+  @override
+  String get commandTopHalf => '上半部';
+
+  @override
+  String get commandBottomHalf => '下半部';
+
+  @override
+  String get commandTopLeft => '左上四分之一';
+
+  @override
+  String get commandTopRight => '右上四分之一';
+
+  @override
+  String get commandBottomLeft => '左下四分之一';
+
+  @override
+  String get commandBottomRight => '右下四分之一';
+
+  @override
+  String get commandMaximize => '最大化';
+
+  @override
+  String get commandCenter => '置中';
+
+  @override
+  String get shortcutsTitle => '快速鍵';
+
+  @override
+  String get shortcutsSubtitle => '開啟格線，或將最前方的視窗直接放到它所在顯示器的某個區域。';
+
+  @override
+  String get shortcutsGroupBuiltIn => '內建';
+
+  @override
+  String get shortcutsGroupRegions => '你的區域';
+
+  @override
+  String shortcutsRegionsHint(String key) {
+    return '為內建項目沒有的形狀綁定快速鍵。可在此繪製，也可在格線中選取後按 $key。';
+  }
+
+  @override
+  String get shortcutsNotGranted =>
+      '在 Orthant 取得輔助使用權限之前，這些快速鍵都不會生效。你仍然可以更改它們。';
+
+  @override
+  String shortcutsListening(String escape) {
+    return '正在錄製…按下組合鍵，或按 $escape 取消。';
+  }
+
+  @override
+  String shortcutsHint(String modifiers) {
+    return '按一下快速鍵即可更改。組合鍵須包含 $modifiers 其中之一。';
+  }
+
+  @override
+  String shortcutsCollision(String combo, String owner) {
+    return '$combo 已被 $owner 使用。再按一次即可在此使用。';
+  }
+
+  @override
+  String get shortcutsUseHere => '在此使用';
+
+  @override
+  String shortcutsDisplaced(String command, String combo) {
+    return '$command 不再使用 $combo。';
+  }
+
+  @override
+  String get shortcutsUndo => '復原';
+
+  @override
+  String shortcutsRegionDeleted(String name) {
+    return '已刪除 $name。';
+  }
+
+  @override
+  String get shortcutsResetDone => '所有快速鍵已還原為預設值。';
+
+  @override
+  String get shortcutsReset => '重設快速鍵';
+
+  @override
+  String get shortcutsAddRegion => '新增區域…';
+
+  @override
+  String get shortcutsAddRegionLabel => '新增區域';
+
+  @override
+  String shortcutsEditRegion(String name) {
+    return '編輯 $name';
+  }
+
+  @override
+  String get shortcutsClickToSet => '按一下以設定';
+
+  @override
+  String get shortcutsRemove => '移除快速鍵';
+
+  @override
+  String shortcutsRemoveLabel(String command) {
+    return '移除 $command 的快速鍵';
+  }
+
+  @override
+  String shortcutsUnavailableTooltip(String system) {
+    return '$system 或其他應用程式已使用此組合鍵，因此 Orthant 收不到它。\n按一下該快速鍵可另選一個。';
+  }
+
+  @override
+  String shortcutRowBound(String command, String combo) {
+    return '$command，$combo';
+  }
+
+  @override
+  String shortcutRowUnbound(String command) {
+    return '$command，未設定快速鍵';
+  }
+
+  @override
+  String shortcutRowUnavailable(String command, String combo) {
+    return '$command，$combo，不可用';
+  }
+
+  @override
+  String shortcutRowListening(String command) {
+    return '$command，等待輸入組合鍵';
+  }
+
+  @override
+  String shortcutRowCollision(String command, String combo, String owner) {
+    return '$command，$combo 已被 $owner 使用。再按一次即可在此使用，或按 Esc 取消。';
+  }
+
+  @override
+  String get refusalKeypad => 'Windows 無法在快速鍵中使用數字鍵盤的數字、小數點或 =。';
+
+  @override
+  String get refusalUnregistrable => 'Windows 無法在快速鍵中使用該按鍵。';
 }
 
 /// The translations for Chinese, as used in Hong Kong, using the Han script (`zh_Hant_HK`).
@@ -1460,4 +1757,153 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String get regionSheetSaveLabel => '儲存區域';
+
+  @override
+  String get commandOpenGrid => '開啟格線';
+
+  @override
+  String get commandLeftHalf => '左半部';
+
+  @override
+  String get commandRightHalf => '右半部';
+
+  @override
+  String get commandTopHalf => '上半部';
+
+  @override
+  String get commandBottomHalf => '下半部';
+
+  @override
+  String get commandTopLeft => '左上四分之一';
+
+  @override
+  String get commandTopRight => '右上四分之一';
+
+  @override
+  String get commandBottomLeft => '左下四分之一';
+
+  @override
+  String get commandBottomRight => '右下四分之一';
+
+  @override
+  String get commandMaximize => '最大化';
+
+  @override
+  String get commandCenter => '置中';
+
+  @override
+  String get shortcutsTitle => '快速鍵';
+
+  @override
+  String get shortcutsSubtitle => '開啟格線，或將最前方的視窗直接放到它所在顯示器的某個區域。';
+
+  @override
+  String get shortcutsGroupBuiltIn => '內建';
+
+  @override
+  String get shortcutsGroupRegions => '你的區域';
+
+  @override
+  String shortcutsRegionsHint(String key) {
+    return '為內建項目沒有的形狀綁定快速鍵。可在此繪製，也可在格線中選取後按 $key。';
+  }
+
+  @override
+  String get shortcutsNotGranted =>
+      '在 Orthant 取得輔助使用權限之前，這些快速鍵都不會生效。你仍然可以更改它們。';
+
+  @override
+  String shortcutsListening(String escape) {
+    return '正在錄製…按下組合鍵，或按 $escape 取消。';
+  }
+
+  @override
+  String shortcutsHint(String modifiers) {
+    return '按一下快速鍵即可更改。組合鍵須包含 $modifiers 其中之一。';
+  }
+
+  @override
+  String shortcutsCollision(String combo, String owner) {
+    return '$combo 已被 $owner 使用。再按一次即可在此使用。';
+  }
+
+  @override
+  String get shortcutsUseHere => '在此使用';
+
+  @override
+  String shortcutsDisplaced(String command, String combo) {
+    return '$command 不再使用 $combo。';
+  }
+
+  @override
+  String get shortcutsUndo => '復原';
+
+  @override
+  String shortcutsRegionDeleted(String name) {
+    return '已刪除 $name。';
+  }
+
+  @override
+  String get shortcutsResetDone => '所有快速鍵已還原為預設值。';
+
+  @override
+  String get shortcutsReset => '重設快速鍵';
+
+  @override
+  String get shortcutsAddRegion => '新增區域…';
+
+  @override
+  String get shortcutsAddRegionLabel => '新增區域';
+
+  @override
+  String shortcutsEditRegion(String name) {
+    return '編輯 $name';
+  }
+
+  @override
+  String get shortcutsClickToSet => '按一下以設定';
+
+  @override
+  String get shortcutsRemove => '移除快速鍵';
+
+  @override
+  String shortcutsRemoveLabel(String command) {
+    return '移除 $command 的快速鍵';
+  }
+
+  @override
+  String shortcutsUnavailableTooltip(String system) {
+    return '$system 或其他應用程式已使用此組合鍵，因此 Orthant 收不到它。\n按一下該快速鍵可另選一個。';
+  }
+
+  @override
+  String shortcutRowBound(String command, String combo) {
+    return '$command，$combo';
+  }
+
+  @override
+  String shortcutRowUnbound(String command) {
+    return '$command，未設定快速鍵';
+  }
+
+  @override
+  String shortcutRowUnavailable(String command, String combo) {
+    return '$command，$combo，不可用';
+  }
+
+  @override
+  String shortcutRowListening(String command) {
+    return '$command，等待輸入組合鍵';
+  }
+
+  @override
+  String shortcutRowCollision(String command, String combo, String owner) {
+    return '$command，$combo 已被 $owner 使用。再按一次即可在此使用，或按 Esc 取消。';
+  }
+
+  @override
+  String get refusalKeypad => 'Windows 無法在快速鍵中使用數字鍵盤的數字、小數點或 =。';
+
+  @override
+  String get refusalUnregistrable => 'Windows 無法在快速鍵中使用該按鍵。';
 }

@@ -101,7 +101,7 @@ class _RecordingFieldState extends State<RecordingField> {
     final chord = chordFromKeyEvent(event);
     if (chord != null) {
       widget.onCombo(chord);
-    } else if (refusalFor(event) case final why?) {
+    } else if (refusalFor(event, context.l10n) case final why?) {
       // Without a word, the refusal read as a field that was not listening.
       SemanticsService.sendAnnouncement(
           View.of(context), why, TextDirection.ltr);

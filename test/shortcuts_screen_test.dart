@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:orthant/l10n/strings.dart';
 import 'package:orthant/settings/platform_theme.dart';
 import 'package:orthant/settings/recording_field.dart';
 import 'package:orthant/settings/region_glyph.dart';
@@ -17,6 +18,9 @@ import 'package:orthant/shortcuts/custom_region.dart';
 import 'package:orthant/shortcuts/shortcut_command.dart';
 
 import 'support/carbon_terms.dart';
+import 'support/locales.dart';
+import 'support/localized_host.dart';
+import 'support/no_english.dart';
 
 Widget _host(Widget child) =>
     MaterialApp(theme: orthantTheme(Brightness.light), home: child);
@@ -2099,6 +2103,424 @@ void main() {
       expect(find.byKey(const ValueKey('add-region')), findsNothing);
       expect(find.text('Left ⅔'), findsOneWidget,
           reason: 'the row still shows; only editing is withheld');
+    });
+  });
+
+  group('across languages', () {
+    // The whole pane in Simplified, Traditional and Hong Kong Chinese, on both
+    // platforms: the list, a collision question, the notice that names what a
+    // change cost with its Undo, Reset with its Undo, a deletion, and a row
+    // that is listening. `expectNoEnglish` reads the visible text and every
+    // semantics node, because a row can be Chinese on screen and read out in
+    // English.
+    const generated = CustomRegion(
+      id: 'g', name: 'Left ⅔', cols: 3, rows: 1, c0: 0, c1: 1, r0: 0, r1: 0,
+    );
+    const authored = CustomRegion(
+      id: 'a', name: 'Reading pane', cols: 3, rows: 1, c0: 1, c1: 2, r0: 0, r1: 0,
+    );
+
+    /// The user's own words are theirs, in whatever language.
+    const theirWords = {'Reading', 'pane'};
+
+    const platforms = [TargetPlatform.macOS, TargetPlatform.windows];
+    final locales = [kSimplified, kTraditional, kHongKong];
+
+    /// What each language is expected to say. Hong Kong shares Taiwan's.
+    ({
+      String left,
+      String right,
+      String openGrid,
+      String clickToSet,
+      String reset,
+      String resetDone,
+      String undo,
+      String useHere,
+      String builtIn,
+      String regions,
+      String taken,
+      String lost,
+      String deleted,
+      String idle,
+      String listening,
+    })
+        wordsFor(Locale locale, TargetPlatform platform) {
+      final windows = platform == TargetPlatform.windows;
+      final mods = windows ? 'Win、Ctrl、Alt 或 Shift' : '⌃、⌥、⇧ 或 ⌘';
+      final esc = windows ? 'Esc' : 'esc';
+      final combo = windows ? 'Win+Ctrl+Shift+→' : '⌃⌥→';
+      if (locale == kSimplified) {
+        return (
+          left: '左半屏',
+          right: '右半屏',
+          openGrid: '打开网格',
+          clickToSet: '点击以设置',
+          reset: '重置快捷键',
+          resetDone: '所有快捷键已恢复为默认设置。',
+          undo: '撤销',
+          useHere: '在此使用',
+          builtIn: '内置',
+          regions: '你的区域',
+          taken: '$combo 已被 右半屏 使用。再按一次即可在此使用。',
+          lost: '右半屏 不再使用 $combo。',
+          deleted: '已删除 左 ⅔。',
+          idle: '点击快捷键即可更改。组合键须包含 $mods 之一。',
+          listening: '正在录制…按下组合键，或按 $esc 取消。',
+        );
+      }
+      return (
+        left: '左半部',
+        right: '右半部',
+        openGrid: '開啟格線',
+        clickToSet: '按一下以設定',
+        reset: '重設快速鍵',
+        resetDone: '所有快速鍵已還原為預設值。',
+        undo: '復原',
+        useHere: '在此使用',
+        builtIn: '內建',
+        regions: '你的區域',
+        taken: '$combo 已被 右半部 使用。再按一次即可在此使用。',
+        lost: '右半部 不再使用 $combo。',
+        deleted: '已刪除 左 ⅔。',
+        idle: '按一下快速鍵即可更改。組合鍵須包含 $mods 其中之一。',
+        listening: '正在錄製…按下組合鍵，或按 $esc 取消。',
+      );
+    }
+
+    /// Opens the pane the way the settings window does, in [locale] on
+    /// [platform], with the language also set for the code that reads it
+    /// without a context (the key legends, the footer's lists).
+    Future<void> open(
+      WidgetTester tester,
+      Locale locale,
+      TargetPlatform platform, {
+      List<Binding>? bindings,
+      List<CustomRegion> regions = const [generated, authored],
+      Set<CommandRef> unavailable = const {},
+      bool granted = true,
+      void Function(Binding)? onRebound,
+      void Function(List<Binding>)? onRestore,
+      VoidCallback? onReset,
+    }) async {
+      // The platform itself is the test's `variant`, which is the only thing
+      // that puts it back before the framework checks it was.
+      setAppStrings(locale);
+      addTearDown(() => setAppStrings(kEnglish));
+      await tester.binding.setSurfaceSize(const Size(600, 1100));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(localizedApp(
+        locale,
+        ShortcutsScreen(
+          bindings: bindings ?? defaultBindings(platform: platform),
+          regions: regions,
+          unavailable: unavailable,
+          permissionGranted: granted,
+          onOpenAccessibility: () {},
+          onRebound: onRebound ?? (_) {},
+          onRestoreBindings: onRestore ?? (_) {},
+          onResetBindings: onReset ?? () {},
+          onRegionSaved: (_) {},
+          onRegionDeleted: (_) {},
+        ),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    /// The modifiers a default chord is made of on [platform], pressed, then
+    /// [key], then released.
+    Future<void> press(
+      WidgetTester tester,
+      TargetPlatform platform,
+      LogicalKeyboardKey key,
+    ) async {
+      final mods = platform == TargetPlatform.windows
+          ? [
+              LogicalKeyboardKey.metaLeft,
+              LogicalKeyboardKey.controlLeft,
+              LogicalKeyboardKey.shiftLeft,
+            ]
+          : [LogicalKeyboardKey.controlLeft, LogicalKeyboardKey.altLeft];
+      for (final m in mods) {
+        await tester.sendKeyDownEvent(m);
+      }
+      await tester.sendKeyEvent(key);
+      for (final m in mods.reversed) {
+        await tester.sendKeyUpEvent(m);
+      }
+      await tester.pumpAndSettle();
+    }
+
+    void expectNoEnglishTooltips(WidgetTester tester) {
+      expectNoEnglishIn([
+        for (final t in tester.widgetList<Tooltip>(find.byType(Tooltip)))
+          t.message ?? t.richMessage?.toPlainText() ?? '',
+      ]);
+    }
+
+    for (final platform in platforms) {
+      for (final locale in locales) {
+        final tag = '${locale.toLanguageTag()}, ${platform.name}';
+        final w = wordsFor(locale, platform);
+
+        testWidgets('the list speaks the language ($tag)', (tester) async {
+          // One row with no shortcut, one refused by the OS, the permission
+          // warning up, every kind of row on screen at once.
+          final defaults = defaultBindings(platform: platform);
+          await open(
+            tester,
+            locale,
+            platform,
+            granted: false,
+            bindings: [
+              for (final b in defaults)
+                if (b.command == const BuiltIn(ShortcutCommand.center))
+                  Binding.unbound(b.command)
+                else
+                  b,
+            ],
+            unavailable: {const BuiltIn(ShortcutCommand.topLeft)},
+          );
+          expect(find.text(w.left), findsOneWidget);
+          expect(find.text(w.right), findsOneWidget);
+          expect(find.text(w.openGrid), findsOneWidget);
+          expect(find.text(w.clickToSet), findsNWidgets(3),
+              reason: 'the three rows with no shortcut each offer a button: '
+                  'the unbound built-in and the two regions, which start '
+                  'without one');
+          expect(find.text(w.reset), findsOneWidget);
+          expect(find.text(w.builtIn), findsOneWidget);
+          expect(find.text(w.regions), findsOneWidget);
+          expect(find.text(w.idle), findsOneWidget);
+          expect(find.text('左 ⅔'), findsOneWidget,
+              reason: 'a generated name is shown in the language');
+          expect(find.text('Left ⅔'), findsNothing);
+          expect(find.text('Reading pane'), findsOneWidget,
+              reason: 'an authored name is exactly as the user wrote it');
+          expectNoEnglish(tester, allow: theirWords);
+          expectNoEnglishTooltips(tester);
+        }, variant: TargetPlatformVariant.only(platform));
+
+        testWidgets('a collision asks, then names what it cost, with an Undo '
+            '($tag)', (tester) async {
+          final rebound = <Binding>[];
+          List<Binding>? restored;
+          await open(
+            tester,
+            locale,
+            platform,
+            onRebound: rebound.add,
+            onRestore: (b) => restored = b,
+          );
+          // Right half's chord, tried on Left half.
+          await tester.tap(find.text(w.left));
+          await tester.pumpAndSettle();
+          await press(tester, platform, LogicalKeyboardKey.arrowRight);
+          expect(find.text(w.taken), findsOneWidget);
+          expect(find.text(w.useHere), findsOneWidget);
+          expectNoEnglish(tester, allow: theirWords);
+
+          // The same combination again takes it.
+          await press(tester, platform, LogicalKeyboardKey.arrowRight);
+          await tester.pumpAndSettle();
+          expect(rebound, hasLength(1));
+          expect(find.text(w.lost), findsOneWidget);
+          expect(find.text(w.undo), findsOneWidget);
+          expectNoEnglish(tester, allow: theirWords);
+
+          await tester.tap(find.text(w.undo));
+          await tester.pumpAndSettle();
+          expect(restored, isNotNull, reason: 'the Undo still undoes');
+        }, variant: TargetPlatformVariant.only(platform));
+
+        testWidgets('Reset says it is done and offers the way back ($tag)',
+            (tester) async {
+          var resets = 0;
+          List<Binding>? restored;
+          // A row that is not at its default, so the reset has something to
+          // undo.
+          final changed = withRebind(
+            defaultBindings(platform: platform),
+            Binding.unbound(const BuiltIn(ShortcutCommand.center)),
+          );
+          await open(tester, locale, platform,
+              bindings: changed,
+              onReset: () => resets++,
+              onRestore: (b) => restored = b);
+          await tester.tap(find.text(w.reset));
+          await tester.pumpAndSettle();
+          expect(resets, 1);
+          expect(find.text(w.resetDone), findsOneWidget);
+          expect(find.text(w.undo), findsOneWidget);
+          expectNoEnglish(tester, allow: theirWords);
+
+          await tester.tap(find.text(w.undo));
+          await tester.pumpAndSettle();
+          expect(restored, isNotNull);
+        }, variant: TargetPlatformVariant.only(platform));
+
+        testWidgets('deleting a region names it in the language, and keeps '
+            'the Undo ($tag)', (tester) async {
+          await open(tester, locale, platform);
+          await tester.tap(find.byKey(const ValueKey('edit-custom:g')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('region-delete')));
+          await tester.pumpAndSettle();
+          expect(find.text(w.deleted), findsOneWidget);
+          expect(find.text(w.undo), findsOneWidget);
+          expectNoEnglish(tester, allow: theirWords);
+        }, variant: TargetPlatformVariant.only(platform));
+
+        testWidgets('a row that is listening says so in the language ($tag)',
+            (tester) async {
+          await open(tester, locale, platform);
+          await tester.tap(find.text(w.left));
+          await tester.pumpAndSettle();
+          expect(find.text(w.listening), findsOneWidget);
+          expect(find.byType(RecordingField), findsOneWidget);
+          expectNoEnglish(tester, allow: theirWords);
+        }, variant: TargetPlatformVariant.only(platform));
+      }
+    }
+
+    for (final locale in locales) {
+      testWidgets('on Windows a key it cannot register says why, in '
+          '${locale.toLanguageTag()}', (tester) async {
+        await open(tester, locale, TargetPlatform.windows);
+        await tester.tap(find.text(wordsFor(locale, TargetPlatform.windows).left));
+        await tester.pumpAndSettle();
+
+        final zh = locale == kSimplified;
+        final keypad = zh
+            ? 'Windows 无法在快捷键中使用小键盘的数字、小数点或 =。'
+            : 'Windows 無法在快速鍵中使用數字鍵盤的數字、小數點或 =。';
+        final other = zh
+            ? 'Windows 无法在快捷键中使用该按键。'
+            : 'Windows 無法在快速鍵中使用該按鍵。';
+
+        // The keypad's digits: a different virtual key in each NumLock state.
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.sendKeyEvent(LogicalKeyboardKey.numpad1);
+        await tester.pumpAndSettle();
+        expect(find.text(keypad), findsOneWidget);
+        expectNoEnglish(tester, allow: theirWords);
+
+        // A key Windows has no virtual key for: the ISO key. The simulator has
+        // no Windows key code for it, so it is sent as another platform's key
+        // press; the refusal depends only on the key's two identities and on
+        // the platform the app is running as.
+        await tester.sendKeyEvent(LogicalKeyboardKey.intlBackslash,
+            platform: 'macos',
+            physicalKey: PhysicalKeyboardKey.intlBackslash);
+        await tester.pumpAndSettle();
+        expect(find.text(other), findsOneWidget);
+        expect(find.text(keypad), findsNothing,
+            reason: 'the line describes the last key pressed');
+        expectNoEnglish(tester, allow: theirWords);
+
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+      }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
+    }
+
+    for (final locale in locales) {
+      testWidgets('the region picker, opened from here, names the command it '
+          'collides with in ${locale.toLanguageTag()}', (tester) async {
+        // The sheet asks this pane what a command is called, so the name in
+        // its collision notice is the list's own and not a second spelling.
+        final rightHalf = macDefaults
+            .firstWhere(
+                (b) => b.command == const BuiltIn(ShortcutCommand.rightHalf))
+            .chord;
+        await open(
+          tester,
+          locale,
+          TargetPlatform.macOS,
+          bindings: [
+            ...macDefaults,
+            Binding(const Custom('g'), rightHalf),
+          ],
+        );
+        await tester.tap(find.byKey(const ValueKey('edit-custom:g')));
+        await tester.pumpAndSettle();
+        final owner = wordsFor(locale, TargetPlatform.macOS).right;
+        expect(
+            find.text(locale == kSimplified
+                ? '$owner 已使用此组合键。'
+                : '$owner 已使用此組合鍵。'),
+            findsOneWidget);
+        expectNoEnglish(tester, allow: theirWords);
+      }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+    }
+
+    testWidgets('the pane takes its language from the tree it is in, not from '
+        'the global the tray reads', (tester) async {
+      // Nothing points `appStrings` at Chinese here, so only the widgets that
+      // ask their context can be speaking it. The footer's modifier list and
+      // key legends are the global's (the tray has them too) and stay out.
+      await tester.pumpWidget(localizedApp(
+        kSimplified,
+        SizedBox(
+          width: 600,
+          height: 900,
+          child: ShortcutsScreen(
+            bindings: macDefaults,
+            regions: const [generated],
+            onRebound: (_) {},
+            onResetBindings: () {},
+            onRegionSaved: (_) {},
+            onRegionDeleted: (_) {},
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('左半屏'), findsOneWidget);
+      expect(find.text('左 ⅔'), findsOneWidget);
+      expect(find.text('重置快捷键'), findsOneWidget);
+      expect(find.text('内置'), findsOneWidget);
+      expect(find.text('添加区域…'), findsOneWidget);
+      expect(find.text('Left half'), findsNothing);
+    });
+
+    testWidgets('English is unchanged in every message the pane composes',
+        (tester) async {
+      final rebound = <Binding>[];
+      await tester.pumpWidget(_host(ShortcutsScreen(
+        bindings: macDefaults,
+        regions: const [generated],
+        onRebound: rebound.add,
+        onRestoreBindings: (_) {},
+        onResetBindings: () {},
+        onRegionSaved: (_) {},
+        onRegionDeleted: (_) {},
+        permissionGranted: false,
+      )));
+      expect(find.text('Built-in'), findsNothing,
+          reason: 'drawn upper-case, as it always was');
+      expect(find.text('BUILT-IN'), findsOneWidget);
+      expect(find.text('YOUR REGIONS'), findsOneWidget);
+      expect(find.text('Shortcuts'), findsOneWidget);
+      expect(
+          find.text('Open the grid, or snap the frontmost window straight to a '
+              'region of its own display.'),
+          findsOneWidget);
+      expect(find.text('Reset Shortcuts'), findsOneWidget);
+      expect(find.text('Add region…'), findsOneWidget);
+      expect(
+          find.text("Bind a shape the built-ins don't cover. Draw it here, or "
+              'select it in the grid and press ⌘S.'),
+          findsOneWidget);
+      expect(
+          find.textContaining('None of these will fire until Orthant has '
+              'Accessibility permission. You can still change them.  '),
+          findsOneWidget);
+      expect(find.text('Click a shortcut to change it. Combinations need '
+              '⌃, ⌥, ⇧ or ⌘.'),
+          findsOneWidget);
+      await tester.tap(find.text('Left half'));
+      await tester.pumpAndSettle();
+      expect(find.text('Listening… press a combination, or esc to cancel.'),
+          findsOneWidget);
     });
   });
 }

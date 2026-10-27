@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/geometry.dart';
 import 'package:orthant/core/key_chord.dart';
+import 'package:orthant/l10n/strings.dart';
 import 'package:orthant/settings/keycap.dart';
 import 'package:orthant/settings/mac_control.dart';
 import 'package:orthant/settings/platform_theme.dart';
@@ -1231,6 +1232,46 @@ void main() {
         expect(find.textContaining('左半屏'), findsOneWidget);
         expectNoEnglish(tester);
       });
+    }
+
+    for (final locale in [kSimplified, kTraditional, kHongKong]) {
+      testWidgets('no English is left while the shortcut field listens '
+          '(${locale.toLanguageTag()})', (tester) async {
+        // The state the sheet's other no-English test never reached: the
+        // field has become the shared recorder, which draws its own prompt and
+        // the modifiers it hears.
+        await openFresh(tester, locale, sheet());
+        await tester.tap(find.byKey(const ValueKey('region-record')));
+        await tester.pumpAndSettle();
+        expect(find.byType(RecordingField), findsOneWidget);
+        expectNoEnglish(tester);
+
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.pump();
+        expectNoEnglish(tester);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+        await tester.pump();
+      });
+
+      testWidgets('and a key Windows cannot use is refused in the language '
+          '(${locale.toLanguageTag()})', (tester) async {
+        // The recorder's refusal is drawn by the sheet under its field.
+        setAppStrings(locale);
+        addTearDown(() => setAppStrings(kEnglish));
+        await openFresh(tester, locale, sheet());
+        await tester.tap(find.byKey(const ValueKey('region-record')));
+        await tester.pumpAndSettle();
+
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.sendKeyEvent(LogicalKeyboardKey.numpad1);
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Windows'), findsOneWidget,
+            reason: 'the refusal is on screen');
+        expect(find.byType(RecordingField), findsOneWidget,
+            reason: 'still listening: a refusal is not a cancel');
+        expectNoEnglish(tester);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
     }
 
     testWidgets('the collision notice is one whole message each way',

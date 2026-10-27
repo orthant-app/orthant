@@ -492,4 +492,156 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get regionSheetSaveLabel => 'Save region';
+
+  @override
+  String get commandOpenGrid => 'Open grid';
+
+  @override
+  String get commandLeftHalf => 'Left half';
+
+  @override
+  String get commandRightHalf => 'Right half';
+
+  @override
+  String get commandTopHalf => 'Top half';
+
+  @override
+  String get commandBottomHalf => 'Bottom half';
+
+  @override
+  String get commandTopLeft => 'Top-left quarter';
+
+  @override
+  String get commandTopRight => 'Top-right quarter';
+
+  @override
+  String get commandBottomLeft => 'Bottom-left quarter';
+
+  @override
+  String get commandBottomRight => 'Bottom-right quarter';
+
+  @override
+  String get commandMaximize => 'Maximize';
+
+  @override
+  String get commandCenter => 'Center';
+
+  @override
+  String get shortcutsTitle => 'Shortcuts';
+
+  @override
+  String get shortcutsSubtitle =>
+      'Open the grid, or snap the frontmost window straight to a region of its own display.';
+
+  @override
+  String get shortcutsGroupBuiltIn => 'Built-in';
+
+  @override
+  String get shortcutsGroupRegions => 'Your regions';
+
+  @override
+  String shortcutsRegionsHint(String key) {
+    return 'Bind a shape the built-ins don\'t cover. Draw it here, or select it in the grid and press $key.';
+  }
+
+  @override
+  String get shortcutsNotGranted =>
+      'None of these will fire until Orthant has Accessibility permission. You can still change them.';
+
+  @override
+  String shortcutsListening(String escape) {
+    return 'Listening… press a combination, or $escape to cancel.';
+  }
+
+  @override
+  String shortcutsHint(String modifiers) {
+    return 'Click a shortcut to change it. Combinations need $modifiers.';
+  }
+
+  @override
+  String shortcutsCollision(String combo, String owner) {
+    return '$combo is used by $owner. Press it again to use it here.';
+  }
+
+  @override
+  String get shortcutsUseHere => 'Use it here';
+
+  @override
+  String shortcutsDisplaced(String command, String combo) {
+    return '$command lost $combo.';
+  }
+
+  @override
+  String get shortcutsUndo => 'Undo';
+
+  @override
+  String shortcutsRegionDeleted(String name) {
+    return '$name deleted.';
+  }
+
+  @override
+  String get shortcutsResetDone => 'All shortcuts reset to their defaults.';
+
+  @override
+  String get shortcutsReset => 'Reset Shortcuts';
+
+  @override
+  String get shortcutsAddRegion => 'Add region…';
+
+  @override
+  String get shortcutsAddRegionLabel => 'Add region';
+
+  @override
+  String shortcutsEditRegion(String name) {
+    return 'Edit $name';
+  }
+
+  @override
+  String get shortcutsClickToSet => 'Click to set';
+
+  @override
+  String get shortcutsRemove => 'Remove shortcut';
+
+  @override
+  String shortcutsRemoveLabel(String command) {
+    return 'Remove $command shortcut';
+  }
+
+  @override
+  String shortcutsUnavailableTooltip(String system) {
+    return '$system or another app already uses this combination, so it never reaches Orthant.\nClick the shortcut to pick a different one.';
+  }
+
+  @override
+  String shortcutRowBound(String command, String combo) {
+    return '$command, $combo';
+  }
+
+  @override
+  String shortcutRowUnbound(String command) {
+    return '$command, no shortcut';
+  }
+
+  @override
+  String shortcutRowUnavailable(String command, String combo) {
+    return '$command, $combo, unavailable';
+  }
+
+  @override
+  String shortcutRowListening(String command) {
+    return '$command, listening for a combination';
+  }
+
+  @override
+  String shortcutRowCollision(String command, String combo, String owner) {
+    return '$command, $combo is used by $owner. Press it again to use it here, or escape to cancel.';
+  }
+
+  @override
+  String get refusalKeypad =>
+      'Windows can\'t use the keypad\'s digits, decimal point or = in a shortcut.';
+
+  @override
+  String get refusalUnregistrable =>
+      'Windows can\'t use that key in a shortcut.';
 }

@@ -848,6 +848,246 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save region'**
   String get regionSheetSaveLabel;
+
+  /// The name of the command that opens the grid, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Open grid'**
+  String get commandOpenGrid;
+
+  /// The name of the command that places the frontmost window in the left half of its display, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Left half'**
+  String get commandLeftHalf;
+
+  /// The name of the command that places the frontmost window in the right half of its display, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Right half'**
+  String get commandRightHalf;
+
+  /// The name of the command that places the frontmost window in the top half of its display, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Top half'**
+  String get commandTopHalf;
+
+  /// The name of the command that places the frontmost window in the bottom half of its display, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom half'**
+  String get commandBottomHalf;
+
+  /// The name of the command that places the frontmost window in the top-left quarter of its display, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Top-left quarter'**
+  String get commandTopLeft;
+
+  /// The name of the command that places the frontmost window in the top-right quarter of its display, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Top-right quarter'**
+  String get commandTopRight;
+
+  /// The name of the command that places the frontmost window in the bottom-left quarter of its display, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom-left quarter'**
+  String get commandBottomLeft;
+
+  /// The name of the command that places the frontmost window in the bottom-right quarter of its display, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom-right quarter'**
+  String get commandBottomRight;
+
+  /// The name of the command that makes the frontmost window fill its display, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximize'**
+  String get commandMaximize;
+
+  /// The name of the command that centers the frontmost window on its display without resizing it, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Center'**
+  String get commandCenter;
+
+  /// The title at the top of the Shortcuts tab. The tab itself is named by settingsTabShortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcuts'**
+  String get shortcutsTitle;
+
+  /// The line under the Shortcuts tab's title. It says what the shortcuts below do. "Its own display" means the display the window is on, not the one the pointer is on.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the grid, or snap the frontmost window straight to a region of its own display.'**
+  String get shortcutsSubtitle;
+
+  /// The heading over the eleven commands Orthant ships with, in the Shortcuts list. English draws it in capital letters.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in'**
+  String get shortcutsGroupBuiltIn;
+
+  /// The heading over the custom regions the user has drawn, in the Shortcuts list, with the Add region row at its end. English draws it in capital letters.
+  ///
+  /// In en, this message translates to:
+  /// **'Your regions'**
+  String get shortcutsGroupRegions;
+
+  /// The line under the regions heading in the Shortcuts list. It explains the two ways to make a custom region: draw it in the region picker, or select it on the grid and press the save chord. {key} is that chord as the platform writes it, such as ⌘S or Ctrl+S, and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Bind a shape the built-ins don\'t cover. Draw it here, or select it in the grid and press {key}.'**
+  String shortcutsRegionsHint(String key);
+
+  /// The warning above the Shortcuts list while Orthant lacks the macOS Accessibility permission. Accessibility is the name of that System Settings pane. The link "Open Accessibility Settings…" follows it on the same line, after two spaces the app adds. Shown on macOS only.
+  ///
+  /// In en, this message translates to:
+  /// **'None of these will fire until Orthant has Accessibility permission. You can still change them.'**
+  String get shortcutsNotGranted;
+
+  /// The footer of the Shortcuts tab while a row is recording a new key combination. {escape} is the Escape key as the platform prints it, esc on macOS and Esc on Windows, and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening… press a combination, or {escape} to cancel.'**
+  String shortcutsListening(String escape);
+
+  /// The footer of the Shortcuts tab when nothing is happening. {modifiers} is the list of modifier keys, one of which every combination must include, already written as the platform writes them, such as "⌃, ⌥, ⇧ or ⌘" or "Win, Ctrl, Alt or Shift", and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Click a shortcut to change it. Combinations need {modifiers}.'**
+  String shortcutsHint(String modifiers);
+
+  /// The footer notice on the Shortcuts tab when the user records a key combination another command already owns. The row keeps listening; pressing the same combination again, or the "Use it here" link beside the notice, takes it. {combo} is the combination as the platform writes it, such as ⌃⌥→, and stays as written. {owner} is the name of the command that has it, such as "Left half".
+  ///
+  /// In en, this message translates to:
+  /// **'{combo} is used by {owner}. Press it again to use it here.'**
+  String shortcutsCollision(String combo, String owner);
+
+  /// The link beside the collision notice on the Shortcuts tab that takes the key combination from the other command for this row.
+  ///
+  /// In en, this message translates to:
+  /// **'Use it here'**
+  String get shortcutsUseHere;
+
+  /// The footer notice on the Shortcuts tab after a key combination was taken from another command: that command now has no shortcut. An Undo link follows it. {command} is that command's name, such as "Left half". {combo} is the combination as the platform writes it, such as ⌃⌥←, and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'{command} lost {combo}.'**
+  String shortcutsDisplaced(String command, String combo);
+
+  /// The link beside a notice on the Shortcuts tab that puts back what the change just made replaced: a taken key combination, a reset, or a deleted region. On macOS use Apple's word for Undo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get shortcutsUndo;
+
+  /// The footer notice on the Shortcuts tab after a custom region was deleted, with an Undo link. {name} is the region's name as the list shows it, either one Orthant generated, such as "Left ⅔", or one the user typed, and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} deleted.'**
+  String shortcutsRegionDeleted(String name);
+
+  /// The footer notice on the Shortcuts tab after Reset Shortcuts, with an Undo link.
+  ///
+  /// In en, this message translates to:
+  /// **'All shortcuts reset to their defaults.'**
+  String get shortcutsResetDone;
+
+  /// The button at the foot of the Shortcuts tab that puts every shortcut back to its default. It leaves custom regions in the list and clears their key combinations.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Shortcuts'**
+  String get shortcutsReset;
+
+  /// The last row of the Shortcuts list, which opens the region picker to draw a new custom region. The ellipsis says a window opens. A screen reader says shortcutsAddRegionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Add region…'**
+  String get shortcutsAddRegion;
+
+  /// What a screen reader says for the Add region row of the Shortcuts list. Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Add region'**
+  String get shortcutsAddRegionLabel;
+
+  /// What a screen reader says for the name of a custom region in the Shortcuts list, which opens the region picker on it. Never drawn on screen. {name} is the region's name as the list shows it, and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit {name}'**
+  String shortcutsEditRegion(String name);
+
+  /// The button-like prompt on a Shortcuts row that has no key combination. Pressing the row starts listening for one.
+  ///
+  /// In en, this message translates to:
+  /// **'Click to set'**
+  String get shortcutsClickToSet;
+
+  /// The tooltip on the small button at the end of a Shortcuts row that clears the row's key combination. A screen reader says shortcutsRemoveLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove shortcut'**
+  String get shortcutsRemove;
+
+  /// What a screen reader says for the button at the end of a Shortcuts row that clears the row's key combination. Never drawn on screen. {command} is the command's name as the list shows it.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {command} shortcut'**
+  String shortcutsRemoveLabel(String command);
+
+  /// The tooltip on the warning icon beside a key combination on the Shortcuts tab that the system refused to give Orthant. {system} is the operating system's name, macOS or Windows, and stays as written. The line break before the second sentence stays.
+  ///
+  /// In en, this message translates to:
+  /// **'{system} or another app already uses this combination, so it never reaches Orthant.\nClick the shortcut to pick a different one.'**
+  String shortcutsUnavailableTooltip(String system);
+
+  /// What a screen reader says for a Shortcuts row that has a key combination: the command, then the combination. Never drawn on screen. {command} is the command's name as the list shows it. {combo} is the combination as the platform writes it, such as ⌃⌥←, and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'{command}, {combo}'**
+  String shortcutRowBound(String command, String combo);
+
+  /// What a screen reader says for a Shortcuts row that has no key combination. Never drawn on screen. {command} is the command's name as the list shows it.
+  ///
+  /// In en, this message translates to:
+  /// **'{command}, no shortcut'**
+  String shortcutRowUnbound(String command);
+
+  /// What a screen reader says for a Shortcuts row whose key combination the system refused to give Orthant, so it is stored and shown but never fires. Never drawn on screen; sighted users see a warning icon. {command} is the command's name as the list shows it. {combo} is the combination as the platform writes it, and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'{command}, {combo}, unavailable'**
+  String shortcutRowUnavailable(String command, String combo);
+
+  /// What a screen reader says for a Shortcuts row that is recording a new key combination. Never drawn on screen. {command} is the command's name as the list shows it.
+  ///
+  /// In en, this message translates to:
+  /// **'{command}, listening for a combination'**
+  String shortcutRowListening(String command);
+
+  /// What a screen reader says for a Shortcuts row that is recording when the combination just pressed belongs to another command: the same question the footer shows, so someone who cannot see the footer hears it. Never drawn on screen. {command} is the row's command. {combo} is the combination as the platform writes it, and stays as written. {owner} is the command that has it. The key is called Escape here because it is spoken.
+  ///
+  /// In en, this message translates to:
+  /// **'{command}, {combo} is used by {owner}. Press it again to use it here, or escape to cancel.'**
+  String shortcutRowCollision(String command, String combo, String owner);
+
+  /// Shown under the shortcut recorder, and spoken, on Windows when the user presses a keypad digit, decimal point or = with a modifier held. Each of those is a different key depending on Num Lock, so no shortcut on one fires in both states. Windows is the operating system's name and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Windows can\'t use the keypad\'s digits, decimal point or = in a shortcut.'**
+  String get refusalKeypad;
+
+  /// Shown under the shortcut recorder, and spoken, on Windows when the user presses a key, with a modifier held, that Windows has no way to register as a shortcut. Windows is the operating system's name and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Windows can\'t use that key in a shortcut.'**
+  String get refusalUnregistrable;
 }
 
 class _AppLocalizationsDelegate

@@ -543,6 +543,14 @@ void main() {
 
       announced.clear();
       await send('moveSelection', {'sessionId': 1, 'direction': 'right'});
+      await tester.pump();
+      // The selection the arrow made is spoken in the same language: the grid
+      // composes it from the overlay's own strings, on the first move.
+      expect(announced, [
+        zh.overlaySelection(zh.overlayRowOne(1), zh.overlayColumnOne(1), '0',
+            '0', '200', '100', zh.overlayUnitPoints),
+      ]);
+      expectNoEnglishIn(announced, allow: {'記事本'});
       await send('commitCurrent', 1);
       await tester.pump();
       expect(announced.last, zh.overlayPlacingWindow);

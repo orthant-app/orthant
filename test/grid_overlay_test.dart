@@ -3,6 +3,7 @@ import 'dart:ui' show Tristate;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/geometry.dart';
 import 'package:orthant/l10n/app_localizations.dart';
@@ -748,7 +749,29 @@ void main() {
   group('in the language the overlay was told', () {
     // The overlay engine points `appStrings` at the summon's language before it
     // builds anything, so that is how a grid is put in one here.
-    tearDown(() => setAppStrings(kEnglish));
+    // What a screen reader would be told, via Flutter's own accessibility
+    // channel: the same capture overlay_main_test.dart makes.
+    late List<String> announced;
+
+    setUp(() {
+      announced = [];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockDecodedMessageHandler<dynamic>(SystemChannels.accessibility,
+              (message) async {
+        final m = message as Map;
+        if (m['type'] == 'announce') {
+          announced.add((m['data'] as Map)['message'] as String);
+        }
+        return null;
+      });
+    });
+
+    tearDown(() {
+      setAppStrings(kEnglish);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockDecodedMessageHandler<dynamic>(
+              SystemChannels.accessibility, null);
+    });
 
     Future<GridOverlayState> selectOne(WidgetTester tester) async {
       final key = GlobalKey<GridOverlayState>();
@@ -766,6 +789,44 @@ void main() {
         await selectOne(tester);
         // The app's own name is the one Latin thing on this screen.
         expectNoEnglish(tester, allow: {'Google', 'Chrome'});
+      });
+    }
+
+    testWidgets('a move announces the selection in English as it always did',
+        (tester) async {
+      await selectOne(tester);
+      expect(announced, [
+        'Row 1, column 1. Target: x 0, y 0, width 200, height 100 points.',
+      ]);
+    });
+
+    for (final locale in [kSimplified, kTraditional]) {
+      testWidgets('${locale.toLanguageTag()}: a move and an extension announce '
+          'the selection in Chinese', (tester) async {
+        setAppStrings(locale);
+        final s = lookupAppLocalizations(locale);
+        final key = GlobalKey<GridOverlayState>();
+        await tester.pumpWidget(host(gridKey: key));
+        key.currentState!.moveSelection(GridDirection.right);
+        await tester.pump();
+        expect(announced, [
+          s.overlaySelection(s.overlayRowOne(1), s.overlayColumnOne(1), '0',
+              '0', '200', '100', s.overlayUnitPoints),
+        ]);
+        announced.clear();
+        // Each extension is its own change and its own sentence: a range of
+        // rows with one column, then with two.
+        key.currentState!.moveSelection(GridDirection.down, extend: true);
+        key.currentState!.moveSelection(GridDirection.right, extend: true);
+        await tester.pump();
+        expect(announced, [
+          s.overlaySelection(s.overlayRowRange(1, 2), s.overlayColumnOne(1), '0',
+              '0', '200', '200', s.overlayUnitPoints),
+          s.overlaySelection(s.overlayRowRange(1, 2),
+              s.overlayColumnRange(1, 2), '0', '0', '400', '200',
+              s.overlayUnitPoints),
+        ]);
+        expectNoEnglishIn(announced);
       });
     }
 

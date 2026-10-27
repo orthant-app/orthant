@@ -16,11 +16,28 @@ Set<String> _messages(Map<String, dynamic> arb) =>
 
 void main() {
   final template = _readJson('app_en.arb');
-  const others = <String>[
-    'app_zh.arb',
-    'app_zh_Hant.arb',
-    'app_zh_Hant_HK.arb',
-  ];
+  // Every translation present, found rather than listed: gen-l10n fills a
+  // message a translation lacks with the English text without a word, so a
+  // file added later must be checked for completeness without anyone
+  // remembering to name it here.
+  final others = Directory('lib/l10n')
+      .listSync()
+      .whereType<File>()
+      .map((f) => f.uri.pathSegments.last)
+      .where((n) => RegExp(r'^app_.+\.arb$').hasMatch(n) && n != 'app_en.arb')
+      .toList()
+    ..sort();
+
+  test('the translation files are found by glob, the shipped ones among them',
+      () {
+    expect(
+        others,
+        containsAll(<String>[
+          'app_zh.arb',
+          'app_zh_Hant.arb',
+          'app_zh_Hant_HK.arb',
+        ]));
+  });
 
   test('every ARB has every message of the template, Hong Kong included', () {
     final want = _messages(template);

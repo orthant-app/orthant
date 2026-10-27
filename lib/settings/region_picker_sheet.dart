@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import '../overlay/grid_selection.dart';
 import '../core/key_chord.dart';
 import '../core/key_words.dart';
+import '../l10n/app_localizations.dart';
+import '../l10n/strings.dart';
 import '../shortcuts/bindings.dart';
 import '../shortcuts/custom_region.dart';
 import 'keycap.dart';
@@ -121,9 +123,28 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
   };
 
 
-  late final TextEditingController _name = TextEditingController(
-    text: widget.initial?.name ?? '',
-  );
+  /// The name field. Its first text is written in [didChangeDependencies], not
+  /// here, because a generated name is shown in the language the sheet is in
+  /// and only the context knows that.
+  final TextEditingController _name = TextEditingController();
+
+  /// The strings the field was last written with. A change of language, as
+  /// opposed to any other dependency changing, is what moves a generated name.
+  AppLocalizations? _l10n;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final l = context.l10n;
+    final before = _l10n;
+    _l10n = l;
+    if (before == null) {
+      final initial = widget.initial;
+      if (initial != null) _name.text = regionDisplayName(initial, l);
+    } else if (before.localeName != l.localeName) {
+      _resuggest();
+    }
+  }
 
   /// Whether the name is the user's own words rather than a suggestion.
   ///
@@ -131,19 +152,17 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
   /// authored meant reshaping one never re-suggested, so a region renamed
   /// nothing and reshaped to a third still called itself "Left ⅔" — a row
   /// lying about what it does. The stored data already distinguishes the two
-  /// cases: if the name still equals what the suggester would produce for the
-  /// stored shape, it was generated, so keep generating.
+  /// cases: if the name still equals the English suggestion for the stored
+  /// shape ([isGeneratedName]), it was generated, so keep generating.
+  ///
+  /// **The single source of that status.** Set here from the stored name, set
+  /// by any edit of the field, and never derived from the field's text: the
+  /// field shows the suggestion in the current language, so comparing it to
+  /// anything would take a name the user wrote (`左 ⅔`, for a left two-thirds)
+  /// for a generated one the moment it matched. Save writes the English
+  /// suggestion when this is false and the field exactly when it is true.
   late bool _nameEdited =
-      widget.initial != null &&
-      widget.initial!.name !=
-          suggestRegionName(
-            cols: widget.initial!.cols,
-            rows: widget.initial!.rows,
-            c0: widget.initial!.c0,
-            c1: widget.initial!.c1,
-            r0: widget.initial!.r0,
-            r1: widget.initial!.r1,
-          );
+      widget.initial != null && !isGeneratedName(widget.initial!);
 
   late KeyChord? _chord = widget.initialChord;
   bool _recording = false;
@@ -246,13 +265,16 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
     // extends `ValueNotifier`, which already drops an equal value, so a
     // `_name.text != suggested` check saves nothing and cannot be shown to.
     // The redundancy worth removing was one level up, in [_select].
-    _name.text = suggestRegionName(
-      cols: _cols,
-      rows: _rows,
-      c0: b.c0,
-      c1: b.c1,
-      r0: b.r0,
-      r1: b.r1,
+    _name.text = localizedSuggestion(
+      suggestRegion(
+        cols: _cols,
+        rows: _rows,
+        c0: b.c0,
+        c1: b.c1,
+        r0: b.r0,
+        r1: b.r1,
+      ),
+      _l10n!,
     );
   }
 
@@ -345,6 +367,19 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
         b.c1 == opened.c1 &&
         b.r0 == opened.r0 &&
         b.r1 == opened.r1;
+    // What is stored: the user's words as typed, or for a generated name the
+    // English suggestion for the shape as it ends up, whatever language the
+    // field showed. The field's text is not consulted for the second.
+    final name = _nameEdited
+        ? _name.text.trim()
+        : suggestRegionName(
+            cols: _cols,
+            rows: _rows,
+            c0: b.c0,
+            c1: b.c1,
+            r0: b.r0,
+            r1: b.r1,
+          );
     widget.onSubmit((
       // Nothing drawn: stored byte-for-byte as it was, only renamed, so an
       // unrelated edit leaves the preferences alone. Drawn or reshaped: stored
@@ -354,10 +389,10 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
       // `gapForPlacement` measures the block rather than the denominators — so
       // the refined grid landing in storage is untidy at worst.
       region: untouched
-          ? widget.initial!.copyWith(name: _name.text.trim())
+          ? widget.initial!.copyWith(name: name)
           : CustomRegion(
               id: widget.initial?.id ?? _newId(),
-              name: _name.text.trim(),
+              name: name,
               cols: _cols,
               rows: _rows,
               c0: b.c0,
@@ -372,6 +407,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final l = context.l10n;
     return Center(
       // Scrolls in a window shorter than the sheet: on Windows the window's
       // floor gives way to a short screen's work area (a 768-pixel screen at
@@ -432,7 +468,9 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        _creating ? 'New region' : 'Edit region',
+                        _creating
+                            ? l.regionSheetTitleNew
+                            : l.regionSheetTitleEdit,
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
@@ -443,8 +481,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
                       _grid(t),
                       const SizedBox(height: 6),
                       Text(
-                        'Drag to draw · arrows to move, '
-                        '${KeyWords.current.shiftName} to extend',
+                        l.regionSheetHint(KeyWords.current.shiftName),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 10.5,
@@ -557,7 +594,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
       SizedBox(
         width: 62,
         child: Text(
-          'Name',
+          context.l10n.regionSheetName,
           style: TextStyle(fontSize: 12, color: t.labelSecondary),
         ),
       ),
@@ -593,7 +630,7 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
       SizedBox(
         width: 62,
         child: Text(
-          'Shortcut',
+          context.l10n.regionSheetShortcut,
           style: TextStyle(fontSize: 12, color: t.labelSecondary),
         ),
       ),
@@ -609,9 +646,10 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
                 key: const ValueKey('region-record'),
                 onPressed: _startRecording,
                 semanticLabel: switch (_chord) {
-                  null => 'Record shortcut, none set',
-                  final chord => 'Record shortcut, currently '
-                      '${formatCombo(chord, keyLabels: KeyboardLabels.of(context))}',
+                  null => context.l10n.regionSheetRecordNone,
+                  final chord => context.l10n.regionSheetRecordCurrent(
+                      formatCombo(chord,
+                          keyLabels: KeyboardLabels.of(context))),
                 },
                 focusRingRadius: 6,
                 inset: 1,
@@ -623,7 +661,8 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
                     // defect — a status where a button belongs — on a field
                     // that is *only* ever clicked.
                     child: _chord == null
-                        ? const SetShortcutPill(label: 'Click to record')
+                        ? SetShortcutPill(
+                            label: context.l10n.regionSheetClickToRecord)
                         : KeycapRow(chord: _chord),
                   ),
                 ),
@@ -651,8 +690,8 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
         Expanded(
           child: Text(
             _takeAnyway
-                ? '$_conflict will lose this combination when you save.'
-                : '$_conflict already uses this combination.',
+                ? context.l10n.regionSheetConflictTaking(_conflict ?? '')
+                : context.l10n.regionSheetConflict(_conflict ?? ''),
             style: TextStyle(
               fontSize: 11,
               height: 1.35,
@@ -665,11 +704,11 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
           MacControl(
             key: const ValueKey('region-take-anyway'),
             onPressed: () => setState(() => _takeAnyway = true),
-            semanticLabel: 'Use this combination here',
+            semanticLabel: context.l10n.regionSheetUseHereLabel,
             focusRingRadius: 5,
             inset: 2,
             child: Text(
-              'Use it here',
+              context.l10n.regionSheetUseHere,
               style: TextStyle(fontSize: 11, color: t.link),
             ),
           ),
@@ -694,14 +733,14 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
         MacControl(
           key: const ValueKey('region-delete'),
           onPressed: widget.onDelete,
-          semanticLabel: 'Delete region',
+          semanticLabel: context.l10n.regionSheetDeleteLabel,
           focusRingRadius: 6,
           child: Text(
             // 'Delete' alone on screen, 'Delete region' to a reader: three
             // controls plus the sheet's padding do not fit the longer label,
             // and the row it sits in is the one place a wrap would look
             // broken rather than merely tight.
-            'Delete',
+            context.l10n.regionSheetDelete,
             style: TextStyle(fontSize: 12.5, color: t.warning),
           ),
         ),
@@ -709,10 +748,10 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
       MacControl(
         key: const ValueKey('region-cancel'),
         onPressed: widget.onCancel,
-        semanticLabel: 'Cancel',
+        semanticLabel: context.l10n.regionSheetCancel,
         focusRingRadius: 6,
         child: Text(
-          'Cancel',
+          context.l10n.regionSheetCancel,
           style: TextStyle(fontSize: 12.5, color: t.labelPrimary),
         ),
       ),
@@ -723,7 +762,9 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
         // makes MacControl report isEnabled false, so a screen reader is
         // told the same thing the colour says.
         onPressed: _canSubmit ? _submit : null,
-        semanticLabel: _creating ? 'Add region' : 'Save region',
+        semanticLabel: _creating
+            ? context.l10n.regionSheetAddLabel
+            : context.l10n.regionSheetSaveLabel,
         focusRingRadius: 6,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 5),
@@ -732,7 +773,9 @@ class _RegionPickerSheetState extends State<RegionPickerSheet> {
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
-            _creating ? 'Add' : 'Save',
+            _creating
+                ? context.l10n.regionSheetAdd
+                : context.l10n.regionSheetSave,
             style: TextStyle(
               fontSize: 12.5,
               color: _canSubmit ? t.onAccent : t.labelTertiary,

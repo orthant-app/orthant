@@ -397,6 +397,97 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutTagline => '基于网格的窗口管理工具。';
+
+  @override
+  String get regionNameFullScreen => '全屏';
+
+  @override
+  String regionNameLeft(String fraction) {
+    return '左 $fraction';
+  }
+
+  @override
+  String regionNameRight(String fraction) {
+    return '右 $fraction';
+  }
+
+  @override
+  String regionNameTop(String fraction) {
+    return '上 $fraction';
+  }
+
+  @override
+  String regionNameBottom(String fraction) {
+    return '下 $fraction';
+  }
+
+  @override
+  String get regionNameCustom => '自定义区域';
+
+  @override
+  String get regionSheetTitleNew => '新建区域';
+
+  @override
+  String get regionSheetTitleEdit => '编辑区域';
+
+  @override
+  String regionSheetHint(String shift) {
+    return '拖动绘制 · 方向键移动，$shift 扩展';
+  }
+
+  @override
+  String get regionSheetName => '名称';
+
+  @override
+  String get regionSheetShortcut => '快捷键';
+
+  @override
+  String get regionSheetRecordNone => '录制快捷键，当前未设置';
+
+  @override
+  String regionSheetRecordCurrent(String combo) {
+    return '录制快捷键，当前为 $combo';
+  }
+
+  @override
+  String get regionSheetClickToRecord => '点击以录制';
+
+  @override
+  String regionSheetConflict(String command) {
+    return '$command 已使用此组合键。';
+  }
+
+  @override
+  String regionSheetConflictTaking(String command) {
+    return '保存后，$command 将不再使用此组合键。';
+  }
+
+  @override
+  String get regionSheetUseHere => '在此使用';
+
+  @override
+  String get regionSheetUseHereLabel => '在此使用该组合键';
+
+  @override
+  String get regionSheetCancel => '取消';
+
+  @override
+  String get regionSheetDelete => '删除';
+
+  @override
+  String get regionSheetDeleteLabel => '删除区域';
+
+  @override
+  String get regionSheetAdd => '添加';
+
+  @override
+  String get regionSheetAddLabel => '添加区域';
+
+  @override
+  String get regionSheetSave => '保存';
+
+  @override
+  String get regionSheetSaveLabel => '保存区域';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -792,6 +883,97 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get aboutTagline => '以格線為基礎的視窗管理工具。';
+
+  @override
+  String get regionNameFullScreen => '全螢幕';
+
+  @override
+  String regionNameLeft(String fraction) {
+    return '左 $fraction';
+  }
+
+  @override
+  String regionNameRight(String fraction) {
+    return '右 $fraction';
+  }
+
+  @override
+  String regionNameTop(String fraction) {
+    return '上 $fraction';
+  }
+
+  @override
+  String regionNameBottom(String fraction) {
+    return '下 $fraction';
+  }
+
+  @override
+  String get regionNameCustom => '自訂區域';
+
+  @override
+  String get regionSheetTitleNew => '新增區域';
+
+  @override
+  String get regionSheetTitleEdit => '編輯區域';
+
+  @override
+  String regionSheetHint(String shift) {
+    return '拖曳繪製 · 方向鍵移動，$shift 擴展';
+  }
+
+  @override
+  String get regionSheetName => '名稱';
+
+  @override
+  String get regionSheetShortcut => '快速鍵';
+
+  @override
+  String get regionSheetRecordNone => '錄製快速鍵，目前未設定';
+
+  @override
+  String regionSheetRecordCurrent(String combo) {
+    return '錄製快速鍵，目前為 $combo';
+  }
+
+  @override
+  String get regionSheetClickToRecord => '按一下以錄製';
+
+  @override
+  String regionSheetConflict(String command) {
+    return '$command 已使用此組合鍵。';
+  }
+
+  @override
+  String regionSheetConflictTaking(String command) {
+    return '儲存後，$command 將不再使用此組合鍵。';
+  }
+
+  @override
+  String get regionSheetUseHere => '在此使用';
+
+  @override
+  String get regionSheetUseHereLabel => '在此使用該組合鍵';
+
+  @override
+  String get regionSheetCancel => '取消';
+
+  @override
+  String get regionSheetDelete => '刪除';
+
+  @override
+  String get regionSheetDeleteLabel => '刪除區域';
+
+  @override
+  String get regionSheetAdd => '新增';
+
+  @override
+  String get regionSheetAddLabel => '新增區域';
+
+  @override
+  String get regionSheetSave => '儲存';
+
+  @override
+  String get regionSheetSaveLabel => '儲存區域';
 }
 
 /// The translations for Chinese, as used in Hong Kong, using the Han script (`zh_Hant_HK`).
@@ -1187,4 +1369,95 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String get aboutTagline => '以格線為基礎的視窗管理工具。';
+
+  @override
+  String get regionNameFullScreen => '全螢幕';
+
+  @override
+  String regionNameLeft(String fraction) {
+    return '左 $fraction';
+  }
+
+  @override
+  String regionNameRight(String fraction) {
+    return '右 $fraction';
+  }
+
+  @override
+  String regionNameTop(String fraction) {
+    return '上 $fraction';
+  }
+
+  @override
+  String regionNameBottom(String fraction) {
+    return '下 $fraction';
+  }
+
+  @override
+  String get regionNameCustom => '自訂區域';
+
+  @override
+  String get regionSheetTitleNew => '新增區域';
+
+  @override
+  String get regionSheetTitleEdit => '編輯區域';
+
+  @override
+  String regionSheetHint(String shift) {
+    return '拖曳繪製 · 方向鍵移動，$shift 擴展';
+  }
+
+  @override
+  String get regionSheetName => '名稱';
+
+  @override
+  String get regionSheetShortcut => '快速鍵';
+
+  @override
+  String get regionSheetRecordNone => '錄製快速鍵，目前未設定';
+
+  @override
+  String regionSheetRecordCurrent(String combo) {
+    return '錄製快速鍵，目前為 $combo';
+  }
+
+  @override
+  String get regionSheetClickToRecord => '按一下以錄製';
+
+  @override
+  String regionSheetConflict(String command) {
+    return '$command 已使用此組合鍵。';
+  }
+
+  @override
+  String regionSheetConflictTaking(String command) {
+    return '儲存後，$command 將不再使用此組合鍵。';
+  }
+
+  @override
+  String get regionSheetUseHere => '在此使用';
+
+  @override
+  String get regionSheetUseHereLabel => '在此使用該組合鍵';
+
+  @override
+  String get regionSheetCancel => '取消';
+
+  @override
+  String get regionSheetDelete => '刪除';
+
+  @override
+  String get regionSheetDeleteLabel => '刪除區域';
+
+  @override
+  String get regionSheetAdd => '新增';
+
+  @override
+  String get regionSheetAddLabel => '新增區域';
+
+  @override
+  String get regionSheetSave => '儲存';
+
+  @override
+  String get regionSheetSaveLabel => '儲存區域';
 }

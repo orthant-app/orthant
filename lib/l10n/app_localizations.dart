@@ -698,6 +698,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A grid-based window manager.'**
   String get aboutTagline;
+
+  /// The name given to a custom region that covers the whole screen, shown in the region picker's name field and in the Shortcuts list. A generated name: the app suggests it from the shape and shows it in the current language, but always stores the English text.
+  ///
+  /// In en, this message translates to:
+  /// **'Full screen'**
+  String get regionNameFullScreen;
+
+  /// The name given to a custom region that fills the full height from the left edge, such as "Left ⅔". {fraction} is how much of the width it spans, as a fraction glyph or digits such as ⅔ or 3/7, and stays as written. A generated name, shown in the region picker's name field and the Shortcuts list.
+  ///
+  /// In en, this message translates to:
+  /// **'Left {fraction}'**
+  String regionNameLeft(String fraction);
+
+  /// The name given to a custom region that fills the full height from the right edge, such as "Right ⅓". {fraction} is how much of the width it spans, as a fraction glyph or digits such as ⅓ or 3/7, and stays as written. A generated name, shown in the region picker's name field and the Shortcuts list.
+  ///
+  /// In en, this message translates to:
+  /// **'Right {fraction}'**
+  String regionNameRight(String fraction);
+
+  /// The name given to a custom region that fills the full width from the top edge, such as "Top ½". {fraction} is how much of the height it spans, as a fraction glyph or digits such as ½ or 3/7, and stays as written. A generated name, shown in the region picker's name field and the Shortcuts list.
+  ///
+  /// In en, this message translates to:
+  /// **'Top {fraction}'**
+  String regionNameTop(String fraction);
+
+  /// The name given to a custom region that fills the full width from the bottom edge, such as "Bottom ¼". {fraction} is how much of the height it spans, as a fraction glyph or digits such as ¼ or 3/7, and stays as written. A generated name, shown in the region picker's name field and the Shortcuts list.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom {fraction}'**
+  String regionNameBottom(String fraction);
+
+  /// The name given to a custom region whose shape none of the other generated names describes, such as a block in the middle of the screen. A generated name, shown in the region picker's name field and the Shortcuts list.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom region'**
+  String get regionNameCustom;
+
+  /// The title of the region picker sheet while a new custom region is being drawn. The sheet opens over the Shortcuts tab.
+  ///
+  /// In en, this message translates to:
+  /// **'New region'**
+  String get regionSheetTitleNew;
+
+  /// The title of the region picker sheet while an existing custom region is being edited.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit region'**
+  String get regionSheetTitleEdit;
+
+  /// The one-line instruction under the region picker's grid. {shift} is the Shift key as the platform draws it: the symbol ⇧ on macOS, the word Shift on Windows. The dot between the two halves stays.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to draw · arrows to move, {shift} to extend'**
+  String regionSheetHint(String shift);
+
+  /// The label of the name field in the region picker sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get regionSheetName;
+
+  /// The label of the shortcut field in the region picker sheet, beside the keys bound to the region.
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcut'**
+  String get regionSheetShortcut;
+
+  /// What a screen reader says for the region picker's shortcut field when no key combination is set. Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Record shortcut, none set'**
+  String get regionSheetRecordNone;
+
+  /// What a screen reader says for the region picker's shortcut field when a key combination is set. {combo} is the combination as the platform writes it, such as ⌃⌥← or Win+Ctrl+Shift+Left, and stays as written. Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Record shortcut, currently {combo}'**
+  String regionSheetRecordCurrent(String combo);
+
+  /// The button-like prompt in the region picker's shortcut field while no combination is set. Pressing it starts listening for the combination.
+  ///
+  /// In en, this message translates to:
+  /// **'Click to record'**
+  String get regionSheetClickToRecord;
+
+  /// A notice in the region picker sheet: the key combination the user chose belongs to another command. {command} is that command's name as the Shortcuts list shows it, such as "Left half" or the name of another custom region.
+  ///
+  /// In en, this message translates to:
+  /// **'{command} already uses this combination.'**
+  String regionSheetConflict(String command);
+
+  /// A notice in the region picker sheet after the user chose to take a key combination from another command: saving will leave that command without it. {command} is that command's name as the Shortcuts list shows it.
+  ///
+  /// In en, this message translates to:
+  /// **'{command} will lose this combination when you save.'**
+  String regionSheetConflictTaking(String command);
+
+  /// The small link in the region picker's collision notice that takes the key combination from the other command for this region.
+  ///
+  /// In en, this message translates to:
+  /// **'Use it here'**
+  String get regionSheetUseHere;
+
+  /// What a screen reader says for the link that takes a key combination from another command for this region. Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this combination here'**
+  String get regionSheetUseHereLabel;
+
+  /// The button that closes the region picker sheet without saving.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get regionSheetCancel;
+
+  /// The button on the region picker sheet, shown while editing, that deletes the custom region. Drawn short; a screen reader says the longer regionSheetDeleteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get regionSheetDelete;
+
+  /// What a screen reader says for the region picker's Delete button. Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete region'**
+  String get regionSheetDeleteLabel;
+
+  /// The default button on the region picker sheet while a new custom region is being created. Drawn short; a screen reader says the longer regionSheetAddLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get regionSheetAdd;
+
+  /// What a screen reader says for the region picker's Add button. Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Add region'**
+  String get regionSheetAddLabel;
+
+  /// The default button on the region picker sheet while an existing custom region is being edited. Drawn short; a screen reader says the longer regionSheetSaveLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get regionSheetSave;
+
+  /// What a screen reader says for the region picker's Save button. Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Save region'**
+  String get regionSheetSaveLabel;
 }
 
 class _AppLocalizationsDelegate

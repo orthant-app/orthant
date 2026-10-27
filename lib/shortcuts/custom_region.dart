@@ -1,3 +1,5 @@
+import '../l10n/app_localizations.dart';
+
 /// Bounds on a region's *denominator*.
 ///
 /// Deliberately not `kMinGridAxis` (which is 2). That constant governs the
@@ -148,14 +150,21 @@ class CustomRegion {
       'CustomRegion($id "$name" ${cols}x$rows $c0..$c1, $r0..$r1)';
 }
 
-/// A default name for the shape just drawn.
+/// Which of the few names a shape can have: the language-free half of a
+/// suggested name. The words come later, either the English ones
+/// [suggestRegionName] stores or the current language's
+/// ([localizedSuggestion]).
+enum RegionNameKind { fullScreen, left, right, top, bottom, custom }
+
+/// What the shape just drawn is called, as a [RegionNameKind] and the fraction
+/// it spans (`⅔`, `3/7`), which is empty for [RegionNameKind.fullScreen] and
+/// [RegionNameKind.custom].
 ///
-/// A convenience the user overwrites, never an identity — [CustomRegion.id] is
-/// that, which is what makes renaming free. Deliberately shallow: it names the
-/// six shapes that have an obvious word ("Left ⅔", "Top ½") and gives up on the
+/// The decision, without the words. Deliberately shallow: it names the six
+/// shapes that have an obvious word ("Left ⅔", "Top ½") and gives up on the
 /// rest rather than inventing something like "columns 2–4 of 6". A wrong-sounding
 /// name is one text field away from right; a long wrong one is just noise.
-String suggestRegionName({
+({RegionNameKind kind, String fraction}) suggestRegion({
   required int cols,
   required int rows,
   required int c0,
@@ -166,13 +175,107 @@ String suggestRegionName({
   final fullWidth = c0 == 0 && c1 == cols - 1;
   final fullHeight = r0 == 0 && r1 == rows - 1;
 
-  if (fullWidth && fullHeight) return 'Full screen';
-  if (fullHeight && c0 == 0) return 'Left ${_fraction(c1 + 1, cols)}';
-  if (fullHeight && c1 == cols - 1) return 'Right ${_fraction(cols - c0, cols)}';
-  if (fullWidth && r0 == 0) return 'Top ${_fraction(r1 + 1, rows)}';
-  if (fullWidth && r1 == rows - 1) return 'Bottom ${_fraction(rows - r0, rows)}';
-  return 'Custom region';
+  if (fullWidth && fullHeight) {
+    return (kind: RegionNameKind.fullScreen, fraction: '');
+  }
+  if (fullHeight && c0 == 0) {
+    return (kind: RegionNameKind.left, fraction: _fraction(c1 + 1, cols));
+  }
+  if (fullHeight && c1 == cols - 1) {
+    return (kind: RegionNameKind.right, fraction: _fraction(cols - c0, cols));
+  }
+  if (fullWidth && r0 == 0) {
+    return (kind: RegionNameKind.top, fraction: _fraction(r1 + 1, rows));
+  }
+  if (fullWidth && r1 == rows - 1) {
+    return (kind: RegionNameKind.bottom, fraction: _fraction(rows - r0, rows));
+  }
+  return (kind: RegionNameKind.custom, fraction: '');
 }
+
+/// A default name for the shape just drawn, **in English, always**.
+///
+/// A convenience the user overwrites, never an identity — [CustomRegion.id] is
+/// that, which is what makes renaming free.
+///
+/// **This text is a stored format.** A generated region is saved under this
+/// name whatever language was showing, and "generated" means exactly that the
+/// stored name equals this string for the stored shape ([isGeneratedName]); an
+/// older install both reads and rewrites those names, and has only these words.
+/// So the words are written out here rather than read from the localization,
+/// and changing any of them turns every existing generated name into an
+/// authored one: it would need a migration. The words the user sees come from
+/// [localizedSuggestion].
+String suggestRegionName({
+  required int cols,
+  required int rows,
+  required int c0,
+  required int c1,
+  required int r0,
+  required int r1,
+}) {
+  final s = suggestRegion(
+      cols: cols, rows: rows, c0: c0, c1: c1, r0: r0, r1: r1);
+  return switch (s.kind) {
+    RegionNameKind.fullScreen => 'Full screen',
+    RegionNameKind.left => 'Left ${s.fraction}',
+    RegionNameKind.right => 'Right ${s.fraction}',
+    RegionNameKind.top => 'Top ${s.fraction}',
+    RegionNameKind.bottom => 'Bottom ${s.fraction}',
+    RegionNameKind.custom => 'Custom region',
+  };
+}
+
+/// [s] in the language of [l]: what a generated name is shown as.
+///
+/// For English this is [suggestRegionName] exactly; a test holds the two
+/// together, since the stored English is never read from the localization.
+String localizedSuggestion(
+  ({RegionNameKind kind, String fraction}) s,
+  AppLocalizations l,
+) =>
+    switch (s.kind) {
+      RegionNameKind.fullScreen => l.regionNameFullScreen,
+      RegionNameKind.left => l.regionNameLeft(s.fraction),
+      RegionNameKind.right => l.regionNameRight(s.fraction),
+      RegionNameKind.top => l.regionNameTop(s.fraction),
+      RegionNameKind.bottom => l.regionNameBottom(s.fraction),
+      RegionNameKind.custom => l.regionNameCustom,
+    };
+
+/// Whether [r]'s name is a generated one: the English suggestion for its own
+/// shape, exactly. Anything else, including a stale suggestion that no longer
+/// fits the shape and the suggestion in another language, is the user's.
+///
+/// Decided from the *stored* name alone, which is all an older build's rewrite
+/// leaves intact.
+bool isGeneratedName(CustomRegion r) =>
+    r.name ==
+    suggestRegionName(
+      cols: r.cols,
+      rows: r.rows,
+      c0: r.c0,
+      c1: r.c1,
+      r0: r.r0,
+      r1: r.r1,
+    );
+
+/// What a row, a menu or a screen reader calls [r] in the language of [l]: a
+/// generated name in that language, an authored one exactly as written.
+String regionDisplayName(CustomRegion r, AppLocalizations l) =>
+    isGeneratedName(r)
+        ? localizedSuggestion(
+            suggestRegion(
+              cols: r.cols,
+              rows: r.rows,
+              c0: r.c0,
+              c1: r.c1,
+              r0: r.r0,
+              r1: r.r1,
+            ),
+            l,
+          )
+        : r.name;
 
 /// [n]/[d] reduced, as a vulgar-fraction glyph where one exists.
 ///

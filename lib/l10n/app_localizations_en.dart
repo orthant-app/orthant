@@ -401,4 +401,95 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutTagline => 'A grid-based window manager.';
+
+  @override
+  String get regionNameFullScreen => 'Full screen';
+
+  @override
+  String regionNameLeft(String fraction) {
+    return 'Left $fraction';
+  }
+
+  @override
+  String regionNameRight(String fraction) {
+    return 'Right $fraction';
+  }
+
+  @override
+  String regionNameTop(String fraction) {
+    return 'Top $fraction';
+  }
+
+  @override
+  String regionNameBottom(String fraction) {
+    return 'Bottom $fraction';
+  }
+
+  @override
+  String get regionNameCustom => 'Custom region';
+
+  @override
+  String get regionSheetTitleNew => 'New region';
+
+  @override
+  String get regionSheetTitleEdit => 'Edit region';
+
+  @override
+  String regionSheetHint(String shift) {
+    return 'Drag to draw · arrows to move, $shift to extend';
+  }
+
+  @override
+  String get regionSheetName => 'Name';
+
+  @override
+  String get regionSheetShortcut => 'Shortcut';
+
+  @override
+  String get regionSheetRecordNone => 'Record shortcut, none set';
+
+  @override
+  String regionSheetRecordCurrent(String combo) {
+    return 'Record shortcut, currently $combo';
+  }
+
+  @override
+  String get regionSheetClickToRecord => 'Click to record';
+
+  @override
+  String regionSheetConflict(String command) {
+    return '$command already uses this combination.';
+  }
+
+  @override
+  String regionSheetConflictTaking(String command) {
+    return '$command will lose this combination when you save.';
+  }
+
+  @override
+  String get regionSheetUseHere => 'Use it here';
+
+  @override
+  String get regionSheetUseHereLabel => 'Use this combination here';
+
+  @override
+  String get regionSheetCancel => 'Cancel';
+
+  @override
+  String get regionSheetDelete => 'Delete';
+
+  @override
+  String get regionSheetDeleteLabel => 'Delete region';
+
+  @override
+  String get regionSheetAdd => 'Add';
+
+  @override
+  String get regionSheetAddLabel => 'Add region';
+
+  @override
+  String get regionSheetSave => 'Save';
+
+  @override
+  String get regionSheetSaveLabel => 'Save region';
 }

@@ -605,5 +605,153 @@
   "aboutTagline": "A grid-based window manager.",
   "@aboutTagline": {
     "description": "The one-line description of the app at the foot of the About tab. It names no operating system."
+  },
+  "regionNameFullScreen": "Full screen",
+  "@regionNameFullScreen": {
+    "description": "The name given to a custom region that covers the whole screen, shown in the region picker's name field and in the Shortcuts list. A generated name: the app suggests it from the shape and shows it in the current language, but always stores the English text."
+  },
+  "regionNameLeft": "Left {fraction}",
+  "@regionNameLeft": {
+    "description": "The name given to a custom region that fills the full height from the left edge, such as \"Left ⅔\". {fraction} is how much of the width it spans, as a fraction glyph or digits such as ⅔ or 3/7, and stays as written. A generated name, shown in the region picker's name field and the Shortcuts list.",
+    "placeholders": {
+      "fraction": {
+        "type": "String",
+        "example": "⅔"
+      }
+    }
+  },
+  "regionNameRight": "Right {fraction}",
+  "@regionNameRight": {
+    "description": "The name given to a custom region that fills the full height from the right edge, such as \"Right ⅓\". {fraction} is how much of the width it spans, as a fraction glyph or digits such as ⅓ or 3/7, and stays as written. A generated name, shown in the region picker's name field and the Shortcuts list.",
+    "placeholders": {
+      "fraction": {
+        "type": "String",
+        "example": "⅔"
+      }
+    }
+  },
+  "regionNameTop": "Top {fraction}",
+  "@regionNameTop": {
+    "description": "The name given to a custom region that fills the full width from the top edge, such as \"Top ½\". {fraction} is how much of the height it spans, as a fraction glyph or digits such as ½ or 3/7, and stays as written. A generated name, shown in the region picker's name field and the Shortcuts list.",
+    "placeholders": {
+      "fraction": {
+        "type": "String",
+        "example": "⅔"
+      }
+    }
+  },
+  "regionNameBottom": "Bottom {fraction}",
+  "@regionNameBottom": {
+    "description": "The name given to a custom region that fills the full width from the bottom edge, such as \"Bottom ¼\". {fraction} is how much of the height it spans, as a fraction glyph or digits such as ¼ or 3/7, and stays as written. A generated name, shown in the region picker's name field and the Shortcuts list.",
+    "placeholders": {
+      "fraction": {
+        "type": "String",
+        "example": "⅔"
+      }
+    }
+  },
+  "regionNameCustom": "Custom region",
+  "@regionNameCustom": {
+    "description": "The name given to a custom region whose shape none of the other generated names describes, such as a block in the middle of the screen. A generated name, shown in the region picker's name field and the Shortcuts list."
+  },
+  "regionSheetTitleNew": "New region",
+  "@regionSheetTitleNew": {
+    "description": "The title of the region picker sheet while a new custom region is being drawn. The sheet opens over the Shortcuts tab."
+  },
+  "regionSheetTitleEdit": "Edit region",
+  "@regionSheetTitleEdit": {
+    "description": "The title of the region picker sheet while an existing custom region is being edited."
+  },
+  "regionSheetHint": "Drag to draw · arrows to move, {shift} to extend",
+  "@regionSheetHint": {
+    "description": "The one-line instruction under the region picker's grid. {shift} is the Shift key as the platform draws it: the symbol ⇧ on macOS, the word Shift on Windows. The dot between the two halves stays.",
+    "placeholders": {
+      "shift": {
+        "type": "String",
+        "example": "⇧"
+      }
+    }
+  },
+  "regionSheetName": "Name",
+  "@regionSheetName": {
+    "description": "The label of the name field in the region picker sheet."
+  },
+  "regionSheetShortcut": "Shortcut",
+  "@regionSheetShortcut": {
+    "description": "The label of the shortcut field in the region picker sheet, beside the keys bound to the region."
+  },
+  "regionSheetRecordNone": "Record shortcut, none set",
+  "@regionSheetRecordNone": {
+    "description": "What a screen reader says for the region picker's shortcut field when no key combination is set. Never drawn on screen."
+  },
+  "regionSheetRecordCurrent": "Record shortcut, currently {combo}",
+  "@regionSheetRecordCurrent": {
+    "description": "What a screen reader says for the region picker's shortcut field when a key combination is set. {combo} is the combination as the platform writes it, such as ⌃⌥← or Win+Ctrl+Shift+Left, and stays as written. Never drawn on screen.",
+    "placeholders": {
+      "combo": {
+        "type": "String",
+        "example": "⌃⌥←"
+      }
+    }
+  },
+  "regionSheetClickToRecord": "Click to record",
+  "@regionSheetClickToRecord": {
+    "description": "The button-like prompt in the region picker's shortcut field while no combination is set. Pressing it starts listening for the combination."
+  },
+  "regionSheetConflict": "{command} already uses this combination.",
+  "@regionSheetConflict": {
+    "description": "A notice in the region picker sheet: the key combination the user chose belongs to another command. {command} is that command's name as the Shortcuts list shows it, such as \"Left half\" or the name of another custom region.",
+    "placeholders": {
+      "command": {
+        "type": "String",
+        "example": "Left half"
+      }
+    }
+  },
+  "regionSheetConflictTaking": "{command} will lose this combination when you save.",
+  "@regionSheetConflictTaking": {
+    "description": "A notice in the region picker sheet after the user chose to take a key combination from another command: saving will leave that command without it. {command} is that command's name as the Shortcuts list shows it.",
+    "placeholders": {
+      "command": {
+        "type": "String",
+        "example": "Left half"
+      }
+    }
+  },
+  "regionSheetUseHere": "Use it here",
+  "@regionSheetUseHere": {
+    "description": "The small link in the region picker's collision notice that takes the key combination from the other command for this region."
+  },
+  "regionSheetUseHereLabel": "Use this combination here",
+  "@regionSheetUseHereLabel": {
+    "description": "What a screen reader says for the link that takes a key combination from another command for this region. Never drawn on screen."
+  },
+  "regionSheetCancel": "Cancel",
+  "@regionSheetCancel": {
+    "description": "The button that closes the region picker sheet without saving."
+  },
+  "regionSheetDelete": "Delete",
+  "@regionSheetDelete": {
+    "description": "The button on the region picker sheet, shown while editing, that deletes the custom region. Drawn short; a screen reader says the longer regionSheetDeleteLabel."
+  },
+  "regionSheetDeleteLabel": "Delete region",
+  "@regionSheetDeleteLabel": {
+    "description": "What a screen reader says for the region picker's Delete button. Never drawn on screen."
+  },
+  "regionSheetAdd": "Add",
+  "@regionSheetAdd": {
+    "description": "The default button on the region picker sheet while a new custom region is being created. Drawn short; a screen reader says the longer regionSheetAddLabel."
+  },
+  "regionSheetAddLabel": "Add region",
+  "@regionSheetAddLabel": {
+    "description": "What a screen reader says for the region picker's Add button. Never drawn on screen."
+  },
+  "regionSheetSave": "Save",
+  "@regionSheetSave": {
+    "description": "The default button on the region picker sheet while an existing custom region is being edited. Drawn short; a screen reader says the longer regionSheetSaveLabel."
+  },
+  "regionSheetSaveLabel": "Save region",
+  "@regionSheetSaveLabel": {
+    "description": "What a screen reader says for the region picker's Save button. Never drawn on screen."
   }
 }

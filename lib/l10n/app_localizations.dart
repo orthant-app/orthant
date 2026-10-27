@@ -633,10 +633,10 @@ abstract class AppLocalizations {
   /// **'{label}, decrease'**
   String stepperDecrease(String label);
 
-  /// The caption under the grid preview on the General tab when gaps are on: the grid's size and the largest gap a placement keeps (it shrinks for a window too small to keep it). {cols} and {rows} are the grid's size, and the × between them stays. {gap} is the gap, a whole number, and {unit} is pt on macOS and px on Windows and stays as written.
+  /// The caption under the grid preview on the General tab when gaps are on: the grid's size and the largest gap a placement keeps (it shrinks for a window too small to keep it). {cols} and {rows} are the grid's size, and the × between them stays. {gap} is the gap, a whole number, and {unit} is pt on macOS and px on Windows and stays as written. English says "gaps" even for 1, because the word counts the gaps between cells; a language whose plural needs a form for one may add it.
   ///
   /// In en, this message translates to:
-  /// **'{gap, plural, =1{{cols} × {rows} · up to 1 {unit} gap} other{{cols} × {rows} · up to {gap} {unit} gaps}}'**
+  /// **'{gap, plural, other{{cols} × {rows} · up to {gap} {unit} gaps}}'**
   String gridPreviewCaptionGaps(int cols, int rows, int gap, String unit);
 
   /// Shown inside a shortcut field while it listens for a key combination and no modifier key is held yet.

@@ -113,12 +113,15 @@ void main() {
                 ),
               ));
 
-    testWidgets('English says gaps, and a lone point is one gap',
+    testWidgets('English is what it always was, a single point included',
         (tester) async {
       await pump(tester, 8);
       expect(find.text('6 × 6 · up to 8 pt gaps'), findsOneWidget);
+      // "gaps" counts the gaps between cells, not the points, so one point is
+      // still "gaps". Pinned because a plural form for one is easy to add and
+      // changes today's English.
       await pump(tester, 1);
-      expect(find.text('6 × 6 · up to 1 pt gap'), findsOneWidget);
+      expect(find.text('6 × 6 · up to 1 pt gaps'), findsOneWidget);
       await pump(tester, 0);
       expect(find.text('6 × 6'), findsOneWidget);
     });

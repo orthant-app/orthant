@@ -363,7 +363,6 @@ class AppLocalizationsEn extends AppLocalizations {
       gap,
       locale: localeName,
       other: '$cols × $rows · up to $gap $unit gaps',
-      one: '$cols × $rows · up to 1 $unit gap',
     );
     return '$_temp0';
   }

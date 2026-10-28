@@ -66,8 +66,9 @@ abstract class SparkleApi {
   void setAppBuildVersion(String build);
   void setAutomaticCheck(bool on);
 
-  /// The language of WinSparkle's own windows, as a tag it knows (`en`,
-  /// `zh-CN`, `zh-TW`). WinSparkle takes it only before [init].
+  /// The language of WinSparkle's own windows, as the lowercase tag its
+  /// catalogue lookup matches (`en`, `zh-cn`, `zh-tw`). WinSparkle takes it
+  /// only before [init].
   void setLang(String language);
   void setShutdownRequestCallback(void Function() onRequest);
 
@@ -283,7 +284,8 @@ class WindowsUpdater {
   /// executable's resources, of which this one has none.
   ///
   /// [language] is Orthant's own resolved language as WinSparkle spells it
-  /// (`winSparkleLanguage`), given even when the user left it on System: left
+  /// (`winSparkleLanguage`; it is lowercased on the way to WinSparkle, which
+  /// matches only that), given even when the user left it on System: left
   /// to detect one itself, WinSparkle would show a language Orthant does not
   /// have. Only null (nothing resolved, a suite) sets none.
   bool start({
@@ -307,7 +309,14 @@ class WindowsUpdater {
     _api.setAppDetails('Orthant', 'Orthant', display);
     _api.setAppBuildVersion(build);
     // Before init, as WinSparkle requires: its windows are built from it then.
-    if (language != null) _api.setLang(language);
+    // Lowercased, because WinSparkle 0.9.4 finds its catalogues only that way:
+    // the wxWidgets inside it lowercases the names of the DLL's catalogues
+    // (translation.cpp:1999) and matches the requested tag case-sensitively
+    // (:1595), so `zh-CN` and `pt-BR` miss and the window stays English, while
+    // `zh-cn`, `zh-tw` and `pt-br` find theirs (measured on the VM). 0.9.4 is
+    // the latest release and nothing upstream fixes it. The canonical tag
+    // (`winSparkleLanguage`) stays as it is for everything else.
+    if (language != null) _api.setLang(language.toLowerCase());
     // Off before init, so WinSparkle never starts its own schedule, nor asks
     // at a second launch whether to.
     _api.setAutomaticCheck(false);

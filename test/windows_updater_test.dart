@@ -178,7 +178,7 @@ void main() {
   });
 
   test('WinSparkle is told Orthant\'s language before it starts, so that its '
-      'windows speak it', () {
+      'windows speak it, in the lowercase its catalogue lookup matches', () {
     final t = make();
     t.store.automatic = true;
     expect(
@@ -194,7 +194,7 @@ void main() {
       'key $key',
       'details Orthant Orthant 1.1.0',
       'build 8',
-      'lang zh-TW',
+      'lang zh-tw',
       'automatic false',
       'shutdown callback',
       'skipped callback',
@@ -216,6 +216,30 @@ void main() {
     expect(t.api.calls.where((c) => c.startsWith('lang')), ['lang en']);
     expect(t.api.calls.indexOf('lang en'),
         lessThan(t.api.calls.indexOf('init')));
+  });
+
+  test('the tag goes to WinSparkle lowercased, whatever its region', () {
+    // wxWidgets 3.2.10 inside WinSparkle 0.9.4 lowercases the names of the
+    // DLL's catalogues (translation.cpp:1999) but matches the requested tag
+    // case-sensitively (:1595), so `zh-CN` and `pt-BR` find nothing and the
+    // window stays English; measured on the VM, `zh-cn`, `zh-tw` and `pt-br`
+    // find theirs.
+    for (final (given, passed) in [
+      ('zh-CN', 'zh-cn'),
+      ('zh-TW', 'zh-tw'),
+      ('pt-BR', 'pt-br'),
+      ('en', 'en'),
+      ('zh-tw', 'zh-tw'),
+    ]) {
+      final t = make();
+      t.updater.start(
+          build: '8',
+          display: '1.1.0',
+          onShutdownRequested: () {},
+          language: given);
+      expect(t.api.calls.where((c) => c.startsWith('lang')), ['lang $passed'],
+          reason: given);
+    }
   });
 
   test('with no language given it does not set one', () {

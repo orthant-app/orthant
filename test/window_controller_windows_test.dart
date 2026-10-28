@@ -365,7 +365,7 @@ void main() {
     test('the updater\'s language comes from the injected source', () {
       final t = fresh();
       expect(start(t.updater, () => taiwan), isTrue);
-      expect(t.api.calls, ['lang zh-TW', 'automatic false', 'init']);
+      expect(t.api.calls, ['lang zh-tw', 'automatic false', 'init']);
     });
 
     test('the controller\'s systemLocales() is the same source, read afresh',
@@ -399,7 +399,7 @@ void main() {
       final t = fresh();
       start(t.updater, () => [const Locale('en', 'US')],
           _Language()..stored = 'zh-Hant');
-      expect(t.api.calls.first, 'lang zh-TW');
+      expect(t.api.calls.first, 'lang zh-tw');
     });
   });
 

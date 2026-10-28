@@ -250,7 +250,9 @@ String? optionTagFor(String? choice, List<LanguageOption> options) {
 
 /// The language tag WinSparkle takes for [resolved]: Chinese by script (`Hans`
 /// is `zh-CN`, `Hant` is `zh-TW`), every other language its own
-/// `toLanguageTag()` (`en`, `pt-BR`).
+/// `toLanguageTag()` (`en`, `pt-BR`). The canonical spelling: WinSparkle 0.9.4
+/// finds its catalogues only by the lowercase one, which `WindowsUpdater.start`
+/// applies as it hands the tag over.
 String winSparkleLanguage(Locale resolved) {
   final n = normalizeLocale(resolved);
   if (n.languageCode == 'zh') {

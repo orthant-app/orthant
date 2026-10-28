@@ -739,7 +739,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String overlayGridHint(String place) {
-    return '方向鍵移動選取範圍。Shift 加方向鍵擴展選取範圍。$place 放置視窗。Esc 取消。';
+    return '方向鍵移動選取範圍。Shift 加方向鍵延伸選取範圍。$place 放置視窗。Esc 取消。';
   }
 
   @override
@@ -749,7 +749,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
     String rows,
     String place,
   ) {
-    return '已為$target開啟格線。$columns，$rows。方向鍵移動，Shift 加方向鍵擴展，$place 放置，Esc 取消。';
+    return '已為$target開啟格線。$columns，$rows。方向鍵移動，Shift 加方向鍵延伸，$place 放置，Esc 取消。';
   }
 
   @override
@@ -843,11 +843,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String overlayExtend(String direction) {
     String _temp0 = intl.Intl.selectLogic(direction, {
-      'left': '向左擴展',
-      'right': '向右擴展',
-      'up': '向上擴展',
-      'down': '向下擴展',
-      'other': '擴展',
+      'left': '向左延伸',
+      'right': '向右延伸',
+      'up': '向上延伸',
+      'down': '向下延伸',
+      'other': '延伸',
     });
     return '$_temp0';
   }
@@ -1122,7 +1122,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String regionSheetHint(String shift) {
-    return '拖曳繪製 · 方向鍵移動，$shift 擴展';
+    return '拖曳繪製 · 方向鍵移動，$shift 延伸';
   }
 
   @override
@@ -1356,7 +1356,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String readyGridCaption(String shift, String place) {
-    return '開啟格線。在格線上拖曳，就能選取任意區域，三分之一、三分之二都行。也可以用方向鍵移動，$shift 加方向鍵擴展，$place 放置。';
+    return '開啟格線。在格線上拖曳，就能選取任意區域，三分之一、三分之二都行。也可以用方向鍵移動，$shift 加方向鍵延伸，$place 放置。';
   }
 
   @override
@@ -1425,7 +1425,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String overlayGridHint(String place) {
-    return '方向鍵移動選取範圍。Shift 加方向鍵擴展選取範圍。$place 放置視窗。Esc 取消。';
+    return '方向鍵移動選取範圍。Shift 加方向鍵延伸選取範圍。$place 放置視窗。Esc 取消。';
   }
 
   @override
@@ -1435,7 +1435,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
     String rows,
     String place,
   ) {
-    return '已為$target開啟格線。$columns，$rows。方向鍵移動，Shift 加方向鍵擴展，$place 放置，Esc 取消。';
+    return '已為$target開啟格線。$columns，$rows。方向鍵移動，Shift 加方向鍵延伸，$place 放置，Esc 取消。';
   }
 
   @override
@@ -1529,11 +1529,11 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   @override
   String overlayExtend(String direction) {
     String _temp0 = intl.Intl.selectLogic(direction, {
-      'left': '向左擴展',
-      'right': '向右擴展',
-      'up': '向上擴展',
-      'down': '向下擴展',
-      'other': '擴展',
+      'left': '向左延伸',
+      'right': '向右延伸',
+      'up': '向上延伸',
+      'down': '向下延伸',
+      'other': '延伸',
     });
     return '$_temp0';
   }
@@ -1808,7 +1808,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String regionSheetHint(String shift) {
-    return '拖曳繪製 · 方向鍵移動，$shift 擴展';
+    return '拖曳繪製 · 方向鍵移動，$shift 延伸';
   }
 
   @override
@@ -2042,7 +2042,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String readyGridCaption(String shift, String place) {
-    return '開啟格線。在格線上拖曳，就能選取任意區域，三分之一、三分之二都行。也可以用方向鍵移動，$shift 加方向鍵擴展，$place 放置。';
+    return '開啟格線。在格線上拖曳，就能選取任意區域，三分之一、三分之二都行。也可以用方向鍵移動，$shift 加方向鍵延伸，$place 放置。';
   }
 
   @override

@@ -457,12 +457,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String regionSheetConflict(String command) {
-    return '$command 已使用此组合键。';
+    return '“$command”已使用此组合键。';
   }
 
   @override
   String regionSheetConflictTaking(String command) {
-    return '保存后，$command 将不再使用此组合键。';
+    return '保存后，“$command”将不再使用此组合键。';
   }
 
   @override
@@ -558,7 +558,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String shortcutsCollision(String combo, String owner) {
-    return '$combo 已被 $owner 使用。再按一次即可在此使用。';
+    return '$combo 已被“$owner”使用。再按一次即可在此使用。';
   }
 
   @override
@@ -566,7 +566,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String shortcutsDisplaced(String command, String combo) {
-    return '$command 不再使用 $combo。';
+    return '“$command”不再使用 $combo。';
   }
 
   @override
@@ -574,7 +574,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String shortcutsRegionDeleted(String name) {
-    return '已删除 $name。';
+    return '已删除“$name”。';
   }
 
   @override

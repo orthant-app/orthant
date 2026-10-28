@@ -1283,10 +1283,10 @@ void main() {
             withChord: true,
             conflictName: (_) => 'Left half',
           )));
-      expect(find.text('Left half 已使用此组合键。'), findsOneWidget);
+      expect(find.text('“Left half”已使用此组合键。'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('region-take-anyway')));
       await tester.pumpAndSettle();
-      expect(find.text('保存后，Left half 将不再使用此组合键。'), findsOneWidget);
+      expect(find.text('保存后，“Left half”将不再使用此组合键。'), findsOneWidget);
     });
   });
 }

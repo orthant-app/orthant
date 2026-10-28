@@ -2161,9 +2161,9 @@ void main() {
           useHere: '在此使用',
           builtIn: '内置',
           regions: '你的区域',
-          taken: '$combo 已被 右半屏 使用。再按一次即可在此使用。',
-          lost: '右半屏 不再使用 $combo。',
-          deleted: '已删除 左 ⅔。',
+          taken: '$combo 已被“右半屏”使用。再按一次即可在此使用。',
+          lost: '“右半屏”不再使用 $combo。',
+          deleted: '已删除“左 ⅔”。',
           idle: '点击快捷键即可更改。组合键须包含 $mods 之一。',
           listening: '正在录制…按下组合键，或按 $esc 取消。',
         );
@@ -2446,7 +2446,7 @@ void main() {
         final owner = wordsFor(locale, TargetPlatform.macOS).right;
         expect(
             find.text(locale == kSimplified
-                ? '$owner 已使用此组合键。'
+                ? '“$owner”已使用此组合键。'
                 : '$owner 已使用此組合鍵。'),
             findsOneWidget);
         expectNoEnglish(tester, allow: theirWords);

@@ -280,6 +280,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'The update window changes language the next time Orthant starts.';
 
   @override
+  String get generalLanguageRelaunchNoteMac =>
+      'The menu bar and the update window change language the next time Orthant starts.';
+
+  @override
   String get generalColumns => 'Columns';
 
   @override

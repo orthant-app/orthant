@@ -54,6 +54,13 @@ class _Words {
   static _Words get current =>
       defaultTargetPlatform == TargetPlatform.windows ? windows : macOS;
 
+  /// The note under the language picker. On macOS the menu bar takes the new
+  /// language at the next start as well as the update window; Windows has no
+  /// menu of its own to name.
+  String languageNote(AppLocalizations l) => isWindows
+      ? l.generalLanguageUpdaterNote
+      : l.generalLanguageRelaunchNoteMac;
+
   String loginUnrecognised(AppLocalizations l) => isWindows
       ? l.generalLoginUnrecognisedWindows
       : l.generalLoginUnrecognisedMac;
@@ -467,7 +474,7 @@ class GeneralPane extends StatelessWidget {
         SizedBox(
           width: 320,
           child: Text(
-            l.generalLanguageUpdaterNote,
+            _Words.current.languageNote(l),
             style: TextStyle(
               fontSize: 11.5,
               height: 1.45,

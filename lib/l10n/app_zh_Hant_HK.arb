@@ -65,6 +65,7 @@
   "generalGroupLanguage": "語言",
   "languageSystem": "跟隨系統",
   "generalLanguageUpdaterNote": "更新視窗會在下次啟動 Orthant 時切換語言。",
+  "generalLanguageRelaunchNoteMac": "選單列和更新視窗會在下次啟動 Orthant 時切換語言。",
   "generalColumns": "欄數",
   "generalRows": "列數",
   "generalGapSize": "大小",

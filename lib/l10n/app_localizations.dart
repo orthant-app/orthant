@@ -501,11 +501,17 @@ abstract class AppLocalizations {
   /// **'System'**
   String get languageSystem;
 
-  /// A note under the language pop-up button on the General tab. The window that offers and installs updates belongs to the operating system's updater and takes the new language only when Orthant is next started, unlike the rest of Orthant, which changes at once. Orthant stays as written.
+  /// A note under the language pop-up button on the General tab, shown on Windows. The window that offers and installs updates belongs to the operating system's updater and takes the new language only when Orthant is next started, unlike the rest of Orthant, which changes at once. Orthant stays as written. macOS shows generalLanguageRelaunchNoteMac instead.
   ///
   /// In en, this message translates to:
   /// **'The update window changes language the next time Orthant starts.'**
   String get generalLanguageUpdaterNote;
+
+  /// A note under the language pop-up button on the General tab, shown on macOS in place of generalLanguageUpdaterNote. Two things take the new language only when Orthant is next started, unlike the rest of Orthant, which changes at once: the menu bar (the macOS menu bar menu Orthant lives in, which the system draws) and the window that offers and installs updates, which belongs to the operating system's updater. Use the word your language's macOS uses for the menu bar. Orthant stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'The menu bar and the update window change language the next time Orthant starts.'**
+  String get generalLanguageRelaunchNoteMac;
 
   /// The caption of the General tab's stepper for the number of columns in the grid. A column runs top to bottom. Keep it short: the caption has room for about five characters.
   ///

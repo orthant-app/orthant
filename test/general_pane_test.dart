@@ -356,8 +356,10 @@ void main() {
       expect(picked, isEmpty);
     });
 
-    testWidgets('says under the picker that the update window follows at the '
-        'next start', (tester) async {
+    // Windows has no menu bar of Orthant's to translate: only the update
+    // window, which the OS's updater draws, waits for the next start.
+    testWidgets('on Windows says under the picker that the update window '
+        'follows at the next start', (tester) async {
       await pump(tester, pane());
       expect(find.text(english), findsOneWidget);
       expect(tester.getTopLeft(find.text(english)).dy,
@@ -371,7 +373,30 @@ void main() {
         await pump(tester, pane(), locale: locale);
         expect(find.text(note), findsOneWidget, reason: locale.toLanguageTag());
       }
-    });
+    }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
+
+    // On macOS the menu bar is native too, and it takes the new language only
+    // when Orthant next starts, so the note names it beside the update window.
+    testWidgets('on macOS says under the picker that the menu bar and the '
+        'update window follow at the next start', (tester) async {
+      const macEnglish = 'The menu bar and the update window change language '
+          'the next time Orthant starts.';
+      await pump(tester, pane());
+      expect(find.text(macEnglish), findsOneWidget);
+      expect(find.text(english), findsNothing);
+      expect(tester.getTopLeft(find.text(macEnglish)).dy,
+          greaterThan(tester.getBottomLeft(button).dy - 1));
+
+      for (final (locale, note) in [
+        (kSimplified, '菜单栏和更新窗口会在下次启动 Orthant 时切换语言。'),
+        (kTraditional, '選單列和更新視窗會在下次啟動 Orthant 時切換語言。'),
+        (kHongKong, '選單列和更新視窗會在下次啟動 Orthant 時切換語言。'),
+      ]) {
+        await pump(tester, pane(), locale: locale);
+        expect(find.text(note), findsOneWidget, reason: locale.toLanguageTag());
+        expectNoEnglish(tester);
+      }
+    }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
     testWidgets('is reached by Tab, opened with Space, moved with the arrows '
         'and chosen with Return', (tester) async {

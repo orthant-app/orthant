@@ -277,6 +277,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get generalLanguageUpdaterNote => '更新窗口会在下次启动 Orthant 时切换语言。';
 
   @override
+  String get generalLanguageRelaunchNoteMac => '菜单栏和更新窗口会在下次启动 Orthant 时切换语言。';
+
+  @override
   String get generalColumns => '列数';
 
   @override
@@ -957,6 +960,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get generalLanguageUpdaterNote => '更新視窗會在下次啟動 Orthant 時切換語言。';
+
+  @override
+  String get generalLanguageRelaunchNoteMac => '選單列和更新視窗會在下次啟動 Orthant 時切換語言。';
 
   @override
   String get generalColumns => '欄數';
@@ -1640,6 +1646,9 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String get generalLanguageUpdaterNote => '更新視窗會在下次啟動 Orthant 時切換語言。';
+
+  @override
+  String get generalLanguageRelaunchNoteMac => '選單列和更新視窗會在下次啟動 Orthant 時切換語言。';
 
   @override
   String get generalColumns => '欄數';

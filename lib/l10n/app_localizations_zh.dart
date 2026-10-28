@@ -734,7 +734,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String overlaySaveHint(String key) {
-    return '$key  將此區域儲存為快速鍵';
+    return '$key  將此形狀儲存為快速鍵';
   }
 
   @override
@@ -1073,7 +1073,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String aboutUpdateAvailable(String name) {
-    return '有可用的新版本 Orthant $name。';
+    return 'Orthant $name 現已可供下載。';
   }
 
   @override
@@ -1089,7 +1089,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get aboutTagline => '以格線為基礎的視窗管理工具。';
 
   @override
-  String get regionNameFullScreen => '全螢幕';
+  String get regionNameFullScreen => '整個螢幕';
 
   @override
   String regionNameLeft(String fraction) {
@@ -1230,8 +1230,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get shortcutsNotGranted =>
-      '在 Orthant 取得輔助使用權限之前，這些快速鍵都不會生效。你仍然可以更改它們。';
+  String get shortcutsNotGranted => '在 Orthant 取得輔助使用權限之前，這些快速鍵都不會生效，但你仍可更改。';
 
   @override
   String shortcutsListening(String escape) {
@@ -1257,7 +1256,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get shortcutsUndo => '復原';
+  String get shortcutsUndo => '還原';
 
   @override
   String shortcutsRegionDeleted(String name) {
@@ -1309,7 +1308,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String shortcutRowUnavailable(String command, String combo) {
-    return '$command，$combo，不可用';
+    return '$command，$combo，無法使用';
   }
 
   @override
@@ -1421,7 +1420,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String overlaySaveHint(String key) {
-    return '$key  將此區域儲存為快速鍵';
+    return '$key  將此形狀儲存為快速鍵';
   }
 
   @override
@@ -1760,7 +1759,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String aboutUpdateAvailable(String name) {
-    return '有可用的新版本 Orthant $name。';
+    return 'Orthant $name 現已可供下載。';
   }
 
   @override
@@ -1776,7 +1775,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   String get aboutTagline => '以格線為基礎的視窗管理工具。';
 
   @override
-  String get regionNameFullScreen => '全螢幕';
+  String get regionNameFullScreen => '整個螢幕';
 
   @override
   String regionNameLeft(String fraction) {
@@ -1917,8 +1916,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   }
 
   @override
-  String get shortcutsNotGranted =>
-      '在 Orthant 取得輔助使用權限之前，這些快速鍵都不會生效。你仍然可以更改它們。';
+  String get shortcutsNotGranted => '在 Orthant 取得輔助使用權限之前，這些快速鍵都不會生效，但你仍可更改。';
 
   @override
   String shortcutsListening(String escape) {
@@ -1944,7 +1942,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   }
 
   @override
-  String get shortcutsUndo => '復原';
+  String get shortcutsUndo => '還原';
 
   @override
   String shortcutsRegionDeleted(String name) {
@@ -1996,7 +1994,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String shortcutRowUnavailable(String command, String combo) {
-    return '$command，$combo，不可用';
+    return '$command，$combo，無法使用';
   }
 
   @override

@@ -2175,7 +2175,7 @@ void main() {
         clickToSet: '按一下以設定',
         reset: '重設快速鍵',
         resetDone: '所有快速鍵已還原為預設值。',
-        undo: '復原',
+        undo: '還原',
         useHere: '在此使用',
         builtIn: '內建',
         regions: '你的區域',

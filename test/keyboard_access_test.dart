@@ -569,7 +569,7 @@ void main() {
           center: '置中',
           bound: '左半部，⌃⌥←',
           unbound: '置中，未設定快速鍵',
-          unavailable: '左半部，⌃⌥←，不可用',
+          unavailable: '左半部，⌃⌥←，無法使用',
           listening: '左半部，等待輸入組合鍵',
           collision: '左半部，⌃⌥→ 已被 右半部 使用。再按一次即可在此使用，或按 Esc 取消。',
           remove: '移除 左半部 的快速鍵',

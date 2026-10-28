@@ -1015,8 +1015,8 @@ void main() {
     for (final (locale, words) in [
       (kEnglish, 'Full screen'),
       (kSimplified, '全屏'),
-      (kTraditional, '全螢幕'),
-      (kHongKong, '全螢幕'),
+      (kTraditional, '整個螢幕'),
+      (kHongKong, '整個螢幕'),
     ]) {
       testWidgets('a stored generated name opens in the current language '
           '(${locale.toLanguageTag()})', (tester) async {

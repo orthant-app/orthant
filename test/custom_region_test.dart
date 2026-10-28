@@ -247,7 +247,7 @@ void main() {
     test('Traditional Chinese words are Taiwan usage, and Hong Kong reads them',
         () {
       final expected = {
-        'Full screen': '全螢幕',
+        'Full screen': '整個螢幕',
         'Left ⅔': '左 ⅔',
         'Right ⅓': '右 ⅓',
         'Top ½': '上 ½',
@@ -308,7 +308,7 @@ void main() {
       expect(regionDisplayName(regionOf(shapes[1]), strings(kSimplified)),
           '左侧 ⅔');
       expect(regionDisplayName(regionOf(shapes[0]), strings(kTraditional)),
-          '全螢幕');
+          '整個螢幕');
     });
 
     test('regionDisplayName leaves an authored name exactly as written', () {

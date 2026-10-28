@@ -47,8 +47,8 @@ void main() {
   testWidgets('and says so in the language of the app', (tester) async {
     for (final (locale, prompt) in [
       (kSimplified, '按下按键…'),
-      (kTraditional, '按下按鍵…'),
-      (kHongKong, '按下按鍵…'),
+      (kTraditional, '按下按鍵⋯'),
+      (kHongKong, '按下按鍵⋯'),
     ]) {
       await tester.pumpWidget(localizedApp(
         locale,

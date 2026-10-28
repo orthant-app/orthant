@@ -2183,7 +2183,7 @@ void main() {
         lost: '「右半部」不再使用 $combo。',
         deleted: '已刪除「左 ⅔」。',
         idle: '按一下快速鍵即可更改。組合鍵須包含 $mods 其中之一。',
-        listening: '正在錄製…按下組合鍵，或按 $esc 取消。',
+        listening: '正在錄製⋯按下組合鍵，或按 $esc 取消。',
       );
     }
 

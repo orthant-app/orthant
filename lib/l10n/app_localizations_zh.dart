@@ -705,24 +705,24 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get languageNativeName => '繁體中文';
 
   @override
-  String get trayEnableAccessibility => '啟用輔助使用…';
+  String get trayEnableAccessibility => '啟用輔助使用⋯';
 
   @override
   String get trayOpenGrid => '開啟格線';
 
   @override
-  String get traySettings => '設定…';
+  String get traySettings => '設定⋯';
 
   @override
   String get trayAbout => '關於 Orthant';
 
   @override
   String trayUpdateTo(String version) {
-    return '更新至 Orthant $version…';
+    return '更新至 Orthant $version⋯';
   }
 
   @override
-  String get trayCheckForUpdates => '檢查更新…';
+  String get trayCheckForUpdates => '檢查更新⋯';
 
   @override
   String get trayQuit => '結束 Orthant';
@@ -988,7 +988,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get generalAccessibilityNotGranted => '未授權。快速鍵和格線不會有作用。';
 
   @override
-  String get generalOpenAccessibilitySettings => '開啟輔助使用設定…';
+  String get generalOpenAccessibilitySettings => '開啟輔助使用設定⋯';
 
   @override
   String generalSummonUnavailable(String system) {
@@ -996,7 +996,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get generalChange => '更改…';
+  String get generalChange => '更改⋯';
 
   @override
   String get shortcutNotSet => '未設定';
@@ -1025,13 +1025,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '已在「設定 ▸ 應用程式 ▸ 啟動」中關閉，因此 Orthant 不會自動啟動。';
 
   @override
-  String get generalOpenLoginItemsMac13 => '開啟登入項目…';
+  String get generalOpenLoginItemsMac13 => '開啟登入項目⋯';
 
   @override
-  String get generalOpenLoginItemsMac15 => '開啟登入項目與延伸功能…';
+  String get generalOpenLoginItemsMac15 => '開啟登入項目與延伸功能⋯';
 
   @override
-  String get generalOpenStartupApps => '開啟啟動應用程式…';
+  String get generalOpenStartupApps => '開啟啟動應用程式⋯';
 
   @override
   String generalStepperValue(String caption, int value) {
@@ -1064,7 +1064,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get recordingPressKeys => '按下按鍵…';
+  String get recordingPressKeys => '按下按鍵⋯';
 
   @override
   String aboutVersion(String version) {
@@ -1077,10 +1077,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get aboutUpdate => '更新…';
+  String get aboutUpdate => '更新⋯';
 
   @override
-  String get aboutCheckForUpdates => '檢查更新…';
+  String get aboutCheckForUpdates => '檢查更新⋯';
 
   @override
   String get aboutAutomaticChecks => '自動檢查更新';
@@ -1235,7 +1235,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String shortcutsListening(String escape) {
-    return '正在錄製…按下組合鍵，或按 $escape 取消。';
+    return '正在錄製⋯按下組合鍵，或按 $escape 取消。';
   }
 
   @override
@@ -1271,7 +1271,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get shortcutsReset => '重設快速鍵';
 
   @override
-  String get shortcutsAddRegion => '新增區域…';
+  String get shortcutsAddRegion => '新增區域⋯';
 
   @override
   String get shortcutsAddRegionLabel => '新增區域';
@@ -1346,7 +1346,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get onboardingGranted => '已授權';
 
   @override
-  String get onboardingWaiting => '正在等待授權…';
+  String get onboardingWaiting => '正在等待授權⋯';
 
   @override
   String get readyTitle => 'Orthant 已就緒';
@@ -1363,7 +1363,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get readyDirectCaption => '直接將視窗放成一半、四分之一或全螢幕。不必瞄準，還可以新增自己的形狀，例如第三個。';
 
   @override
-  String get readyChangeShortcuts => '更改這些快速鍵…';
+  String get readyChangeShortcuts => '更改這些快速鍵⋯';
 
   @override
   String get readyDone => '完成';
@@ -1391,24 +1391,24 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   String get languageNativeName => '繁體中文';
 
   @override
-  String get trayEnableAccessibility => '啟用輔助使用…';
+  String get trayEnableAccessibility => '啟用輔助使用⋯';
 
   @override
   String get trayOpenGrid => '開啟格線';
 
   @override
-  String get traySettings => '設定…';
+  String get traySettings => '設定⋯';
 
   @override
   String get trayAbout => '關於 Orthant';
 
   @override
   String trayUpdateTo(String version) {
-    return '更新至 Orthant $version…';
+    return '更新至 Orthant $version⋯';
   }
 
   @override
-  String get trayCheckForUpdates => '檢查更新…';
+  String get trayCheckForUpdates => '檢查更新⋯';
 
   @override
   String get trayQuit => '結束 Orthant';
@@ -1674,7 +1674,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   String get generalAccessibilityNotGranted => '未授權。快速鍵和格線不會有作用。';
 
   @override
-  String get generalOpenAccessibilitySettings => '開啟輔助使用設定…';
+  String get generalOpenAccessibilitySettings => '開啟輔助使用設定⋯';
 
   @override
   String generalSummonUnavailable(String system) {
@@ -1682,7 +1682,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   }
 
   @override
-  String get generalChange => '更改…';
+  String get generalChange => '更改⋯';
 
   @override
   String get shortcutNotSet => '未設定';
@@ -1711,13 +1711,13 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
       '已在「設定 ▸ 應用程式 ▸ 啟動」中關閉，因此 Orthant 不會自動啟動。';
 
   @override
-  String get generalOpenLoginItemsMac13 => '開啟登入項目…';
+  String get generalOpenLoginItemsMac13 => '開啟登入項目⋯';
 
   @override
-  String get generalOpenLoginItemsMac15 => '開啟登入項目與延伸功能…';
+  String get generalOpenLoginItemsMac15 => '開啟登入項目與延伸功能⋯';
 
   @override
-  String get generalOpenStartupApps => '開啟啟動應用程式…';
+  String get generalOpenStartupApps => '開啟啟動應用程式⋯';
 
   @override
   String generalStepperValue(String caption, int value) {
@@ -1750,7 +1750,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   }
 
   @override
-  String get recordingPressKeys => '按下按鍵…';
+  String get recordingPressKeys => '按下按鍵⋯';
 
   @override
   String aboutVersion(String version) {
@@ -1763,10 +1763,10 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   }
 
   @override
-  String get aboutUpdate => '更新…';
+  String get aboutUpdate => '更新⋯';
 
   @override
-  String get aboutCheckForUpdates => '檢查更新…';
+  String get aboutCheckForUpdates => '檢查更新⋯';
 
   @override
   String get aboutAutomaticChecks => '自動檢查更新';
@@ -1921,7 +1921,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String shortcutsListening(String escape) {
-    return '正在錄製…按下組合鍵，或按 $escape 取消。';
+    return '正在錄製⋯按下組合鍵，或按 $escape 取消。';
   }
 
   @override
@@ -1957,7 +1957,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   String get shortcutsReset => '重設快速鍵';
 
   @override
-  String get shortcutsAddRegion => '新增區域…';
+  String get shortcutsAddRegion => '新增區域⋯';
 
   @override
   String get shortcutsAddRegionLabel => '新增區域';
@@ -2032,7 +2032,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   String get onboardingGranted => '已授權';
 
   @override
-  String get onboardingWaiting => '正在等待授權…';
+  String get onboardingWaiting => '正在等待授權⋯';
 
   @override
   String get readyTitle => 'Orthant 已就緒';
@@ -2049,7 +2049,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   String get readyDirectCaption => '直接將視窗放成一半、四分之一或全螢幕。不必瞄準，還可以新增自己的形狀，例如第三個。';
 
   @override
-  String get readyChangeShortcuts => '更改這些快速鍵…';
+  String get readyChangeShortcuts => '更改這些快速鍵⋯';
 
   @override
   String get readyDone => '完成';

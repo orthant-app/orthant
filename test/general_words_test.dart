@@ -215,13 +215,13 @@ void main() {
       (kSimplified, TargetPlatform.windows, true):
           ('已在“设置 ▸ 应用 ▸ 启动”中关闭，因此 Orthant 不会自动启动。', '打开启动应用…'),
       (kTraditional, TargetPlatform.macOS, false):
-          ('已在「系統設定 ▸ 一般 ▸ 登入項目」中關閉，因此 Orthant 不會自動啟動。', '開啟登入項目…'),
+          ('已在「系統設定 ▸ 一般 ▸ 登入項目」中關閉，因此 Orthant 不會自動啟動。', '開啟登入項目⋯'),
       (kTraditional, TargetPlatform.macOS, true): (
         '已在「系統設定 ▸ 一般 ▸ 登入項目與延伸功能」中關閉，因此 Orthant 不會自動啟動。',
-        '開啟登入項目與延伸功能…'
+        '開啟登入項目與延伸功能⋯'
       ),
       (kTraditional, TargetPlatform.windows, true):
-          ('已在「設定 ▸ 應用程式 ▸ 啟動」中關閉，因此 Orthant 不會自動啟動。', '開啟啟動應用程式…'),
+          ('已在「設定 ▸ 應用程式 ▸ 啟動」中關閉，因此 Orthant 不會自動啟動。', '開啟啟動應用程式⋯'),
     };
 
     for (final entry in turnedOff.entries) {

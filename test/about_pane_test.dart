@@ -195,8 +195,8 @@ void main() {
       'zh-Hant': (
         version: '版本 1.0.0 (2)',
         available: '有可用的新版本 Orthant 1.0.4。',
-        update: '更新…',
-        check: '檢查更新…',
+        update: '更新⋯',
+        check: '檢查更新⋯',
         automatic: '自動檢查更新',
         tagline: '以格線為基礎的視窗管理工具。',
       ),

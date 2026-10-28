@@ -18,7 +18,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get languageNativeName => '简体中文';
 
   @override
-  String get trayEnableAccessibility => '启用无障碍…';
+  String get trayEnableAccessibility => '开启辅助功能权限…';
 
   @override
   String get trayOpenGrid => '打开网格';
@@ -253,7 +253,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get generalGroupAccessibility => '无障碍';
+  String get generalGroupAccessibility => '辅助功能';
 
   @override
   String get generalGroupOpenGrid => '打开网格';
@@ -301,7 +301,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get generalAccessibilityNotGranted => '未授权。快捷键和网格不会起作用。';
 
   @override
-  String get generalOpenAccessibilitySettings => '打开无障碍设置…';
+  String get generalOpenAccessibilitySettings => '打开辅助功能设置…';
 
   @override
   String generalSummonUnavailable(String system) {
@@ -543,7 +543,8 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get shortcutsNotGranted => '在 Orthant 获得无障碍权限之前，这些快捷键都不会生效。你仍然可以更改它们。';
+  String get shortcutsNotGranted =>
+      '在 Orthant 获得辅助功能权限之前，这些快捷键都不会生效。你仍然可以更改它们。';
 
   @override
   String shortcutsListening(String escape) {
@@ -641,7 +642,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get refusalUnregistrable => 'Windows 无法在快捷键中使用该按键。';
 
   @override
-  String get onboardingTitle => 'Orthant 需要无障碍权限';
+  String get onboardingTitle => 'Orthant 需要辅助功能权限';
 
   @override
   String get onboardingBody =>
@@ -652,7 +653,7 @@ class AppLocalizationsZh extends AppLocalizations {
       'Orthant 借助 macOS 的无障碍功能来移动你的窗口。请在“隐私与安全 ▸ 设备控制和数据访问”中启用“Orthant”，Orthant 会立即检测到。';
 
   @override
-  String get onboardingOpenAccessibility => '打开无障碍设置';
+  String get onboardingOpenAccessibility => '打开辅助功能设置';
 
   @override
   String get onboardingGranted => '已授权';

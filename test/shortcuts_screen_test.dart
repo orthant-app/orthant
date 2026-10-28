@@ -2163,7 +2163,7 @@ void main() {
           regions: '你的区域',
           taken: '$combo 已被“右半屏”使用。再按一次即可在此使用。',
           lost: '“右半屏”不再使用 $combo。',
-          deleted: '已删除“左 ⅔”。',
+          deleted: '已删除“左侧 ⅔”。',
           idle: '点击快捷键即可更改。组合键须包含 $mods 之一。',
           listening: '正在录制…按下组合键，或按 $esc 取消。',
         );
@@ -2291,7 +2291,7 @@ void main() {
           expect(find.text(w.builtIn), findsOneWidget);
           expect(find.text(w.regions), findsOneWidget);
           expect(find.text(w.idle), findsOneWidget);
-          expect(find.text('左 ⅔'), findsOneWidget,
+          expect(find.text(locale == kSimplified ? '左侧 ⅔' : '左 ⅔'), findsOneWidget,
               reason: 'a generated name is shown in the language');
           expect(find.text('Left ⅔'), findsNothing);
           expect(find.text('Reading pane'), findsOneWidget,
@@ -2475,7 +2475,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
       expect(find.text('左半屏'), findsOneWidget);
-      expect(find.text('左 ⅔'), findsOneWidget);
+      expect(find.text('左侧 ⅔'), findsOneWidget);
       expect(find.text('重置快捷键'), findsOneWidget);
       expect(find.text('内置'), findsOneWidget);
       expect(find.text('添加区域…'), findsOneWidget);

@@ -89,7 +89,7 @@ void main() {
       expect(commandLabel(const Custom('g'), regions, strings(kEnglish)),
           'Left ⅔');
       expect(commandLabel(const Custom('g'), regions, strings(kSimplified)),
-          '左 ⅔');
+          '左侧 ⅔');
       expect(commandLabel(const Custom('g'), regions, strings(kTraditional)),
           '左 ⅔');
       for (final locale in [kEnglish, kSimplified, kTraditional]) {

@@ -556,7 +556,7 @@ void main() {
           listening: '左半屏，等待输入组合键',
           collision: '左半屏，⌃⌥→ 已被 右半屏 使用。再按一次即可在此使用，或按 Esc 取消。',
           remove: '移除 左半屏 的快捷键',
-          editGenerated: '编辑 左 ⅔',
+          editGenerated: '编辑 左侧 ⅔',
           editAuthored: '编辑 Reading pane',
           add: '添加区域',
         ),

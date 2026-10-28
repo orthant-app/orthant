@@ -406,22 +406,22 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String regionNameLeft(String fraction) {
-    return '左 $fraction';
+    return '左侧 $fraction';
   }
 
   @override
   String regionNameRight(String fraction) {
-    return '右 $fraction';
+    return '右侧 $fraction';
   }
 
   @override
   String regionNameTop(String fraction) {
-    return '上 $fraction';
+    return '顶部 $fraction';
   }
 
   @override
   String regionNameBottom(String fraction) {
-    return '下 $fraction';
+    return '底部 $fraction';
   }
 
   @override

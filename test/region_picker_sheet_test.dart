@@ -1004,7 +1004,7 @@ void main() {
           kSimplified, sheet(onSubmit: (d) => submitted = d)));
 
       await _dragCells(tester, cols: 6, rows: 6, c0: 0, r0: 0, c1: 3, r1: 5);
-      expect(find.text('左 ⅔'), findsOneWidget);
+      expect(find.text('左侧 ⅔'), findsOneWidget);
       expect(find.text('Left ⅔'), findsNothing);
 
       await save(tester);
@@ -1043,13 +1043,13 @@ void main() {
       RegionDraft? submitted;
       await tester.pumpWidget(inLanguage(kSimplified,
           sheet(initial: _leftTwoThirds, onSubmit: (d) => submitted = d)));
-      expect(find.text('左 ⅔'), findsOneWidget);
+      expect(find.text('左侧 ⅔'), findsOneWidget);
 
       await _dragCells(tester, cols: 6, rows: 6, c0: 0, r0: 0, c1: 1, r1: 5);
-      expect(find.text('左 ⅓'), findsOneWidget);
+      expect(find.text('左侧 ⅓'), findsOneWidget);
 
       await _dragCells(tester, cols: 6, rows: 6, c0: 0, r0: 0, c1: 5, r1: 2);
-      expect(find.text('上 ½'), findsOneWidget);
+      expect(find.text('顶部 ½'), findsOneWidget);
 
       await save(tester);
       expect(submitted!.region.name, 'Top ½');
@@ -1091,24 +1091,26 @@ void main() {
       // Cleared first: entering text the field already holds changes nothing,
       // so it fires no edit, exactly as it would not for a person.
       await tester.enterText(find.byType(TextField), '');
-      await tester.enterText(find.byType(TextField), '左 ⅔');
+      await tester.enterText(find.byType(TextField), '左侧 ⅔');
       await _dragCells(tester, cols: 6, rows: 6, c0: 0, r0: 0, c1: 1, r1: 5);
-      expect(find.text('左 ⅔'), findsOneWidget);
+      expect(find.text('左侧 ⅔'), findsOneWidget);
 
       await save(tester);
-      expect(submitted!.region.name, '左 ⅔');
+      expect(submitted!.region.name, '左侧 ⅔');
     });
 
     for (final locale in [kEnglish, kSimplified, kTraditional, kHongKong]) {
       testWidgets('opening an authored name that equals the translated '
           'suggestion and saving stores it unchanged '
           '(${locale.toLanguageTag()})', (tester) async {
-        // A user who wrote 左 ⅔ for a left two-thirds region wrote it: the
+        // A user who wrote the suggestion's words for a left two-thirds
+        // region (左侧 ⅔ in Simplified, 左 ⅔ in Traditional) wrote it: the
         // stored format is English, so this is not a generated name, however
         // much it looks like the suggestion in the language on screen.
-        const theirs = CustomRegion(
+        final mine = locale == kSimplified ? '左侧 ⅔' : '左 ⅔';
+        final theirs = CustomRegion(
           id: 'r1',
-          name: '左 ⅔',
+          name: mine,
           cols: 3,
           rows: 1,
           c0: 0,
@@ -1119,10 +1121,10 @@ void main() {
         RegionDraft? submitted;
         await tester.pumpWidget(inLanguage(
             locale, sheet(initial: theirs, onSubmit: (d) => submitted = d)));
-        expect(find.text('左 ⅔'), findsOneWidget);
+        expect(find.text(mine), findsOneWidget);
 
         await save(tester);
-        expect(submitted!.region.name, '左 ⅔');
+        expect(submitted!.region.name, mine);
         expect(submitted!.region, theirs,
             reason: 'nothing about it changes, so nothing is rewritten');
       });
@@ -1134,14 +1136,14 @@ void main() {
       await tester.pumpWidget(inLanguage(
           kSimplified,
           sheet(
-              initial: _leftTwoThirds.copyWith(name: '左 ⅔'),
+              initial: _leftTwoThirds.copyWith(name: '左侧 ⅔'),
               onSubmit: (d) => submitted = d)));
 
       await _dragCells(tester, cols: 6, rows: 6, c0: 0, r0: 0, c1: 1, r1: 5);
-      expect(find.text('左 ⅔'), findsOneWidget);
+      expect(find.text('左侧 ⅔'), findsOneWidget);
 
       await save(tester);
-      expect(submitted!.region.name, '左 ⅔');
+      expect(submitted!.region.name, '左侧 ⅔');
       expect(submitted!.region.c1, 1);
     });
 
@@ -1176,7 +1178,7 @@ void main() {
       await tester.pumpWidget(
           inLanguage(kSimplified, sheet(initial: _leftTwoThirds)));
       await tester.pumpAndSettle();
-      expect(find.text('左 ⅔'), findsOneWidget);
+      expect(find.text('左侧 ⅔'), findsOneWidget);
 
       await tester.enterText(find.byType(TextField), 'Reading pane');
       await tester.pumpWidget(

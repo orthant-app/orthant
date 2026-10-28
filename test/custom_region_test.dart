@@ -235,11 +235,11 @@ void main() {
           s.english: localizedSuggestion((kind: s.kind, fraction: s.fraction), zh),
       }, {
         'Full screen': '全屏',
-        'Left ⅔': '左 ⅔',
-        'Right ⅓': '右 ⅓',
-        'Top ½': '上 ½',
-        'Bottom ¼': '下 ¼',
-        'Left 3/7': '左 3/7',
+        'Left ⅔': '左侧 ⅔',
+        'Right ⅓': '右侧 ⅓',
+        'Top ½': '顶部 ½',
+        'Bottom ¼': '底部 ¼',
+        'Left 3/7': '左侧 3/7',
         'Custom region': '自定义区域',
       });
     });
@@ -291,7 +291,7 @@ void main() {
       expect(isGeneratedName(regionOf(left, name: 'Left ½')), isFalse);
       // The translated suggestion is not the stored format: a user who wrote
       // it, or an older install in Chinese, wrote their own words.
-      expect(isGeneratedName(regionOf(left, name: '左 ⅔')), isFalse);
+      expect(isGeneratedName(regionOf(left, name: '左侧 ⅔')), isFalse);
       expect(isGeneratedName(regionOf(left, name: 'left ⅔')), isFalse,
           reason: 'the stored format is compared exactly');
     });
@@ -306,7 +306,7 @@ void main() {
         expect(regionDisplayName(r, strings(kSimplified)), isNot(s.english));
       }
       expect(regionDisplayName(regionOf(shapes[1]), strings(kSimplified)),
-          '左 ⅔');
+          '左侧 ⅔');
       expect(regionDisplayName(regionOf(shapes[0]), strings(kTraditional)),
           '全螢幕');
     });
@@ -315,7 +315,7 @@ void main() {
       final left = shapes[1];
       for (final name in [
         'Reading pane',
-        '左 ⅔', // equal to the Simplified suggestion, and still theirs
+        '左侧 ⅔', // equal to the Simplified suggestion, and still theirs
         'Left ½', // the English suggestion for a different shape
         '全屏', // another language's word
       ]) {

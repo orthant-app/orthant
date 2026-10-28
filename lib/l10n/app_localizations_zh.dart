@@ -42,7 +42,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String trayTooltipUpdate(String version) {
-    return 'Orthant：有可用更新 $version';
+    return 'Orthant: 有可用更新 $version';
   }
 
   @override
@@ -190,7 +190,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get keyEnter => 'Enter';
 
   @override
-  String get keySpace => 'Space';
+  String get keySpace => '空格键';
 
   @override
   String get keyTab => 'Tab';
@@ -386,7 +386,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String aboutUpdateAvailable(String name) {
-    return '有可用的新版本 Orthant $name。';
+    return '有新版本可用：Orthant $name。';
   }
 
   @override
@@ -548,7 +548,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String shortcutsListening(String escape) {
-    return '正在录制…按下组合键，或按 $escape 取消。';
+    return '正在录制，请按下组合键，或按 $escape 取消。';
   }
 
   @override

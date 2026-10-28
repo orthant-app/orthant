@@ -2165,7 +2165,7 @@ void main() {
           lost: '“右半屏”不再使用 $combo。',
           deleted: '已删除“左侧 ⅔”。',
           idle: '点击快捷键即可更改。组合键须包含 $mods 之一。',
-          listening: '正在录制…按下组合键，或按 $esc 取消。',
+          listening: '正在录制，请按下组合键，或按 $esc 取消。',
         );
       }
       return (

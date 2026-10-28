@@ -186,7 +186,7 @@ void main() {
     const words = {
       'zh': (
         version: '版本 1.0.0 (2)',
-        available: '有可用的新版本 Orthant 1.0.4。',
+        available: '有新版本可用：Orthant 1.0.4。',
         update: '更新…',
         check: '检查更新…',
         automatic: '自动检查更新',

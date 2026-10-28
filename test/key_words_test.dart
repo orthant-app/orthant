@@ -205,9 +205,14 @@ void main() {
         final english = KeyWords.windows;
         setAppStrings(locale);
         final w = KeyWords.windows;
-        // The legends are printed on the keyboards, in English everywhere.
+        // The legends are printed on the keyboards, in English everywhere,
+        // except the space bar, which prints none and which both operating
+        // systems name in Simplified Chinese.
         expect(w.modifiers, english.modifiers);
-        expect(w.named, english.named);
+        expect(w.named, {
+          ...english.named,
+          if (locale == kSimplified) 0x0007002C: '空格键',
+        });
         expect(w.escape, english.escape);
         // macOS's two words are English in Chinese too.
         expect(KeyWords.macOS.escape, 'esc');

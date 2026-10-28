@@ -1360,7 +1360,8 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get readyDirectCaption => '直接將視窗放成一半、四分之一或全螢幕。不必瞄準，還可以新增自己的形狀，例如第三個。';
+  String get readyDirectCaption =>
+      '直接將視窗貼齊一半、四分之一或全螢幕。不必瞄準，還可以新增自己的形狀，例如上方第三個。';
 
   @override
   String get readyChangeShortcuts => '更改這些快速鍵⋯';
@@ -2046,7 +2047,8 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   }
 
   @override
-  String get readyDirectCaption => '直接將視窗放成一半、四分之一或全螢幕。不必瞄準，還可以新增自己的形狀，例如第三個。';
+  String get readyDirectCaption =>
+      '直接將視窗貼齊一半、四分之一或全螢幕。不必瞄準，還可以新增自己的形狀，例如上方第三個。';
 
   @override
   String get readyChangeShortcuts => '更改這些快速鍵⋯';

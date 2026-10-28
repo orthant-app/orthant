@@ -992,7 +992,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String generalSummonUnavailable(String system) {
-    return '$system 或其他應用程式已使用此組合鍵，因此 Orthant 收不到它。';
+    return '$system 或其他應用程式已在使用此組合鍵，因此 Orthant 接收不到。';
   }
 
   @override
@@ -1294,7 +1294,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String shortcutsUnavailableTooltip(String system) {
-    return '$system 或其他應用程式已使用此組合鍵，因此 Orthant 收不到它。\n按一下該快速鍵可另選一個。';
+    return '$system 或其他應用程式已在使用此組合鍵，因此 Orthant 接收不到。\n按一下該快速鍵可另選一個。';
   }
 
   @override
@@ -1373,7 +1373,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String readyUnavailableTooltip(String system) {
-    return '$system 或其他應用程式已使用此組合鍵，因此 Orthant 收不到它。\n請在下方另選一個。';
+    return '$system 或其他應用程式已在使用此組合鍵，因此 Orthant 接收不到。\n請在下方另選一個。';
   }
 }
 
@@ -1678,7 +1678,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String generalSummonUnavailable(String system) {
-    return '$system 或其他應用程式已使用此組合鍵，因此 Orthant 收不到它。';
+    return '$system 或其他應用程式已在使用此組合鍵，因此 Orthant 接收不到。';
   }
 
   @override
@@ -1980,7 +1980,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String shortcutsUnavailableTooltip(String system) {
-    return '$system 或其他應用程式已使用此組合鍵，因此 Orthant 收不到它。\n按一下該快速鍵可另選一個。';
+    return '$system 或其他應用程式已在使用此組合鍵，因此 Orthant 接收不到。\n按一下該快速鍵可另選一個。';
   }
 
   @override
@@ -2059,6 +2059,6 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String readyUnavailableTooltip(String system) {
-    return '$system 或其他應用程式已使用此組合鍵，因此 Orthant 收不到它。\n請在下方另選一個。';
+    return '$system 或其他應用程式已在使用此組合鍵，因此 Orthant 接收不到。\n請在下方另選一個。';
   }
 }

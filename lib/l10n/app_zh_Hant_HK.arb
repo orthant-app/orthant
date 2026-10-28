@@ -74,7 +74,7 @@
   "generalAccessibilityGranted": "已授權",
   "generalAccessibilityNotGranted": "未授權。快速鍵和格線不會有作用。",
   "generalOpenAccessibilitySettings": "開啟輔助使用設定⋯",
-  "generalSummonUnavailable": "{system} 或其他應用程式已使用此組合鍵，因此 Orthant 收不到它。",
+  "generalSummonUnavailable": "{system} 或其他應用程式已在使用此組合鍵，因此 Orthant 接收不到。",
   "generalChange": "更改⋯",
   "shortcutNotSet": "未設定",
   "generalLaunchAtLogin": "登入時啟動",
@@ -155,7 +155,7 @@
   "shortcutsClickToSet": "按一下以設定",
   "shortcutsRemove": "移除快速鍵",
   "shortcutsRemoveLabel": "移除 {command} 的快速鍵",
-  "shortcutsUnavailableTooltip": "{system} 或其他應用程式已使用此組合鍵，因此 Orthant 收不到它。\n按一下該快速鍵可另選一個。",
+  "shortcutsUnavailableTooltip": "{system} 或其他應用程式已在使用此組合鍵，因此 Orthant 接收不到。\n按一下該快速鍵可另選一個。",
   "shortcutRowBound": "{command}，{combo}",
   "shortcutRowUnbound": "{command}，未設定快速鍵",
   "shortcutRowUnavailable": "{command}，{combo}，不可用",
@@ -176,5 +176,5 @@
   "readyChangeShortcuts": "更改這些快速鍵⋯",
   "readyDone": "完成",
   "readyNoShortcutSet": "未設定快速鍵",
-  "readyUnavailableTooltip": "{system} 或其他應用程式已使用此組合鍵，因此 Orthant 收不到它。\n請在下方另選一個。"
+  "readyUnavailableTooltip": "{system} 或其他應用程式已在使用此組合鍵，因此 Orthant 接收不到。\n請在下方另選一個。"
 }

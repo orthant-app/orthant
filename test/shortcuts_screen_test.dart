@@ -2179,9 +2179,9 @@ void main() {
         useHere: '在此使用',
         builtIn: '內建',
         regions: '你的區域',
-        taken: '$combo 已被 右半部 使用。再按一次即可在此使用。',
-        lost: '右半部 不再使用 $combo。',
-        deleted: '已刪除 左 ⅔。',
+        taken: '$combo 已被「右半部」使用。再按一次即可在此使用。',
+        lost: '「右半部」不再使用 $combo。',
+        deleted: '已刪除「左 ⅔」。',
         idle: '按一下快速鍵即可更改。組合鍵須包含 $mods 其中之一。',
         listening: '正在錄製…按下組合鍵，或按 $esc 取消。',
       );
@@ -2447,7 +2447,7 @@ void main() {
         expect(
             find.text(locale == kSimplified
                 ? '“$owner”已使用此组合键。'
-                : '$owner 已使用此組合鍵。'),
+                : '「$owner」已使用此組合鍵。'),
             findsOneWidget);
         expectNoEnglish(tester, allow: theirWords);
       }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));

@@ -1144,12 +1144,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String regionSheetConflict(String command) {
-    return '$command 已使用此組合鍵。';
+    return '「$command」已使用此組合鍵。';
   }
 
   @override
   String regionSheetConflictTaking(String command) {
-    return '儲存後，$command 將不再使用此組合鍵。';
+    return '儲存後，「$command」將不再使用此組合鍵。';
   }
 
   @override
@@ -1245,7 +1245,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String shortcutsCollision(String combo, String owner) {
-    return '$combo 已被 $owner 使用。再按一次即可在此使用。';
+    return '$combo 已被「$owner」使用。再按一次即可在此使用。';
   }
 
   @override
@@ -1253,7 +1253,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String shortcutsDisplaced(String command, String combo) {
-    return '$command 不再使用 $combo。';
+    return '「$command」不再使用 $combo。';
   }
 
   @override
@@ -1261,7 +1261,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String shortcutsRegionDeleted(String name) {
-    return '已刪除 $name。';
+    return '已刪除「$name」。';
   }
 
   @override
@@ -1830,12 +1830,12 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String regionSheetConflict(String command) {
-    return '$command 已使用此組合鍵。';
+    return '「$command」已使用此組合鍵。';
   }
 
   @override
   String regionSheetConflictTaking(String command) {
-    return '儲存後，$command 將不再使用此組合鍵。';
+    return '儲存後，「$command」將不再使用此組合鍵。';
   }
 
   @override
@@ -1931,7 +1931,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String shortcutsCollision(String combo, String owner) {
-    return '$combo 已被 $owner 使用。再按一次即可在此使用。';
+    return '$combo 已被「$owner」使用。再按一次即可在此使用。';
   }
 
   @override
@@ -1939,7 +1939,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String shortcutsDisplaced(String command, String combo) {
-    return '$command 不再使用 $combo。';
+    return '「$command」不再使用 $combo。';
   }
 
   @override
@@ -1947,7 +1947,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String shortcutsRegionDeleted(String name) {
-    return '已刪除 $name。';
+    return '已刪除「$name」。';
   }
 
   @override

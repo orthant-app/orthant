@@ -1420,7 +1420,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String overlaySaveHint(String key) {
-    return '$key  將此形狀儲存為快速鍵';
+    return '$key  將此形狀儲存為快捷鍵';
   }
 
   @override
@@ -1542,7 +1542,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   String get overlayPlaceWindow => '放置視窗';
 
   @override
-  String get overlayPlaceAndSave => '放置視窗並儲存快速鍵';
+  String get overlayPlaceAndSave => '放置視窗並儲存快捷鍵';
 
   @override
   String get overlayCancelGrid => '取消格線';
@@ -1615,14 +1615,14 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   String get settingsTabGeneral => '一般';
 
   @override
-  String get settingsTabShortcuts => '快速鍵';
+  String get settingsTabShortcuts => '快捷鍵';
 
   @override
   String get settingsTabAbout => '關於';
 
   @override
   String settingsTabLabel(String tab) {
-    return '$tab標籤頁';
+    return '$tab分頁';
   }
 
   @override
@@ -1671,7 +1671,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   String get generalAccessibilityGranted => '已授權';
 
   @override
-  String get generalAccessibilityNotGranted => '未授權。快速鍵和格線不會有作用。';
+  String get generalAccessibilityNotGranted => '未授權。快捷鍵和格線不會有作用。';
 
   @override
   String get generalOpenAccessibilitySettings => '開啟輔助使用設定⋯';
@@ -1815,14 +1815,14 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   String get regionSheetName => '名稱';
 
   @override
-  String get regionSheetShortcut => '快速鍵';
+  String get regionSheetShortcut => '快捷鍵';
 
   @override
-  String get regionSheetRecordNone => '錄製快速鍵，目前未設定';
+  String get regionSheetRecordNone => '錄製快捷鍵，目前未設定';
 
   @override
   String regionSheetRecordCurrent(String combo) {
-    return '錄製快速鍵，目前為 $combo';
+    return '錄製快捷鍵，目前為 $combo';
   }
 
   @override
@@ -1899,24 +1899,24 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   String get commandCenter => '置中';
 
   @override
-  String get shortcutsTitle => '快速鍵';
+  String get shortcutsTitle => '快捷鍵';
 
   @override
   String get shortcutsSubtitle => '開啟格線，或將最前方的視窗直接放到它所在顯示器的某個區域。';
 
   @override
-  String get shortcutsGroupBuiltIn => '內建';
+  String get shortcutsGroupBuiltIn => '內置';
 
   @override
   String get shortcutsGroupRegions => '你的區域';
 
   @override
   String shortcutsRegionsHint(String key) {
-    return '為內建項目沒有的形狀綁定快速鍵。可在此繪製，也可在格線中選取後按 $key。';
+    return '為內置項目沒有的形狀綁定快捷鍵。可在此繪製，也可在格線中選取後按 $key。';
   }
 
   @override
-  String get shortcutsNotGranted => '在 Orthant 取得輔助使用權限之前，這些快速鍵都不會生效，但你仍可更改。';
+  String get shortcutsNotGranted => '在 Orthant 取得輔助使用權限之前，這些快捷鍵都不會生效，但你仍可更改。';
 
   @override
   String shortcutsListening(String escape) {
@@ -1925,7 +1925,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String shortcutsHint(String modifiers) {
-    return '按一下快速鍵即可更改。組合鍵須包含 $modifiers 其中之一。';
+    return '按一下快捷鍵即可更改。組合鍵須包含 $modifiers 其中之一。';
   }
 
   @override
@@ -1950,10 +1950,10 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   }
 
   @override
-  String get shortcutsResetDone => '所有快速鍵已還原為預設值。';
+  String get shortcutsResetDone => '所有快捷鍵已還原為預設值。';
 
   @override
-  String get shortcutsReset => '重設快速鍵';
+  String get shortcutsReset => '重設快捷鍵';
 
   @override
   String get shortcutsAddRegion => '新增區域⋯';
@@ -1970,16 +1970,16 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   String get shortcutsClickToSet => '按一下以設定';
 
   @override
-  String get shortcutsRemove => '移除快速鍵';
+  String get shortcutsRemove => '移除快捷鍵';
 
   @override
   String shortcutsRemoveLabel(String command) {
-    return '移除 $command 的快速鍵';
+    return '移除 $command 的快捷鍵';
   }
 
   @override
   String shortcutsUnavailableTooltip(String system) {
-    return '$system 或其他應用程式已在使用此組合鍵，因此 Orthant 接收不到。\n按一下該快速鍵可另選一個。';
+    return '$system 或其他應用程式已在使用此組合鍵，因此 Orthant 接收不到。\n按一下該快捷鍵可另選一個。';
   }
 
   @override
@@ -1989,7 +1989,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
 
   @override
   String shortcutRowUnbound(String command) {
-    return '$command，未設定快速鍵';
+    return '$command，未設定快捷鍵';
   }
 
   @override
@@ -2008,10 +2008,10 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   }
 
   @override
-  String get refusalKeypad => 'Windows 無法在快速鍵中使用數字鍵盤的數字、小數點或 =。';
+  String get refusalKeypad => 'Windows 無法在快捷鍵中使用數字鍵盤的數字、小數點或 =。';
 
   @override
-  String get refusalUnregistrable => 'Windows 無法在快速鍵中使用該按鍵。';
+  String get refusalUnregistrable => 'Windows 無法在快捷鍵中使用該按鍵。';
 
   @override
   String get onboardingTitle => 'Orthant 需要輔助使用權限';
@@ -2034,7 +2034,7 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   String get onboardingWaiting => '正在等待授權⋯';
 
   @override
-  String get readyTitle => 'Orthant 已就緒';
+  String get readyTitle => 'Orthant 已準備就緒';
 
   @override
   String get readySubtitle => '兩種方式，把視窗放到你想要的位置。';
@@ -2049,13 +2049,13 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
       '直接將視窗貼齊一半、四分之一或全螢幕。不必瞄準，還可以新增自己的形狀，例如上方第三個。';
 
   @override
-  String get readyChangeShortcuts => '更改這些快速鍵⋯';
+  String get readyChangeShortcuts => '更改這些快捷鍵⋯';
 
   @override
   String get readyDone => '完成';
 
   @override
-  String get readyNoShortcutSet => '未設定快速鍵';
+  String get readyNoShortcutSet => '未設定快捷鍵';
 
   @override
   String readyUnavailableTooltip(String system) {

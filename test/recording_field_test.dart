@@ -354,6 +354,11 @@ void main() {
       expect(refusalFor(keypad(), hant),
           'Windows 無法在快速鍵中使用數字鍵盤的數字、小數點或 =。');
       expect(refusalFor(iso(), hant), 'Windows 無法在快速鍵中使用該按鍵。');
+      // Hong Kong's word for a shortcut is 快捷鍵.
+      final hk = lookupAppLocalizations(kHongKong);
+      expect(refusalFor(keypad(), hk),
+          'Windows 無法在快捷鍵中使用數字鍵盤的數字、小數點或 =。');
+      expect(refusalFor(iso(), hk), 'Windows 無法在快捷鍵中使用該按鍵。');
       expect(refusalFor(keypad()), keypadRefusal,
           reason: 'with no language given it is the app\'s own, English here');
       await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
@@ -402,13 +407,14 @@ void main() {
         await tester.pumpAndSettle();
 
         final zh = locale == kSimplified;
+        final shortcut = locale == kHongKong ? '快捷鍵' : '快速鍵';
         final expected = [
           zh
               ? 'Windows 无法在快捷键中使用小键盘的数字、小数点或 =。'
-              : 'Windows 無法在快速鍵中使用數字鍵盤的數字、小數點或 =。',
+              : 'Windows 無法在$shortcut中使用數字鍵盤的數字、小數點或 =。',
           zh
               ? 'Windows 无法在快捷键中使用该按键。'
-              : 'Windows 無法在快速鍵中使用該按鍵。',
+              : 'Windows 無法在$shortcut中使用該按鍵。',
         ];
         expect(refusals, expected);
         expect(spoken, expected);

@@ -388,7 +388,7 @@ void main() {
     const tabNames = {
       'zh': ['通用', '快捷键', '关于'],
       'zh-Hant': ['一般', '快速鍵', '關於'],
-      'zh-Hant-HK': ['一般', '快速鍵', '關於'],
+      'zh-Hant-HK': ['一般', '快捷鍵', '關於'],
     };
 
     for (final locale in [kSimplified, kTraditional, kHongKong]) {
@@ -402,7 +402,11 @@ void main() {
           expect(find.text(name), findsWidgets);
         }
         // The whole label is one message with the tab's name in it.
-        final suffix = locale == kSimplified ? '标签页' : '標籤頁';
+        final suffix = locale == kSimplified
+            ? '标签页'
+            : locale == kHongKong
+                ? '分頁'
+                : '標籤頁';
         for (final name in names) {
           expect(find.bySemanticsLabel('$name$suffix'), findsOneWidget);
         }

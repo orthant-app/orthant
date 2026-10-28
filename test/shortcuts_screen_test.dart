@@ -2168,21 +2168,25 @@ void main() {
           listening: '正在录制，请按下组合键，或按 $esc 取消。',
         );
       }
+      // Hong Kong says 快捷鍵 and 內置 where Taiwan says 快速鍵 and 內建.
+      final hk = locale == kHongKong;
       return (
         left: '左半部',
         right: '右半部',
         openGrid: '開啟格線',
         clickToSet: '按一下以設定',
-        reset: '重設快速鍵',
-        resetDone: '所有快速鍵已還原為預設值。',
+        reset: hk ? '重設快捷鍵' : '重設快速鍵',
+        resetDone: hk ? '所有快捷鍵已還原為預設值。' : '所有快速鍵已還原為預設值。',
         undo: '還原',
         useHere: '在此使用',
-        builtIn: '內建',
+        builtIn: hk ? '內置' : '內建',
         regions: '你的區域',
         taken: '$combo 已被「右半部」使用。再按一次即可在此使用。',
         lost: '「右半部」不再使用 $combo。',
         deleted: '已刪除「左 ⅔」。',
-        idle: '按一下快速鍵即可更改。組合鍵須包含 $mods 其中之一。',
+        idle: hk
+            ? '按一下快捷鍵即可更改。組合鍵須包含 $mods 其中之一。'
+            : '按一下快速鍵即可更改。組合鍵須包含 $mods 其中之一。',
         listening: '正在錄製⋯按下組合鍵，或按 $esc 取消。',
       );
     }
@@ -2390,12 +2394,13 @@ void main() {
         await tester.pumpAndSettle();
 
         final zh = locale == kSimplified;
+        final shortcut = locale == kHongKong ? '快捷鍵' : '快速鍵';
         final keypad = zh
             ? 'Windows 无法在快捷键中使用小键盘的数字、小数点或 =。'
-            : 'Windows 無法在快速鍵中使用數字鍵盤的數字、小數點或 =。';
+            : 'Windows 無法在$shortcut中使用數字鍵盤的數字、小數點或 =。';
         final other = zh
             ? 'Windows 无法在快捷键中使用该按键。'
-            : 'Windows 無法在快速鍵中使用該按鍵。';
+            : 'Windows 無法在$shortcut中使用該按鍵。';
 
         // The keypad's digits: a different virtual key in each NumLock state.
         await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);

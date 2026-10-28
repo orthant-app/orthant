@@ -673,7 +673,8 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get readyDirectCaption => '直接将窗口放成一半、四分之一或全屏。无需瞄准，还可以添加自己的形状，比如第三个。';
+  String get readyDirectCaption =>
+      '直接将窗口放到半屏、四分之一屏或全屏，无需瞄准。还可以添加自己的形状，比如图中第三个。';
 
   @override
   String get readyChangeShortcuts => '更改这些快捷键…';

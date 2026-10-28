@@ -172,7 +172,7 @@
   "readyTitle": "Orthant 已就绪",
   "readySubtitle": "两种方式，把窗口放到你想要的位置。",
   "readyGridCaption": "打开网格。在网格上拖动，就能选取任意区域，三分之一、三分之二都行。也可以用方向键移动，{shift} 加方向键扩展，{place} 放置。",
-  "readyDirectCaption": "直接将窗口放成一半、四分之一或全屏。无需瞄准，还可以添加自己的形状，比如第三个。",
+  "readyDirectCaption": "直接将窗口放到半屏、四分之一屏或全屏，无需瞄准。还可以添加自己的形状，比如图中第三个。",
   "readyChangeShortcuts": "更改这些快捷键…",
   "readyDone": "完成",
   "readyNoShortcutSet": "未设置快捷键",

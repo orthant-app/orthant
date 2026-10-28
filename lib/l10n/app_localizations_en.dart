@@ -653,6 +653,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Orthant moves your windows using macOS Accessibility. Enable “Orthant” under Privacy & Security ▸ Accessibility and Orthant will pick it up straight away.';
 
   @override
+  String get onboardingBodyMac27 =>
+      'Orthant moves your windows using macOS Accessibility. Enable “Orthant” under Privacy & Security ▸ Device Control and Data Access and Orthant will pick it up straight away.';
+
+  @override
   String get onboardingOpenAccessibility => 'Open Accessibility Settings';
 
   @override

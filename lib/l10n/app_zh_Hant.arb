@@ -164,6 +164,7 @@
   "refusalUnregistrable": "Windows 無法在快速鍵中使用該按鍵。",
   "onboardingTitle": "Orthant 需要輔助使用權限",
   "onboardingBody": "Orthant 透過 macOS 的輔助使用功能來移動你的視窗。請在「隱私權與安全性 ▸ 輔助使用」中啟用「Orthant」，Orthant 會立即偵測到。",
+  "onboardingBodyMac27": "Orthant 透過 macOS 的輔助使用功能來移動你的視窗。請在「隱私權與安全性 ▸ 裝置控制和資料取用」中啟用「Orthant」，Orthant 會立即偵測到。",
   "onboardingOpenAccessibility": "開啟輔助使用設定",
   "onboardingGranted": "已授權",
   "onboardingWaiting": "正在等待授權…",

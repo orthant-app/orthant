@@ -1,4 +1,5 @@
 {
   "l10nProbeLocale": "zh_Hant_HK",
-  "onboardingBody": "Orthant 透過 macOS 的輔助使用功能來移動你的視窗。請在「私隱與保安 ▸ 輔助使用」中啟用「Orthant」，Orthant 會立即偵測到。"
+  "onboardingBody": "Orthant 透過 macOS 的輔助使用功能來移動你的視窗。請在「私隱與保安 ▸ 輔助使用」中啟用「Orthant」，Orthant 會立即偵測到。",
+  "onboardingBodyMac27": "Orthant 透過 macOS 的輔助使用功能來移動你的視窗。請在「私隱與保安 ▸ 裝置控制和資料取用權限」中啟用「Orthant」，Orthant 會立即偵測到。"
 }

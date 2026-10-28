@@ -38,6 +38,14 @@ late final OrthantCoordinator app;
 final bool _loginItemsHasExtensions =
     (macOSMajorVersion(Platform.operatingSystemVersion) ?? 15) >= 15;
 
+/// Whether this Mac names the Privacy & Security list that holds the
+/// Accessibility permission "Device Control and Data Access", which macOS 27
+/// did. A version that cannot be read is taken as the newer one, as for
+/// [_loginItemsHasExtensions]. Read once, for the same reason; the onboarding
+/// window that uses it is macOS-only.
+final bool _privacyListIsDeviceControl =
+    (macOSMajorVersion(Platform.operatingSystemVersion) ?? 27) >= 27;
+
 /// Quits on Windows. Windows keeps a dead icon in the tray until the pointer
 /// sweeps it if the process exits without removing it, so destroy() is
 /// awaited ahead of exit(0). The tray's Quit; the updater once it has started
@@ -214,6 +222,7 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
           AppScreen.onboarding => OnboardingScreen(
               controller: app.permissions,
               onOpenAccessibility: app.openAccessibility,
+              privacyListIsDeviceControl: _privacyListIsDeviceControl,
             ),
           AppScreen.ready => ReadyScreen(
               bindings: app.bindings,

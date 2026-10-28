@@ -13,6 +13,7 @@ class OnboardingScreen extends StatelessWidget {
     super.key,
     required this.controller,
     this.onOpenAccessibility,
+    this.privacyListIsDeviceControl = false,
   });
   final PermissionController controller;
 
@@ -20,6 +21,13 @@ class OnboardingScreen extends StatelessWidget {
   /// supplies one that asks macOS for permission on the first press, which is
   /// where that request now lives — it used to fire at launch, unprompted.
   final VoidCallback? onOpenAccessibility;
+
+  /// Whether this Mac names the Privacy & Security list that holds the
+  /// permission "Device Control and Data Access", which macOS 27 does, rather
+  /// than "Accessibility", which macOS 13 to 26 do. It picks the sentence that
+  /// names the list. False keeps the wording every earlier macOS prints, so a
+  /// host that does not say is not wrong on the versions in the field.
+  final bool privacyListIsDeviceControl;
 
   @override
   Widget build(BuildContext context) {
@@ -74,8 +82,11 @@ class OnboardingScreen extends StatelessWidget {
                   // an operating-system screen, and Hong Kong's macOS names
                   // Privacy & Security differently from Taiwan's, so each
                   // language (Hong Kong included) carries the words as Apple
-                  // writes them.
-                  l.onboardingBody,
+                  // writes them. macOS 27 renamed the list, so it has a second
+                  // message rather than a parameter on this one.
+                  privacyListIsDeviceControl
+                      ? l.onboardingBodyMac27
+                      : l.onboardingBody,
                   style: TextStyle(
                       fontSize: 12.5, height: 1.45, color: t.labelSecondary),
                 ),

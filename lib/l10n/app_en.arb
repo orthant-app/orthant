@@ -1030,6 +1030,10 @@
   "@onboardingBody": {
     "description": "The paragraph under the first-run heading. It is one whole message because its second sentence is an instruction that names two System Settings screens in order, joined by ▸: write each name exactly as Apple's own words for that language and region, since the Hong Kong and Taiwan versions of macOS name Privacy & Security differently. “Orthant” in quotation marks is the name of the row the user switches on. Shown on macOS only."
   },
+  "onboardingBodyMac27": "Orthant moves your windows using macOS Accessibility. Enable “Orthant” under Privacy & Security ▸ Device Control and Data Access and Orthant will pick it up straight away.",
+  "@onboardingBodyMac27": {
+    "description": "The paragraph under the first-run heading on macOS 27 and later, in place of onboardingBody there: macOS 27 renamed the Privacy & Security list that holds the Accessibility permission from Accessibility to Device Control and Data Access. It is one whole message for the same reason as onboardingBody: its second sentence is an instruction that names two System Settings screens in order, joined by ▸, each written exactly as Apple's own words for that language and region on macOS 27. “Orthant” in quotation marks is the name of the row the user switches on. Shown on macOS only."
+  },
   "onboardingOpenAccessibility": "Open Accessibility Settings",
   "@onboardingOpenAccessibility": {
     "description": "The button of the first-run window that opens the macOS Accessibility pane. Accessibility is the name of that pane. It has no ellipsis, unlike the same button on the General tab. Shown on macOS only."

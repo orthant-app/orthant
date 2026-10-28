@@ -642,7 +642,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get onboardingBody =>
-      'Orthant 借助 macOS 的无障碍功能来移动你的窗口。请在“隐私与安全 ▸ 无障碍”中启用“Orthant”，Orthant 会立即检测到。';
+      'Orthant 借助 macOS 的辅助功能来移动你的窗口。请在“隐私与安全性 ▸ 辅助功能”中启用“Orthant”，Orthant 会立即检测到。';
+
+  @override
+  String get onboardingBodyMac27 =>
+      'Orthant 借助 macOS 的无障碍功能来移动你的窗口。请在“隐私与安全 ▸ 设备控制和数据访问”中启用“Orthant”，Orthant 会立即检测到。';
 
   @override
   String get onboardingOpenAccessibility => '打开无障碍设置';
@@ -1324,6 +1328,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       'Orthant 透過 macOS 的輔助使用功能來移動你的視窗。請在「隱私權與安全性 ▸ 輔助使用」中啟用「Orthant」，Orthant 會立即偵測到。';
 
   @override
+  String get onboardingBodyMac27 =>
+      'Orthant 透過 macOS 的輔助使用功能來移動你的視窗。請在「隱私權與安全性 ▸ 裝置控制和資料取用」中啟用「Orthant」，Orthant 會立即偵測到。';
+
+  @override
   String get onboardingOpenAccessibility => '開啟輔助使用設定';
 
   @override
@@ -2001,6 +2009,10 @@ class AppLocalizationsZhHantHk extends AppLocalizationsZh {
   @override
   String get onboardingBody =>
       'Orthant 透過 macOS 的輔助使用功能來移動你的視窗。請在「私隱與保安 ▸ 輔助使用」中啟用「Orthant」，Orthant 會立即偵測到。';
+
+  @override
+  String get onboardingBodyMac27 =>
+      'Orthant 透過 macOS 的輔助使用功能來移動你的視窗。請在「私隱與保安 ▸ 裝置控制和資料取用權限」中啟用「Orthant」，Orthant 會立即偵測到。';
 
   @override
   String get onboardingOpenAccessibility => '開啟輔助使用設定';

@@ -212,7 +212,7 @@ void main() {
     testWidgets('Simplified Chinese names the panes as macOS does',
         (tester) async {
       await pumpIn(tester, kSimplified);
-      expect(find.textContaining('隐私与安全 ▸ 无障碍'), findsOneWidget);
+      expect(find.textContaining('隐私与安全性 ▸ 辅助功能'), findsOneWidget);
     });
 
     testWidgets('Traditional Chinese names the panes as Taiwan\'s macOS does',
@@ -228,6 +228,52 @@ void main() {
       expect(find.textContaining('私隱與保安 ▸ 輔助使用'), findsOneWidget);
       expect(find.textContaining('隱私權與安全性'), findsNothing);
     });
+
+    // macOS 27 renamed the pane that lists the apps allowed to control the
+    // Mac, from Accessibility to Device Control and Data Access, so the
+    // instruction is a second whole message chosen by the host. The first stays
+    // as macOS 13 to 26 print it.
+    testWidgets('English on macOS 27 and later names the renamed pane',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(
+          home: OnboardingScreen(
+              controller: PermissionController(_FakeWc()),
+              privacyListIsDeviceControl: true)));
+      expect(
+          find.text('Orthant moves your windows using macOS Accessibility. '
+              'Enable “Orthant” under Privacy & Security ▸ Device Control '
+              'and Data Access and Orthant will pick it up straight away.'),
+          findsOneWidget);
+      expect(find.textContaining('▸ Accessibility'), findsNothing);
+    });
+
+    testWidgets('without the flag the pane is the one macOS 13 to 26 print',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(
+          home: OnboardingScreen(controller: PermissionController(_FakeWc()))));
+      expect(find.textContaining('▸ Accessibility'), findsOneWidget);
+      expect(find.textContaining('Device Control'), findsNothing);
+    });
+
+    const mac27 = {
+      'zh': ('设备控制和数据访问', '隐私与安全 ▸ ', '辅助功能'),
+      'zh-Hant': ('裝置控制和資料取用', '隱私權與安全性 ▸ ', '輔助使用'),
+      'zh-Hant-HK': ('裝置控制和資料取用權限', '私隱與保安 ▸ ', '輔助使用'),
+    };
+    for (final locale in [kSimplified, kTraditional, kHongKong]) {
+      final (pane, parent, older) = mac27[locale.toLanguageTag()]!;
+      testWidgets('${locale.toLanguageTag()} on macOS 27 and later names '
+          '$parent$pane, with no English left', (tester) async {
+        await tester.pumpWidget(localizedApp(
+            locale,
+            OnboardingScreen(
+                controller: PermissionController(_FakeWc()),
+                privacyListIsDeviceControl: true)));
+        expect(find.textContaining('$parent$pane'), findsOneWidget);
+        expect(find.textContaining('$parent$older'), findsNothing);
+        expectNoEnglish(tester);
+      });
+    }
 
     testWidgets('the button still opens the pane when it is in Chinese',
         (tester) async {

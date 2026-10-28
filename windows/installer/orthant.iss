@@ -97,8 +97,8 @@ Name: "chinesetraditional"; MessagesFile: "ChineseTraditional.isl"
 [CustomMessages]
 ; Orthant's own installer text, one definition per language: a literal in the
 ; script would be English for everyone. The English is what the script said
-; before it was translated. The Chinese names the notification area as Windows
-; itself does (通知区域 on zh-CN, 通知區域 on zh-TW).
+; before it was translated. The Chinese names the tray as Windows 11 does on each
+; Chinese Windows (系统托盘 on zh-CN, 系統匣 on zh-TW).
 english.LaunchOrthant=Launch Orthant
 chinesesimplified.LaunchOrthant=启动 Orthant
 chinesetraditional.LaunchOrthant=啟動 Orthant

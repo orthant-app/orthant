@@ -25,7 +25,8 @@ import 'windows_window_ops.dart';
 
 /// The language WinSparkle's windows are shown in: Orthant's own resolved
 /// language for the OS's [systemLocales] and the stored [choice] (the registry
-/// value, null for System), spelled as WinSparkle knows it (`zh-CN`, `zh-TW`).
+/// value, null for System), as canonical tags (`zh-CN`, `zh-TW`).
+/// [WindowsUpdater.start] lowercases them at the WinSparkle API boundary.
 ///
 /// Always the resolved one, System included: left to detect a language itself,
 /// WinSparkle would pick ones Orthant does not have, so that a Japanese Windows

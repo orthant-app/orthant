@@ -22,6 +22,8 @@
 		<string>en</string>
 		<string>zh-Hans</string>
 		<string>zh-Hant</string>
+		<!-- Selectable per app on macOS; shares Traditional menu resources. -->
+		<string>zh-HK</string>
 	</array>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>

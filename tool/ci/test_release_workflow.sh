@@ -1245,6 +1245,57 @@ assert_contains 'the Windows job encrypts with the flags RELEASING.md decrypts w
   'openssl enc -aes-256-cbc -salt -pbkdf2 -iter 10000 -md sha256' "$(<"$REPO_ROOT/.github/workflows/release.yml")"
 assert_contains 'RELEASING.md decrypts with those flags' \
   'openssl enc -d -aes-256-cbc -pbkdf2 -iter 10000 -md sha256' "$(<"$RELEASING")"
+
+# Execute the workflow's actual encrypted Windows transport. A signing or
+# trace-check failure must retain both host traces, without admitting the
+# installer that failed verification. No release credential is used here.
+encrypt_step="$TMP_DIR/encrypt-windows.sh"
+awk '
+  /- name: Encrypt the Windows release for the macOS job/ { step=1; next }
+  step && /^      - name:/ { exit }
+  step && /^        run: \|/ { body=1; next }
+  body { sub(/^          /, ""); print }
+' "$REPO_ROOT/.github/workflows/release.yml" >"$encrypt_step"
+for job_status in success failure; do
+  transport="$TMP_DIR/transport-$job_status"
+  mkdir -p "$transport/runner/signing-runtime-current" "$transport/work/build/dist"
+  printf 'installer\n' >"$transport/work/build/dist/Orthant-1.0.0-setup.exe"
+  printf 'signing diagnostics\n' >"$transport/runner/windows-diagnostics.log"
+  printf 'IJW host evidence\n' >"$transport/runner/signing-runtime-current/app-ijw.log"
+  printf 'CoreCLR evidence\n' >"$transport/runner/signing-runtime-current/installer-host.log"
+  assert_ok "$job_status encrypts the Windows transport" env \
+    RUNNER_TEMP="$transport/runner" GITHUB_WORKSPACE="$transport/work" \
+    JOB_STATUS="$job_status" VERSION=1.0.0 DRYRUN_ARTIFACT_KEY=runtime-test-only \
+    /bin/bash "$encrypt_step"
+  assert_ok "$job_status transport decrypts" env DRYRUN_ARTIFACT_KEY=runtime-test-only \
+    openssl enc -d -aes-256-cbc -pbkdf2 -iter 10000 -md sha256 \
+    -pass env:DRYRUN_ARTIFACT_KEY -in "$transport/runner/windows.tar.enc" -out "$transport/decrypted.tar"
+  mkdir "$transport/decrypted"
+  tar -xf "$transport/decrypted.tar" -C "$transport/decrypted"
+  assert_file_eq "$job_status retains IJW evidence inside encryption" \
+    "$transport/runner/signing-runtime-current/app-ijw.log" "$transport/decrypted/windows-out/signing-runtime-current/app-ijw.log"
+  assert_file_eq "$job_status retains CoreCLR evidence inside encryption" \
+    "$transport/runner/signing-runtime-current/installer-host.log" "$transport/decrypted/windows-out/signing-runtime-current/installer-host.log"
+  if [[ "$job_status" == success ]]; then
+    assert_file_eq 'a verified installer travels encrypted' "$transport/work/build/dist/Orthant-1.0.0-setup.exe" "$transport/decrypted/windows-out/Orthant-1.0.0-setup.exe"
+  else
+    assert_fails 'a failed signing phase cannot admit the installer' test -e "$transport/decrypted/windows-out/Orthant-1.0.0-setup.exe"
+  fi
+done
+# A setup failure can occur before any native host has written a trace.
+rm -rf "$transport/runner/signing-runtime-current"
+assert_ok 'failure before tracing still encrypts diagnostics' env \
+  RUNNER_TEMP="$transport/runner" GITHUB_WORKSPACE="$transport/work" \
+  JOB_STATUS=failure VERSION=1.0.0 DRYRUN_ARTIFACT_KEY=runtime-test-only \
+  /bin/bash "$encrypt_step"
+assert_ok 'diagnostics without traces decrypt' env DRYRUN_ARTIFACT_KEY=runtime-test-only \
+  openssl enc -d -aes-256-cbc -pbkdf2 -iter 10000 -md sha256 \
+  -pass env:DRYRUN_ARTIFACT_KEY -in "$transport/runner/windows.tar.enc" -out "$transport/decrypted.tar"
+rm -rf "$transport/decrypted"
+mkdir "$transport/decrypted"
+tar -xf "$transport/decrypted.tar" -C "$transport/decrypted"
+assert_file_eq 'setup-failure diagnostics survive encryption' \
+  "$transport/runner/windows-diagnostics.log" "$transport/decrypted/windows-out/windows-diagnostics.log"
 assert_contains 'RELEASING.md says to re-run a run whole before publication' 'Re-run all jobs' "$(<"$RELEASING")"
 
 if (( FAIL_COUNT > 0 )); then

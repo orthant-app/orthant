@@ -12,7 +12,7 @@
 # SDK, and the Artifact Signing client ("dlib") from its NuGet package rather
 # than its installer, which needs administrator rights and fetches "the
 # latest" SDK and .NET as it runs: the pair the release signs with is the pair
-# pinned here. The client needs the .NET 8 runtime.
+# pinned here. Its upstream Major roll-forward policy selects private .NET 10.
 #
 # ASCII only: PowerShell 5.1 reads a BOM-less script as ANSI.
 param(
@@ -45,18 +45,9 @@ if ($Endpoint -notmatch '^https://[a-z0-9]+\.codesigning\.azure\.net/?$') {
 }
 if (-not $Account.Trim() -or -not $CertificateProfile.Trim()) { Fail 'the account and the certificate profile are required' }
 
-# The client is a .NET 8 library: without that runtime SignTool exits 3 and
-# says nothing (measured on a Windows with none).
-$dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
-$runtimes = @()
-if ($dotnet) {
-  $ErrorActionPreference = 'Continue'
-  $runtimes = @(& $dotnet.Source --list-runtimes 2>$null)
-  $ErrorActionPreference = 'Stop'
-}
-if (-not ($runtimes | Where-Object { $_ -match '^Microsoft\.NETCore\.App 8\.' })) {
-  Fail 'the Artifact Signing client needs the .NET 8 runtime, which dotnet --list-runtimes does not list'
-}
+# PATH does not control IJW's native host resolution. Both roots must select
+# the fresh job-owned install, containing only serviced .NET 10.
+& (Join-Path $PSScriptRoot 'check_signing_runtime.ps1') -Root $env:DOTNET_ROOT
 
 New-Item -ItemType Directory -Force -Path $Dir | Out-Null
 # .NET (the unzip, the metadata's write) resolves a relative path against the

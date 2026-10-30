@@ -22,7 +22,7 @@
 		<string>en</string>
 		<string>zh-Hans</string>
 		<string>zh-Hant</string>
-		<!-- Selectable per app on macOS; shares Traditional menu resources. -->
+		<!-- Hong Kong wording for the native menu and Sparkle. -->
 		<string>zh-HK</string>
 	</array>
 	<key>CFBundleName</key>

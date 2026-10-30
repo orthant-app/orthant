@@ -1,0 +1,6 @@
+# The vendored Inno Setup translations are stored exactly as upstream wrote
+# them (the Traditional file has a BOM and CRLF line ends, the Simplified file
+# neither): the hash recorded in windows/installer/orthant.iss is of those
+# bytes, and a checkout that converted line endings (a Windows runner's
+# default) would change it.
+windows/installer/*.isl -text

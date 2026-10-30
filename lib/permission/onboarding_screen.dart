@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/strings.dart';
 import '../settings/first_frame_report.dart';
 import '../settings/platform_theme.dart';
 import '../settings/region_glyph.dart';
@@ -12,6 +13,7 @@ class OnboardingScreen extends StatelessWidget {
     super.key,
     required this.controller,
     this.onOpenAccessibility,
+    this.privacyListIsDeviceControl = false,
   });
   final PermissionController controller;
 
@@ -20,9 +22,17 @@ class OnboardingScreen extends StatelessWidget {
   /// where that request now lives — it used to fire at launch, unprompted.
   final VoidCallback? onOpenAccessibility;
 
+  /// Whether this Mac names the Privacy & Security list that holds the
+  /// permission "Device Control and Data Access", which macOS 27 does, rather
+  /// than "Accessibility", which macOS 13 to 26 do. It picks the sentence that
+  /// names the list. False keeps the wording every earlier macOS prints, so a
+  /// host that does not say is not wrong on the versions in the field.
+  final bool privacyListIsDeviceControl;
+
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final l = context.l10n;
     return FirstFrameReport(
       name: 'onboarding',
       onMacOS: false,
@@ -53,7 +63,7 @@ class OnboardingScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 22),
                 Text(
-                  'Orthant needs Accessibility permission',
+                  l.onboardingTitle,
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w600,
@@ -67,9 +77,16 @@ class OnboardingScreen extends StatelessWidget {
                   // landed, granting advances to it rather than dismissing.
                   // Promising a close and then showing another screen reads as
                   // the app ignoring you at the one moment it must not.
-                  'Orthant moves your windows using macOS Accessibility. '
-                  'Enable “Orthant” under Privacy & Security ▸ Accessibility '
-                  'and Orthant will pick it up straight away.',
+                  //
+                  // One whole message, not a sentence and a path: the path is
+                  // an operating-system screen, and Hong Kong's macOS names
+                  // Privacy & Security differently from Taiwan's, so each
+                  // language (Hong Kong included) carries the words as Apple
+                  // writes them. macOS 27 renamed the list, so it has a second
+                  // message rather than a parameter on this one.
+                  privacyListIsDeviceControl
+                      ? l.onboardingBodyMac27
+                      : l.onboardingBody,
                   style: TextStyle(
                       fontSize: 12.5, height: 1.45, color: t.labelSecondary),
                 ),
@@ -90,7 +107,7 @@ class OnboardingScreen extends StatelessWidget {
                     textStyle: const TextStyle(
                         fontSize: 13, fontWeight: FontWeight.w500),
                   ),
-                  child: const Text('Open Accessibility Settings'),
+                  child: Text(l.onboardingOpenAccessibility),
                 ),
                 const SizedBox(height: 16),
                 AnimatedBuilder(
@@ -109,8 +126,8 @@ class OnboardingScreen extends StatelessWidget {
                       const SizedBox(width: 5),
                       Text(
                         controller.granted
-                            ? 'Permission granted'
-                            : 'Waiting for permission…',
+                            ? l.onboardingGranted
+                            : l.onboardingWaiting,
                         style: TextStyle(
                           fontSize: 12,
                           color: controller.granted

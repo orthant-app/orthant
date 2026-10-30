@@ -1,6 +1,24 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:orthant/l10n/app_localizations.dart';
+import 'package:orthant/l10n/strings.dart';
 import 'package:orthant/overlay/overlay_copy.dart';
+
+import 'support/locales.dart';
+import 'support/no_english.dart';
+import 'support/strg_strings.dart';
+
+/// [actual] says exactly what [expected] does.
+///
+/// Both platforms' copy is built from the strings on every read, so two reads
+/// are two objects and `same` would fail on a correct answer. `OverlayCopy` has
+/// no `==`, because nothing in the app compares two of them; its three fields
+/// are values, so comparing them is what "the same words" means.
+void expectSameCopy(OverlayCopy actual, OverlayCopy expected) {
+  expect(actual.place, expected.place);
+  expect(actual.save, expected.save);
+  expect(actual.pixels, expected.pixels);
+}
 
 /// The overlay names three things that differ by platform: the key that
 /// places, the chord that places and saves, and what a global coordinate is
@@ -31,10 +49,30 @@ void main() {
     expect(c.unit, 'pixels');
   });
 
+  test('Windows\' place and save are the key legends, read at use', () {
+    // The legends are the settings window's (`KeyWords`), so a language that
+    // prints Ctrl as STRG says so here too; the save chord is joined the way
+    // Windows joins every combo.
+    addTearDown(() => setAppStrings(kEnglish));
+    appStrings = StrgStrings();
+    final c = OverlayCopy.of(TargetPlatform.windows);
+    expect(c.place, 'Eingabe');
+    expect(c.save, 'STRG+S');
+    expect(c.saveHint, startsWith('STRG+S  '));
+    expect(c.gridHint, contains('Eingabe places the window'));
+    // macOS's glyph chord is a constant; its Return is a string of its own,
+    // not Windows' Enter.
+    final m = OverlayCopy.of(TargetPlatform.macOS);
+    expect(m.place, 'Zeilenumbruch');
+    expect(m.save, '⌘S');
+    expect(m.gridHint, contains('Zeilenumbruch places the window'));
+    expect(m.opened('TextEdit', 6, 4), contains('Zeilenumbruch places,'));
+  });
+
   test('every other platform reads as macOS, where the overlay began', () {
     for (final p in TargetPlatform.values) {
       if (p == TargetPlatform.windows) continue;
-      expect(OverlayCopy.of(p), same(OverlayCopy.macOS), reason: '$p');
+      expectSameCopy(OverlayCopy.of(p), OverlayCopy.macOS);
     }
   });
 
@@ -43,5 +81,52 @@ void main() {
       expect(OverlayCopy.of(p).opened('', 2, 2),
           startsWith('Grid open for the captured window. 2 columns'));
     }
+  });
+
+  group('in Chinese', () {
+    tearDown(() => setAppStrings(kEnglish));
+
+    for (final locale in [kSimplified, kTraditional, kHongKong]) {
+      for (final platform in [TargetPlatform.macOS, TargetPlatform.windows]) {
+        test('${locale.toLanguageTag()} on $platform: all of it is Chinese, '
+            'around the platform\'s own key words', () {
+          setAppStrings(locale);
+          final s = appStrings;
+          final c = OverlayCopy.of(platform);
+          // The key words are English in every language (they are printed
+          // that way), so they are the only Latin left.
+          expectNoEnglishIn([
+            c.saveHint,
+            c.gridHint,
+            c.opened('記事本', 6, 4),
+            c.opened('', 6, 4),
+            c.unit,
+          ]);
+          expect(c.saveHint, startsWith(c.save));
+          expect(c.gridHint, contains(c.place));
+          expect(c.opened('記事本', 6, 4), contains(c.place));
+          expect(c.opened('記事本', 6, 4), contains('記事本'));
+          expect(c.opened('', 6, 4), contains(s.overlayCapturedWindow));
+          expect(c.opened('', 6, 4),
+              contains('${s.overlayColumns(6)}，${s.overlayRows(4)}'));
+          expect(
+              c.unit,
+              platform == TargetPlatform.windows
+                  ? s.overlayUnitPixels
+                  : s.overlayUnitPoints);
+        });
+      }
+    }
+
+    test('the count is a plural message: one column, not "1 columns"', () {
+      final en = lookupAppLocalizations(kEnglish);
+      expect(en.overlayColumns(1), '1 column');
+      expect(en.overlayColumns(6), '6 columns');
+      expect(en.overlayRows(1), '1 row');
+      expect(en.overlayRows(0), '0 rows');
+      final zh = lookupAppLocalizations(kSimplified);
+      expect(zh.overlayColumns(1), contains('1'));
+      expect(zh.overlayColumns(6), contains('6'));
+    });
   });
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../shortcuts/bindings.dart';
 import '../core/key_chord.dart';
+import '../l10n/strings.dart';
 import 'platform_theme.dart';
 import 'keyboard_labels.dart';
 
@@ -53,13 +54,17 @@ class KeycapRow extends StatelessWidget {
   const KeycapRow({
     super.key,
     required this.chord,
-    this.unsetLabel = 'Not set',
+    this.unsetLabel,
     this.mainAxisAlignment = MainAxisAlignment.start,
   });
 
   /// Null draws [unsetLabel].
   final KeyChord? chord;
-  final String unsetLabel;
+
+  /// What an unset row says, in the app's language. Left out it is the general
+  /// "Not set" of the language this part of the tree is shown in, never a fixed
+  /// English string.
+  final String? unsetLabel;
   final MainAxisAlignment mainAxisAlignment;
 
   @override
@@ -67,7 +72,7 @@ class KeycapRow extends StatelessWidget {
     final t = context.tokens;
     final symbols = comboSymbols(chord, keyLabels: KeyboardLabels.of(context));
     if (symbols.isEmpty) {
-      return Text(unsetLabel,
+      return Text(unsetLabel ?? context.l10n.shortcutNotSet,
           style: TextStyle(fontSize: 12, color: t.labelTertiary));
     }
     return Row(

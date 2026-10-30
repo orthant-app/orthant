@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter/services.dart';
 import '../core/key_chord.dart';
 import '../core/windows_keys.dart';
+import '../l10n/app_localizations.dart';
+import '../l10n/strings.dart';
 
 /// The chord a key press records, or null if the key isn't one a shortcut may
 /// use or no modifier is held.
@@ -39,24 +41,31 @@ KeyChord? chordFromKeyEvent(KeyEvent event) {
 /// the keypad's digits, decimal point and = (each is a different virtual key
 /// in each NumLock state, so no registration fires in both), or a key Windows
 /// has no virtual key for at all.
-const keypadRefusal =
-    "Windows can't use the keypad's digits, decimal point or = in a shortcut.";
-const unregistrableRefusal = "Windows can't use that key in a shortcut.";
+///
+/// Messages (`refusalKeypad`, `refusalUnregistrable`), so they are said in the
+/// language of the app. These two read the language the code without a widget
+/// tree uses (`appStrings`), which is what English is until the app points it
+/// elsewhere; [refusalFor] takes the widget tree's own when it has one.
+String get keypadRefusal => appStrings.refusalKeypad;
+String get unregistrableRefusal => appStrings.refusalUnregistrable;
 
 /// Why [event], pressed with a modifier held, cannot be recorded on this
 /// platform: a sentence for the person recording, or null when it records, or
 /// when there is nothing to explain (a modifier on its own, a bare key, Tab:
 /// the footer already says a combination needs a modifier). Only Windows
 /// refuses keys this way; on macOS every bindable key registers.
-String? refusalFor(KeyEvent event) {
+///
+/// In the language of [l], or of [appStrings] when none is given.
+String? refusalFor(KeyEvent event, [AppLocalizations? l]) {
   if (defaultTargetPlatform != TargetPlatform.windows) return null;
   final physical = event.physicalKey.usbHidUsage;
   if (!isBindableKey(physical) || heldModifiers().isEmpty) return null;
   final logical = event.logicalKey.keyId;
   if (windowsVirtualKey(windowsKeyId(logical, physical)) != null) return null;
+  final words = l ?? appStrings;
   return _keypadUnregistrable.contains(logical)
-      ? keypadRefusal
-      : unregistrableRefusal;
+      ? words.refusalKeypad
+      : words.refusalUnregistrable;
 }
 
 final _keypadUnregistrable = {

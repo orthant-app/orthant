@@ -1,4 +1,4 @@
-; Orthant's Windows installer, compiled by Inno Setup 6 (ISCC.exe) from a
+﻿; Orthant's Windows installer, compiled by Inno Setup 6 (ISCC.exe) from a
 ; release build's bundle. tool/windows/make_installer.ps1 compiles it and
 ; passes every value below; nothing here is read from a build.
 ;
@@ -51,6 +51,15 @@ SetupIconFile=..\runner\resources\app_icon.ico
 UninstallDisplayIcon={app}\Orthant.exe
 UninstallDisplayName=Orthant
 WizardStyle=modern
+; Setup picks its language by Windows' display language (English, Simplified or
+; Traditional Chinese) and falls back to English silently. The default would
+; show a "Select Language" dialog to everyone whose Windows is neither.
+ShowLanguageDialog=no
+; Its default, yes, reuses the language the previous install recorded under the
+; AppId, even with the dialog suppressed and in a silent run: every existing
+; install recorded english, so a friend updating on Chinese Windows would keep
+; an English installer for good.
+UsePreviousLanguage=no
 Compression=lzma2/max
 SolidCompression=yes
 ; Setup closes a running Orthant itself (CloseOrthant, below), never through
@@ -66,7 +75,45 @@ SignedUninstaller=yes
 #endif
 
 [Languages]
+; Inno Setup 6.7.1, the version on the release runner, has no official Chinese
+; (7.1.0 adds it; make_installer.ps1 takes only Inno 6), so the two translations
+; beside this script are vendored byte for byte from jrsoftware/issrc at tag
+; is-6_7_1, Files/Languages/Unofficial/ (windows/installer/*.isl is -text in
+; .gitattributes so git keeps them so). ChineseSimplified.isl targets Inno Setup
+; 6.5.0+ and ChineseTraditional.isl 6.1.0+. Replace one only by vendoring the
+; new file whole and recording its hash here. Source and SHA-256 of each:
+;
+; ChineseSimplified.isl
+; https://raw.githubusercontent.com/jrsoftware/issrc/is-6_7_1/Files/Languages/Unofficial/ChineseSimplified.isl
+; sha256 7d544b9bb1d142cfa11f2e5d3cc8abe2e55f8e066c5124e3772675aa236e1278
+;
+; ChineseTraditional.isl
+; https://raw.githubusercontent.com/jrsoftware/issrc/is-6_7_1/Files/Languages/Unofficial/ChineseTraditional.isl
+; sha256 ab22b0ebf82969d1c9a7208e0e9f60e5119c0c95b9dacc00eb8e5582c7d3c604
 Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "chinesesimplified"; MessagesFile: "ChineseSimplified.isl"
+Name: "chinesetraditional"; MessagesFile: "ChineseTraditional.isl"
+
+[CustomMessages]
+; Orthant's own installer text, one definition per language: a literal in the
+; script would be English for everyone. The English is what the script said
+; before it was translated. The Chinese names the tray as Windows 11 does on each
+; Chinese Windows (系统托盘 on zh-CN, 系統匣 on zh-TW).
+english.LaunchOrthant=Launch Orthant
+chinesesimplified.LaunchOrthant=启动 Orthant
+chinesetraditional.LaunchOrthant=啟動 Orthant
+english.StillRunningSetup=Orthant is still running. Quit it from its icon in the notification area, then run Setup again.
+chinesesimplified.StillRunningSetup=Orthant 仍在运行。请从系统托盘中的图标退出 Orthant，然后重新运行安装程序。
+chinesetraditional.StillRunningSetup=Orthant 仍在執行。請從系統匣中的圖示結束 Orthant，然後重新執行安裝程式。
+english.StillRunningUninstall=Orthant is still running. Quit it from its icon in the notification area, then uninstall it again.
+chinesesimplified.StillRunningUninstall=Orthant 仍在运行。请从系统托盘中的图标退出 Orthant，然后重新卸载。
+chinesetraditional.StillRunningUninstall=Orthant 仍在執行。請從系統匣中的圖示結束 Orthant，然後重新解除安裝。
+english.UpdateStoppedPartWay=Orthant could not be updated, and some of its files were already replaced, so it was not started again. Run the installer again to finish installing it, or download Orthant from orthant.app.
+chinesesimplified.UpdateStoppedPartWay=Orthant 未能更新，且部分文件已被替换，因此没有重新启动它。请重新运行安装程序以完成安装，或从 orthant.app 下载 Orthant。
+chinesetraditional.UpdateStoppedPartWay=Orthant 無法更新，且部分檔案已被取代，因此沒有重新啟動。請重新執行安裝程式以完成安裝，或從 orthant.app 下載 Orthant。
+english.UpdateStoppedUnverified=Orthant could not be updated, and whether its files are still whole could not be verified, so it was not started again. Run the installer again to finish installing it, or download Orthant from orthant.app.
+chinesesimplified.UpdateStoppedUnverified=Orthant 未能更新，且无法确认其文件是否完整，因此没有重新启动它。请重新运行安装程序以完成安装，或从 orthant.app 下载 Orthant。
+chinesetraditional.UpdateStoppedUnverified=Orthant 無法更新，也無法確認其檔案是否完整，因此沒有重新啟動。請重新執行安裝程式以完成安裝，或從 orthant.app 下載 Orthant。
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -77,7 +124,7 @@ Name: "{autoprograms}\Orthant"; Filename: "{app}\Orthant.exe"
 [Run]
 ; Run by hand: a box on the last page, unless Orthant comes back on its own.
 ; Silent, from winget: not launched, unless it was running.
-Filename: "{app}\Orthant.exe"; Description: "Launch Orthant"; Flags: nowait postinstall skipifsilent; Check: not ShouldRelaunch
+Filename: "{app}\Orthant.exe"; Description: "{cm:LaunchOrthant}"; Flags: nowait postinstall skipifsilent; Check: not ShouldRelaunch
 ; Orthant comes back if it was running when Setup began (Setup closed it) or
 ; the updater asked (/RELAUNCH=1): installing over a running copy, by the
 ; updater, by winget or by hand, leaves it running.
@@ -276,7 +323,7 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   WasRunning := CloseOrthant;
   if OrthantRunning then
-    Result := 'Orthant is still running. Quit it from its icon in the notification area, then run Setup again.'
+    Result := CustomMessage('StillRunningSetup')
   else
   begin
     Result := '';
@@ -318,13 +365,13 @@ begin
     begin
       Log('Setup stopped part way, with some of Orthant''s files replaced: not starting it');
       if not VerySilent then
-        MsgBox('Orthant could not be updated, and some of its files were already replaced, so it was not started again. Run the installer again to finish installing it, or download Orthant from orthant.app.', mbCriticalError, MB_OK);
+        MsgBox(CustomMessage('UpdateStoppedPartWay'), mbCriticalError, MB_OK);
     end
     else
     begin
       Log('Setup stopped before finishing, and not all of Orthant''s files could be read: not starting it');
       if not VerySilent then
-        MsgBox('Orthant could not be updated, and whether its files are still whole could not be verified, so it was not started again. Run the installer again to finish installing it, or download Orthant from orthant.app.', mbCriticalError, MB_OK);
+        MsgBox(CustomMessage('UpdateStoppedUnverified'), mbCriticalError, MB_OK);
     end;
   finally
     After.Free;
@@ -341,7 +388,7 @@ begin
     CloseOrthant;
     if OrthantRunning then
     begin
-      SuppressibleMsgBox('Orthant is still running. Quit it from its icon in the notification area, then uninstall it again.', mbCriticalError, MB_OK, IDOK);
+      SuppressibleMsgBox(CustomMessage('StillRunningUninstall'), mbCriticalError, MB_OK, IDOK);
       Abort;
     end;
   end;

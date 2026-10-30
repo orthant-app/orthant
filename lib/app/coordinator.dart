@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:ui' show Locale;
 
 import 'package:flutter/foundation.dart';
 
 import '../core/geometry.dart';
 import '../core/key_words.dart';
 import '../core/window_controller.dart';
+import '../l10n/app_localizations.dart';
+import '../l10n/languages.dart';
+import '../l10n/strings.dart';
 import '../permission/permission_controller.dart';
 import '../settings/settings.dart';
 import '../settings/settings_store.dart';
@@ -126,6 +130,85 @@ class OrthantCoordinator extends ChangeNotifier {
   Map<int, String> _keyboardLabels = const {};
   Map<int, String> get keyboardLabels => _keyboardLabels;
 
+  // The language is resolved here, not in the widget tree: the tray menu and
+  // the overlay's engine have no BuildContext, and both are drawn before the
+  // first widget is.
+
+  /// The OS's preferred languages, read once by [loadLanguage] and reused when
+  /// the user picks another language, so choosing System again lands on the
+  /// language the OS had when the app started.
+  List<Locale> _systemLocales = const [];
+
+  /// What the user picked in Settings, as the BCP-47 tag that is stored: null
+  /// for System. Kept whole (`zh-Hant-HK` stays Hong Kong) and never edited,
+  /// so a tag no translation covers stays what it was and simply behaves as
+  /// System.
+  String? _languageChoice;
+  String? get languageChoice => _languageChoice;
+
+  /// The language the app shows: an element of
+  /// [AppLocalizations.supportedLocales], as the resolver returns it.
+  Locale _locale = const Locale('en');
+  Locale get locale => _locale;
+
+  AppLocalizations _strings = lookupAppLocalizations(const Locale('en'));
+
+  /// The words in [locale], for code with no widget tree.
+  AppLocalizations get strings => _strings;
+
+  bool _languageLoaded = false;
+
+  /// Read the OS's languages and the stored choice and settle on the language,
+  /// before anything is drawn: [start] does it first when nobody has, and
+  /// `main.dart` calls it ahead of the tray's first build, which is earlier
+  /// than [start] runs. The first tray menu and the first grid push would
+  /// otherwise be English for a Chinese reader.
+  Future<void> loadLanguage() async {
+    _systemLocales = await wc.systemLocales();
+    _languageChoice = _storedChoice(await wc.languageOverride());
+    _languageLoaded = true;
+    _resolveLanguage();
+    notifyListeners();
+  }
+
+  /// The user picked [tag] in Settings, or null for System.
+  ///
+  /// Stored, resolved against the system list [loadLanguage] read, and handed
+  /// to the overlay, whose engine has no other way to hear of it.
+  ///
+  /// **A failed write still changes the language, for this session.** macOS's
+  /// write can be refused, and the picker that calls this has nobody to catch
+  /// a throw: letting it escape is an uncaught async error, and keeping the
+  /// old language leaves a click that did nothing and says nothing. The choice
+  /// then lasts until the app quits, which the person can see and fix by
+  /// choosing again.
+  ///
+  /// Shown before it is stored, as [settingsChanged] does and for the same
+  /// reason: the pane's next click must find the new value in its props.
+  Future<void> setLanguageChoice(String? tag) async {
+    final choice = _languageChoice = _storedChoice(tag);
+    _resolveLanguage();
+    notifyListeners();
+    try {
+      await wc.setLanguageOverride(choice);
+    } catch (e) {
+      if (!kReleaseMode) debugPrint('[orthant] language: not stored ($e)');
+    }
+    await pushGrid();
+  }
+
+  /// A stored choice as the app holds it: an empty or blank value is no choice
+  /// at all. Windows reads an empty registry value as `''` where macOS has no
+  /// key, and both mean System.
+  static String? _storedChoice(String? stored) =>
+      stored == null || stored.trim().isEmpty ? null : stored;
+
+  void _resolveLanguage() {
+    _locale = resolveAppLocale(_systemLocales, choice: _languageChoice);
+    _strings = lookupAppLocalizations(_locale);
+    setAppStrings(_locale);
+  }
+
   /// Labels follow the input source, not the saved physical bindings.
   Future<void> refreshKeyboardLabels() async {
     final labels = await wc.keyboardLabels();
@@ -232,6 +315,9 @@ class OrthantCoordinator extends ChangeNotifier {
 
   /// The launch sequence. Returns once the app knows what to show.
   Future<void> start() async {
+    // First, so that nothing below pushes or draws in the wrong language. A
+    // caller that needed it earlier has already run it.
+    if (!_languageLoaded) await loadLanguage();
     await permissions.refresh();
 
     // Before anything can render the tray. Cheap, and it cannot change
@@ -327,6 +413,7 @@ class OrthantCoordinator extends ChangeNotifier {
     // exists they know the feature does, and the overlay goes back to being
     // only the grid.
     saveHint: _regions.isEmpty,
+    locale: _locale.toLanguageTag(),
   );
 
   // ------------------------------------------------------------ permission
@@ -499,7 +586,7 @@ class OrthantCoordinator extends ChangeNotifier {
     // greyed-out "Enabled" row is noise — working is the normal case, and
     // the shortcuts themselves are the feedback that it works.
     if (!permissions.granted) ...[
-      const TrayEntry('permission', 'Enable Accessibility…'),
+      TrayEntry('permission', _strings.trayEnableAccessibility),
       const TrayEntry.separator(),
     ],
     // Greyed while ungranted, because it cannot work: capture fails, the
@@ -510,7 +597,7 @@ class OrthantCoordinator extends ChangeNotifier {
     // because those configure future behaviour rather than acting now, and
     // they persist perfectly well without the grant.
     TrayEntry('overlay', openGridLabel, disabled: !permissions.granted),
-    const TrayEntry('settings', 'Settings…'),
+    TrayEntry('settings', _strings.traySettings),
     // Opens Settings on the About pane, which is where the version lives.
     //
     // This row used to *be* the version, rendered as a disabled label. It read
@@ -522,14 +609,14 @@ class OrthantCoordinator extends ChangeNotifier {
     // audience is a bug report, which can afford a click. Unconditional, unlike
     // the old row: this menu is Orthant's only front door, so About must be
     // reachable even from a build that cannot say what version it is.
-    const TrayEntry('about', 'About Orthant'),
+    TrayEntry('about', _strings.trayAbout),
     // What a check found, here rather than in a window that takes the
     // foreground unasked; choosing it opens the updater's offer (Windows).
     if (availableUpdate case final update?)
-      TrayEntry('install-update', 'Update to Orthant ${update.name}…'),
-    const TrayEntry('updates', 'Check for Updates…'),
+      TrayEntry('install-update', _strings.trayUpdateTo(update.name)),
+    TrayEntry('updates', _strings.trayCheckForUpdates),
     const TrayEntry.separator(),
-    const TrayEntry('quit', 'Quit Orthant'),
+    TrayEntry('quit', _strings.trayQuit),
   ];
 
   /// The update a check found that is still to be installed
@@ -539,11 +626,11 @@ class OrthantCoordinator extends ChangeNotifier {
   /// The tray icon's tooltip: the app's name, and the update when there is
   /// one, so a hover says so without opening anything.
   String get trayToolTip => switch (availableUpdate) {
-    final update? => 'Orthant: update ${update.name} available',
+    final update? => _strings.trayTooltipUpdate(update.name),
     null => 'Orthant',
   };
 
-  /// "Open Grid", with the summon's combo beside it when there is one to show:
+  /// "Open Grid" (in the app's language), with the summon's combo beside it when there is one to show:
   /// inline on macOS, in the menu's accelerator column on Windows
   /// ([KeyWords.menuItem]).
   ///
@@ -565,8 +652,8 @@ class OrthantCoordinator extends ChangeNotifier {
           )
         : null;
     return combo == null
-        ? 'Open Grid'
-        : KeyWords.current.menuItem('Open Grid', combo);
+        ? _strings.trayOpenGrid
+        : KeyWords.current.menuItem(_strings.trayOpenGrid, combo);
   }
 
   /// The tray's "Enable Accessibility…" row. Only reachable while ungranted.

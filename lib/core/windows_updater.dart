@@ -10,6 +10,7 @@ import 'package:win32/win32.dart';
 import 'package:xml/xml.dart';
 
 import 'window_controller.dart';
+import 'windows_registry.dart';
 
 /// The feed a Windows build checks: the stable Windows feed on the project's
 /// own domain, as macOS's `SUFeedURL` is, so hosting can move without
@@ -64,6 +65,11 @@ abstract class SparkleApi {
   void setAppDetails(String company, String app, String version);
   void setAppBuildVersion(String build);
   void setAutomaticCheck(bool on);
+
+  /// The language of WinSparkle's own windows, as the lowercase tag its
+  /// catalogue lookup matches (`en`, `zh-cn`, `zh-tw`). WinSparkle takes it
+  /// only before [init].
+  void setLang(String language);
   void setShutdownRequestCallback(void Function() onRequest);
 
   /// The user chose "Skip this version" in WinSparkle's offer.
@@ -276,10 +282,17 @@ class WindowsUpdater {
   /// WinSparkle's window calls this version. Without a key WinSparkle accepts
   /// it never starts: WinSparkle would then fall back to a key in the
   /// executable's resources, of which this one has none.
+  ///
+  /// [language] is Orthant's own resolved language as WinSparkle spells it
+  /// (`winSparkleLanguage`; it is lowercased on the way to WinSparkle, which
+  /// matches only that), given even when the user left it on System: left
+  /// to detect one itself, WinSparkle would show a language Orthant does not
+  /// have. Only null (nothing resolved, a suite) sets none.
   bool start({
     required String build,
     required String display,
     required void Function() onShutdownRequested,
+    String? language,
   }) {
     if (_running) return true;
     final number = int.tryParse(build);
@@ -295,6 +308,15 @@ class WindowsUpdater {
     }
     _api.setAppDetails('Orthant', 'Orthant', display);
     _api.setAppBuildVersion(build);
+    // Before init, as WinSparkle requires: its windows are built from it then.
+    // Lowercased, because WinSparkle 0.9.4 finds its catalogues only that way:
+    // the wxWidgets inside it lowercases the names of the DLL's catalogues
+    // (translation.cpp:1999) and matches the requested tag case-sensitively
+    // (:1595), so `zh-CN` and `pt-BR` miss and the window stays English, while
+    // `zh-cn`, `zh-tw` and `pt-br` find theirs (measured on the VM). 0.9.4 is
+    // the latest release and nothing upstream fixes it. The canonical tag
+    // (`winSparkleLanguage`) stays as it is for everything else.
+    if (language != null) _api.setLang(language.toLowerCase());
     // Off before init, so WinSparkle never starts its own schedule, nor asks
     // at a second launch whether to.
     _api.setAutomaticCheck(false);
@@ -461,6 +483,9 @@ class FfiSparkleApi implements SparkleApi {
   void setAutomaticCheck(bool on) => _lib.lookupFunction<_IntNative, _IntDart>(
       'win_sparkle_set_automatic_check_for_updates')(on ? 1 : 0);
 
+  @override
+  void setLang(String language) => _utf8('win_sparkle_set_lang', language);
+
   /// WinSparkle calls these from a thread of its own; a listener posts each
   /// to this isolate.
   void _callback(String setter, void Function() onCall) {
@@ -539,64 +564,12 @@ class RegistryUpdateStore implements UpdateStore {
   @override
   String? readSkipped() => _read(kUpdaterRegistryPath, 'SkipThisVersion');
 
-  String? _read(String key, String value) {
-    Pointer<Utf16>? keyPtr;
-    Pointer<Utf16>? valuePtr;
-    Pointer<Uint32>? size;
-    Pointer<Uint16>? data;
-    try {
-      keyPtr = key.toNativeUtf16();
-      valuePtr = value.toNativeUtf16();
-      size = calloc<Uint32>()..value = 512;
-      data = calloc<Uint16>(256);
-      final result = RegGetValue(HKEY_CURRENT_USER, PCWSTR(keyPtr),
-          PCWSTR(valuePtr), RRF_RT_REG_SZ, null, data.cast(), size);
-      if (result != ERROR_SUCCESS) return null;
-      return data.cast<Utf16>().toDartString().trim();
-    } catch (_) {
-      return null;
-    } finally {
-      if (data != null) calloc.free(data);
-      if (size != null) calloc.free(size);
-      if (valuePtr != null) calloc.free(valuePtr);
-      if (keyPtr != null) calloc.free(keyPtr);
-    }
-  }
+  String? _read(String key, String value) => readUserString(key, value);
 
-  void _write(String value, String text) {
-    Pointer<Utf16>? keyPtr;
-    Pointer<Utf16>? valuePtr;
-    Pointer<Utf16>? dataPtr;
-    try {
-      keyPtr = kUpdateSettingsPath.toNativeUtf16();
-      valuePtr = value.toNativeUtf16();
-      dataPtr = text.toNativeUtf16();
-      // REG_SZ counts its bytes with the terminator.
-      RegSetKeyValue(HKEY_CURRENT_USER, PCWSTR(keyPtr), PCWSTR(valuePtr),
-          REG_SZ, dataPtr, (text.length + 1) * 2);
-    } catch (_) {
-      // Unwritten: read back as it was.
-    } finally {
-      if (dataPtr != null) calloc.free(dataPtr);
-      if (valuePtr != null) calloc.free(valuePtr);
-      if (keyPtr != null) calloc.free(keyPtr);
-    }
-  }
+  void _write(String value, String text) =>
+      writeUserString(kUpdateSettingsPath, value, text);
 
-  void _delete(String value) {
-    Pointer<Utf16>? keyPtr;
-    Pointer<Utf16>? valuePtr;
-    try {
-      keyPtr = kUpdateSettingsPath.toNativeUtf16();
-      valuePtr = value.toNativeUtf16();
-      RegDeleteKeyValue(HKEY_CURRENT_USER, PCWSTR(keyPtr), PCWSTR(valuePtr));
-    } catch (_) {
-      // Left: read back as it was.
-    } finally {
-      if (valuePtr != null) calloc.free(valuePtr);
-      if (keyPtr != null) calloc.free(keyPtr);
-    }
-  }
+  void _delete(String value) => deleteUserValue(kUpdateSettingsPath, value);
 }
 
 /// [FeedFetch] over WinINet, the HTTP stack WinSparkle itself uses, so the

@@ -1,3 +1,5 @@
+import 'dart:ui' show Locale;
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/channel.dart';
@@ -259,5 +261,122 @@ void main() {
             .applyOverlayCommit(1, const WinRect(0, 0, 10, 10)),
         isFalse);
     expect(calls, isEmpty);
+  });
+
+  group('language', () {
+    test('the system languages are the OS tags, in the OS order', () async {
+      final calls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        return <Object>['zh-Hant-TW', 'en-US'];
+      });
+      final locales = await const MacosWindowController().systemLocales();
+      expect(calls.single.method, kSystemLanguages);
+      expect(calls.single.arguments, isNull);
+      expect(locales, [
+        Locale.fromSubtags(
+            languageCode: 'zh', scriptCode: 'Hant', countryCode: 'TW'),
+        Locale.fromSubtags(languageCode: 'en', countryCode: 'US'),
+      ]);
+    });
+
+    test('a system languages reply of the wrong shape never throws', () async {
+      final cases = <Object?, List<Locale>>{
+        'zh-Hans': const [],
+        null: const [],
+        <Object?>['en', 3, '']: const [Locale('en')],
+        <Object?>[]: const [],
+      };
+      for (final entry in cases.entries) {
+        messenger.setMockMethodCallHandler(
+            channel, (call) async => entry.key);
+        expect(await const MacosWindowController().systemLocales(),
+            entry.value,
+            reason: '${entry.key}');
+      }
+    });
+
+    test('a failed system languages read is an empty list', () async {
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        throw PlatformException(code: 'languages');
+      });
+      expect(await const MacosWindowController().systemLocales(), isEmpty);
+      // No handler at all: a Dart side newer than its native side.
+      messenger.setMockMethodCallHandler(channel, null);
+      expect(await const MacosWindowController().systemLocales(), isEmpty);
+    });
+
+    test('the stored choice is the whole tag, region kept', () async {
+      final calls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        return 'zh-Hant-HK';
+      });
+      expect(await const MacosWindowController().languageOverride(),
+          'zh-Hant-HK');
+      expect(calls.single.method, kLanguageOverride);
+      expect(calls.single.arguments, isNull);
+    });
+
+    test('no stored choice is null', () async {
+      messenger.setMockMethodCallHandler(channel, (call) async => null);
+      expect(await const MacosWindowController().languageOverride(), isNull);
+    });
+
+    test('a stored choice reply of the wrong shape is null, never a throw',
+        () async {
+      for (final reply in <Object?>[
+        <Object?>['zh-Hans'],
+        3,
+        '',
+      ]) {
+        messenger.setMockMethodCallHandler(channel, (call) async => reply);
+        expect(await const MacosWindowController().languageOverride(), isNull,
+            reason: '$reply');
+      }
+    });
+
+    test('a failed stored choice read is null', () async {
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        throw PlatformException(code: 'languages');
+      });
+      expect(await const MacosWindowController().languageOverride(), isNull);
+      messenger.setMockMethodCallHandler(channel, null);
+      expect(await const MacosWindowController().languageOverride(), isNull);
+    });
+
+    test('setting the choice sends the tag, or null for System', () async {
+      final calls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        return null;
+      });
+      await const MacosWindowController().setLanguageOverride('zh-Hans');
+      await const MacosWindowController().setLanguageOverride(null);
+      expect(calls.map((c) => c.method),
+          [kSetLanguageOverride, kSetLanguageOverride]);
+      expect(calls.map((c) => c.arguments), ['zh-Hans', null]);
+    });
+  });
+
+  test('the grid reaches Swift with the language the overlay is to speak',
+      () async {
+    final calls = <MethodCall>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      return null;
+    });
+    await const MacosWindowController().setOverlayGrid(
+        cols: 6, rows: 4, gap: 8, saveHint: false, locale: 'zh-Hant');
+    expect(calls.map((c) => c.method), [kSetOverlayGrid]);
+    // Swift ignores the key until the overlay reads it; it must still arrive
+    // beside the grid, which is what the overlay's engine is told by.
+    expect(calls.single.arguments, {
+      'cols': 6,
+      'rows': 4,
+      'gap': 8.0,
+      'saveHint': false,
+      'locale': 'zh-Hant',
+    });
   });
 }

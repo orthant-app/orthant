@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show PhysicalKeyboardKey;
 
 import '../core/key_words.dart';
+import '../l10n/app_localizations.dart';
+import '../l10n/strings.dart';
 import '../settings/keycap.dart';
 import '../settings/first_frame_report.dart';
 import '../settings/mac_control.dart';
@@ -73,14 +75,12 @@ class ReadyScreen extends StatelessWidget {
 
   /// One chord's keycaps, preceded by a warning when the OS will not deliver
   /// them.
-  Widget _chord(PlatformTokens t, Binding b,
-          {String unsetLabel = 'Not set'}) =>
+  Widget _chord(PlatformTokens t, AppLocalizations l, Binding b,
+          {required String unsetLabel}) =>
       Row(mainAxisSize: MainAxisSize.min, children: [
         if (b.isBound && unavailable.contains(b.command)) ...[
           Tooltip(
-            message: '${KeyWords.current.system} or another app already uses '
-                'this combination, so it never reaches Orthant.\n'
-                'Pick a different one below.',
+            message: l.readyUnavailableTooltip(KeyWords.current.system),
             child: Icon(Icons.warning_amber_rounded, size: 14, color: t.warning),
           ),
           const SizedBox(width: 5),
@@ -91,6 +91,7 @@ class ReadyScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final l = context.l10n;
     final summon = _bindingFor(const BuiltIn(ShortcutCommand.showGrid));
     final left = _bindingFor(const BuiltIn(ShortcutCommand.leftHalf));
     final right = _bindingFor(const BuiltIn(ShortcutCommand.rightHalf));
@@ -104,7 +105,7 @@ class ReadyScreen extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            'Orthant is ready',
+            l.readyTitle,
             style: TextStyle(
               fontSize: 19,
               fontWeight: FontWeight.w600,
@@ -114,7 +115,7 @@ class ReadyScreen extends StatelessWidget {
           ),
           const SizedBox(height: 5),
           Text(
-            'Two ways to put a window where you want it.',
+            l.readySubtitle,
             style: TextStyle(fontSize: 12.5, color: t.labelSecondary),
           ),
           const SizedBox(height: 24),
@@ -135,18 +136,18 @@ class ReadyScreen extends StatelessWidget {
                           child: Center(child: RegionGlyph(command: null)),
                         ),
                         chords: [
-                          _chord(t, summon, unsetLabel: 'No shortcut set'),
+                          _chord(t, l, summon,
+                              unsetLabel: l.readyNoShortcutSet),
                         ],
                         // The arrows are named here because this card is
                         // the only place the grid is ever explained, and a
                         // keyboard feature nobody is told about is one
                         // nobody finds — least of all on a grid that
                         // arrives under the pointer.
-                        caption:
-                            'Opens the grid. Drag across it to pick any '
-                            'block: thirds, two-thirds, anything. Or use '
-                            'the arrow keys, ${KeyWords.current.shiftName} '
-                            'to extend, ${keySymbol(_enter)} to place.',
+                        // Enter is in both tables, so the fallback names a key
+                        // legend that is English in every language anyway.
+                        caption: l.readyGridCaption(KeyWords.current.shiftName,
+                            keySymbol(_enter) ?? 'Enter'),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -174,16 +175,16 @@ class ReadyScreen extends StatelessWidget {
                             ),
                           ),
                         ),
-                        chords: [_chord(t, left), _chord(t, right)],
+                        chords: [
+                          _chord(t, l, left, unsetLabel: l.shortcutNotSet),
+                          _chord(t, l, right, unsetLabel: l.shortcutNotSet),
+                        ],
                         // The last clause is the only place anything tells
                         // a new user that the eleven defaults are not the
                         // whole vocabulary. A feature nobody is told about
                         // is one nobody finds — the same hole the grid
                         // itself fell into before this screen existed.
-                        caption:
-                            'Snaps straight to a half, a quarter, or full '
-                            'screen. No aiming, and you can add shapes of '
-                            'your own, like the third one.',
+                        caption: l.readyDirectCaption,
                       ),
                     ),
                   ],
@@ -200,7 +201,7 @@ class ReadyScreen extends StatelessWidget {
                 focusRingRadius: 4,
                 inset: 2,
                 child: Text(
-                  'Change these shortcuts…',
+                  l.readyChangeShortcuts,
                   style: TextStyle(fontSize: 12.5, color: t.link),
                 ),
               ),
@@ -221,7 +222,7 @@ class ReadyScreen extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                child: const Text('Done'),
+                child: Text(l.readyDone),
               ),
             ],
           ),

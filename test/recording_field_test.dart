@@ -1,6 +1,8 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:orthant/l10n/app_localizations.dart';
 import 'package:orthant/settings/key_capture.dart';
 import 'package:orthant/settings/platform_theme.dart';
 import 'package:orthant/settings/recording_field.dart';
@@ -8,6 +10,9 @@ import 'package:orthant/shortcuts/bindings.dart';
 import 'package:orthant/core/key_chord.dart';
 
 import 'support/carbon_terms.dart';
+import 'support/locales.dart';
+import 'support/localized_host.dart';
+import 'support/no_english.dart';
 
 void main() {
   Future<List<KeyChord>> pump(
@@ -37,6 +42,24 @@ void main() {
   testWidgets('says nothing is held until something is', (tester) async {
     await pump(tester);
     expect(find.text('Press keys…'), findsOneWidget);
+  });
+
+  testWidgets('and says so in the language of the app', (tester) async {
+    for (final (locale, prompt) in [
+      (kSimplified, '按下按键…'),
+      (kTraditional, '按下按鍵⋯'),
+      (kHongKong, '按下按鍵⋯'),
+    ]) {
+      await tester.pumpWidget(localizedApp(
+        locale,
+        Center(
+          child: RecordingField(onCombo: (_) {}, onCancel: () {}),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text(prompt), findsOneWidget);
+      expectNoEnglish(tester);
+    }
   });
 
   testWidgets('draws the modifiers as they are held', (tester) async {
@@ -295,5 +318,108 @@ void main() {
         reason: 'the row carrying the question looks like every other row');
     expect(fill(),
         orthantTheme(Brightness.light).extension<PlatformTokens>()!.warning);
+  });
+
+  group('a refused key, in the language of the app', () {
+    // The two sentences a Windows user hears when a key cannot be part of a
+    // shortcut, read by the recorder in the Shortcuts list and in the region
+    // picker alike. They are messages like any other: English is exactly what
+    // 1.1.x said, and Chinese is a whole sentence of its own.
+    final windows = TargetPlatformVariant.only(TargetPlatform.windows);
+
+    KeyDownEvent iso() => KeyDownEvent(
+        physicalKey: PhysicalKeyboardKey.intlBackslash,
+        logicalKey: LogicalKeyboardKey.intlBackslash,
+        timeStamp: Duration.zero);
+    KeyDownEvent keypad() => KeyDownEvent(
+        physicalKey: PhysicalKeyboardKey.numpad1,
+        logicalKey: LogicalKeyboardKey.numpad1,
+        timeStamp: Duration.zero);
+
+    test('English is word for word what it was', () {
+      expect(keypadRefusal,
+          "Windows can't use the keypad's digits, decimal point or = in a "
+          'shortcut.');
+      expect(unregistrableRefusal, "Windows can't use that key in a shortcut.");
+    });
+
+    testWidgets('refusalFor takes the language it is asked for',
+        (tester) async {
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      final zh = lookupAppLocalizations(kSimplified);
+      final hant = lookupAppLocalizations(kTraditional);
+      expect(refusalFor(keypad(), zh),
+          'Windows 无法在快捷键中使用小键盘的数字、小数点或 =。');
+      expect(refusalFor(iso(), zh), 'Windows 无法在快捷键中使用该按键。');
+      expect(refusalFor(keypad(), hant),
+          'Windows 無法在快速鍵中使用數字鍵盤的數字、小數點或 =。');
+      expect(refusalFor(iso(), hant), 'Windows 無法在快速鍵中使用該按鍵。');
+      // Hong Kong's word for a shortcut is 快捷鍵.
+      final hk = lookupAppLocalizations(kHongKong);
+      expect(refusalFor(keypad(), hk),
+          'Windows 無法在快捷鍵中使用數字鍵盤的數字、小數點或 =。');
+      expect(refusalFor(iso(), hk), 'Windows 無法在快捷鍵中使用該按鍵。');
+      expect(refusalFor(keypad()), keypadRefusal,
+          reason: 'with no language given it is the app\'s own, English here');
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    }, variant: windows);
+
+    for (final locale in [kSimplified, kTraditional, kHongKong]) {
+      testWidgets('the recorder says it in ${locale.toLanguageTag()}, and '
+          'speaks it', (tester) async {
+        final spoken = <String>[];
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+        messenger.setMockDecodedMessageHandler<dynamic>(
+            SystemChannels.accessibility, (message) async {
+          final m = message as Map;
+          if (m['type'] == 'announce') {
+            spoken.add((m['data'] as Map)['message'] as String);
+          }
+          return null;
+        });
+        addTearDown(() => messenger.setMockDecodedMessageHandler<dynamic>(
+            SystemChannels.accessibility, null));
+
+        final refusals = <String>[];
+        // No `setAppStrings`: the recorder reads the language from the tree,
+        // as every other widget does, not from the global the tray uses.
+        await tester.pumpWidget(localizedApp(
+          locale,
+          Center(
+            child: RecordingField(
+              onCombo: (_) {},
+              onCancel: () {},
+              onRefused: refusals.add,
+            ),
+          ),
+        ));
+        await tester.pumpAndSettle();
+
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.sendKeyEvent(LogicalKeyboardKey.numpad1);
+        // The simulator has no Windows key code for the ISO key, so it is sent
+        // as another platform's key press; the refusal depends only on the
+        // key's two identities and on the platform the app is running as.
+        await tester.sendKeyEvent(LogicalKeyboardKey.intlBackslash,
+            platform: 'macos', physicalKey: PhysicalKeyboardKey.intlBackslash);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+        await tester.pumpAndSettle();
+
+        final zh = locale == kSimplified;
+        final shortcut = locale == kHongKong ? '快捷鍵' : '快速鍵';
+        final expected = [
+          zh
+              ? 'Windows 无法在快捷键中使用小键盘的数字、小数点或 =。'
+              : 'Windows 無法在$shortcut中使用數字鍵盤的數字、小數點或 =。',
+          zh
+              ? 'Windows 无法在快捷键中使用该按键。'
+              : 'Windows 無法在$shortcut中使用該按鍵。',
+        ];
+        expect(refusals, expected);
+        expect(spoken, expected);
+        expectNoEnglishIn(refusals);
+      }, variant: windows);
+    }
   });
 }

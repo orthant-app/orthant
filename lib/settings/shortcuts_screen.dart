@@ -3,8 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../core/key_chord.dart';
 import '../core/key_words.dart';
+import '../l10n/app_localizations.dart';
+import '../l10n/strings.dart';
 import '../overlay/overlay_copy.dart';
 import '../shortcuts/bindings.dart';
+import '../shortcuts/command_labels.dart';
 import '../shortcuts/command_ref.dart';
 import '../shortcuts/custom_region.dart';
 import '../shortcuts/region_commands.dart';
@@ -17,19 +20,10 @@ import 'recording_field.dart';
 import 'region_glyph.dart';
 import 'region_picker_sheet.dart';
 
-const Map<ShortcutCommand, String> kCommandLabels = {
-  ShortcutCommand.showGrid: 'Open grid',
-  ShortcutCommand.leftHalf: 'Left half',
-  ShortcutCommand.rightHalf: 'Right half',
-  ShortcutCommand.topHalf: 'Top half',
-  ShortcutCommand.bottomHalf: 'Bottom half',
-  ShortcutCommand.topLeft: 'Top-left quarter',
-  ShortcutCommand.topRight: 'Top-right quarter',
-  ShortcutCommand.bottomLeft: 'Bottom-left quarter',
-  ShortcutCommand.bottomRight: 'Bottom-right quarter',
-  ShortcutCommand.maximize: 'Maximize',
-  ShortcutCommand.center: 'Center',
-};
+// The commands' names are `commandLabel`'s, in `command_labels.dart`. The
+// English table is re-exported for the site's documentation test, which holds
+// the docs to the app's own words.
+export '../shortcuts/command_labels.dart' show kCommandLabels;
 
 /// The MVP rebind picker, styled as a macOS preferences pane.
 ///
@@ -209,18 +203,12 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   /// because the two move independently.
   CommandRef? _readerOn;
 
-  /// The row's title.
-  ///
-  /// Custom regions resolve through the region list in M9 Task 11; every ref
-  /// reaching here today is a [BuiltIn].
-  String _labelFor(CommandRef ref) => switch (ref) {
-        BuiltIn(:final command) => kCommandLabels[command]!,
-        // Falls back rather than throwing: the loader drops a binding whose
-        // region did not survive, so a nameless row should be unreachable —
-        // and a build-time throw in Release is a featureless grey box, which
-        // is how the last one of these presented.
-        Custom(:final id) => _regionFor(id)?.name ?? 'Custom region',
-      };
+  /// The strings for the language this pane is shown in.
+  AppLocalizations get _l => context.l10n;
+
+  /// What [ref] is called, in the language of the app: the row's title, and
+  /// the name in every notice and screen-reader label that mentions the row.
+  String _labelFor(CommandRef ref) => commandLabel(ref, widget.regions, _l);
 
   CustomRegion? _regionFor(String id) {
     for (final r in widget.regions) {
@@ -453,9 +441,11 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
     if (displaced != null && !_isRepeatOf(cmd, combo)) {
       setState(() => _pending = (row: cmd, chord: combo, owner: displaced));
       _notify(
-        '${formatCombo(combo, keyLabels: KeyboardLabels.of(context))} is used by '
-        '${_labelFor(displaced)}. Press it again to use it here.',
-        actionLabel: 'Use it here',
+        _l.shortcutsCollision(
+          formatCombo(combo, keyLabels: KeyboardLabels.of(context)),
+          _labelFor(displaced),
+        ),
+        actionLabel: _l.shortcutsUseHere,
         // Two ways in, and not for redundancy: [RecordingField] answers every
         // key with `handled`, so Tab cannot walk out to this button. A
         // mouse-only affordance would be a keyboard dead end in the pane whose
@@ -550,9 +540,11 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
     _flashRow(displaced);
     final restore = widget.onRestoreBindings;
     _notify(
-      '${_labelFor(displaced)} lost '
-      '${formatCombo(combo, keyLabels: KeyboardLabels.of(context))}.',
-      actionLabel: restore == null ? null : 'Undo',
+      _l.shortcutsDisplaced(
+        _labelFor(displaced),
+        formatCombo(combo, keyLabels: KeyboardLabels.of(context)),
+      ),
+      actionLabel: restore == null ? null : _l.shortcutsUndo,
       action: restore == null ? null : () => restore(before),
     );
   }
@@ -560,6 +552,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final l = context.l10n;
     return Scaffold(
       backgroundColor: t.windowBackground,
       body: Column(
@@ -577,7 +570,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _sectionHeader('Built-in', t),
+                    _sectionHeader(l.shortcutsGroupBuiltIn, t),
                     // The row set comes from what *exists* — eleven commands
                     // and N regions — never from what the preferences file
                     // happens to contain. Driving it from `bindings` renders
@@ -595,7 +588,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
                     ]),
                     if (_showRegions) ...[
                       const SizedBox(height: 15),
-                      _sectionHeader('Your regions', t),
+                      _sectionHeader(l.shortcutsGroupRegions, t),
                       _regionsHint(t),
                       _group(t, [
                         for (final region in widget.regions)
@@ -663,8 +656,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   Widget _regionsHint(PlatformTokens t) => Padding(
     padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
     child: Text(
-      "Bind a shape the built-ins don't cover. Draw it here, or select it "
-      'in the grid and press ${OverlayCopy.current.save}.',
+      _l.shortcutsRegionsHint(OverlayCopy.current.save),
       style: TextStyle(fontSize: 11, color: t.labelTertiary),
     ),
   );
@@ -775,7 +767,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Shortcuts',
+          _l.shortcutsTitle,
           style: TextStyle(
             fontSize: 19,
             fontWeight: FontWeight.w600,
@@ -790,8 +782,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
           // cursor happens to rest. This line said "the active display" for
           // four milestones, which described the overlay and contradicted the
           // shortcuts it sits above.
-          'Open the grid, or snap the frontmost window straight to a '
-          'region of its own display.',
+          _l.shortcutsSubtitle,
           style: TextStyle(fontSize: 12, color: t.labelSecondary),
         ),
       ],
@@ -833,12 +824,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
             child: Text.rich(
               TextSpan(
                 children: [
-                  const TextSpan(
-                    text:
-                        'None of these will fire until Orthant has '
-                        'Accessibility permission. You can still change '
-                        'them.  ',
-                  ),
+                  TextSpan(text: '${_l.shortcutsNotGranted}  '),
                   // A WidgetSpan so the link wraps with the sentence rather
                   // than claiming a line of its own.
                   WidgetSpan(
@@ -849,7 +835,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
                       focusRingRadius: 4,
                       inset: 2,
                       child: Text(
-                        'Open Accessibility Settings…',
+                        _l.generalOpenAccessibilitySettings,
                         style: TextStyle(
                           fontSize: 11.5,
                           height: 1.4,
@@ -901,10 +887,8 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
             child: Text(
               _notice?.message ??
                   (_recording != null
-                      ? 'Listening… press a combination, or '
-                            '${KeyWords.current.escape} to cancel.'
-                      : 'Click a shortcut to change it. Combinations need '
-                            '${KeyWords.current.anyModifier}.'),
+                      ? _l.shortcutsListening(KeyWords.current.escape)
+                      : _l.shortcutsHint(KeyWords.current.anyModifier)),
               // Two lines at most, so a long message cannot change the pane's
               // height — this window measures its content to size itself, and a
               // line that grows and collapses drives exactly the resize loop that
@@ -973,8 +957,8 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
     final restore = widget.onRegionSaved;
     widget.onRegionDeleted?.call(region.id);
     _notify(
-      '${region.name} deleted.',
-      actionLabel: restore == null ? null : 'Undo',
+      _l.shortcutsRegionDeleted(regionDisplayName(region, _l)),
+      actionLabel: restore == null ? null : _l.shortcutsUndo,
       action: restore == null
           ? null
           : () => restore((region: region, chord: binding?.chord)),
@@ -1000,8 +984,8 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
     final restore = widget.onRestoreBindings;
     widget.onResetBindings!();
     _notify(
-      'All shortcuts reset to their defaults.',
-      actionLabel: restore == null ? null : 'Undo',
+      _l.shortcutsResetDone,
+      actionLabel: restore == null ? null : _l.shortcutsUndo,
       action: restore == null ? null : () => restore(before),
     );
   }
@@ -1013,7 +997,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   Widget _addRegionRow(PlatformTokens t) => MacControl(
         key: const ValueKey('add-region'),
         onPressed: () => _openPicker(null),
-        semanticLabel: 'Add region',
+        semanticLabel: _l.shortcutsAddRegionLabel,
         focusRingRadius: 4,
         inset: 0,
         child: Container(
@@ -1028,7 +1012,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
               const SizedBox(width: 12),
               ExcludeSemantics(
                 child: Text(
-                  'Add region…',
+                  _l.shortcutsAddRegion,
                   style: TextStyle(fontSize: 13, color: t.link),
                 ),
               ),
@@ -1256,7 +1240,10 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
   }
 
   Widget _row(CommandRef cmd, PlatformTokens t) {
+    final l = context.l10n;
     final binding = _bindingFor(cmd);
+    final name = _labelFor(cmd);
+    final keyLabels = KeyboardLabels.of(context);
     final custom = _customOf(cmd);
     final isRecording = _recording == cmd;
     // Focus counts as hover for the clear affordance.
@@ -1281,15 +1268,29 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
         // pressing an occupied combination would otherwise get silence and no
         // way forward but esc — the six-interaction dead end this whole change
         // exists to remove, restored for exactly one class of user.
+        //
+        // Each state is one whole message: nothing is joined from pieces, so a
+        // language can order the command, the combination and the owner as it
+        // needs.
         semanticLabel: switch ((isRecording, _pending)) {
-          (true, final p?) when p.row == cmd =>
-            '${_labelFor(cmd)}, ${formatCombo(p.chord, keyLabels: KeyboardLabels.of(context))} is '
-                'used by ${_labelFor(p.owner)}. '
-                'Press it again to use it here, or escape to cancel.',
-          (true, _) => '${_labelFor(cmd)}, listening for a combination',
-          _ =>
-            '${_labelFor(cmd)}, ${binding.isBound ? formatCombo(binding.chord!, keyLabels: KeyboardLabels.of(context)) : "no shortcut"}'
-                '${widget.unavailable.contains(cmd) ? ", unavailable" : ""}',
+          (true, final p?) when p.row == cmd => l.shortcutRowCollision(
+            name,
+            formatCombo(p.chord, keyLabels: keyLabels),
+            _labelFor(p.owner),
+          ),
+          (true, _) => l.shortcutRowListening(name),
+          // A refused combination is only ever worth saying on a row that has
+          // one: the icon that shows it is drawn for bound rows alone.
+          _ when binding.isBound && widget.unavailable.contains(cmd) =>
+            l.shortcutRowUnavailable(
+              name,
+              formatCombo(binding.chord!, keyLabels: keyLabels),
+            ),
+          _ when binding.isBound => l.shortcutRowBound(
+            name,
+            formatCombo(binding.chord!, keyLabels: keyLabels),
+          ),
+          _ => l.shortcutRowUnbound(name),
         },
         // The clear button lives inside this row and must stay reachable; the
         // decorative halves below exclude themselves instead.
@@ -1331,7 +1332,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
                 child: custom == null
                     ? ExcludeSemantics(
                         child: Text(
-                          _labelFor(cmd),
+                          name,
                           style: TextStyle(fontSize: 13, color: t.labelPrimary),
                         ),
                       )
@@ -1345,7 +1346,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
                         child: MacControl(
                           key: ValueKey('edit-${cmd.jsonName}'),
                           onPressed: () => _openPicker(custom),
-                          semanticLabel: 'Edit ${custom.name}',
+                          semanticLabel: l.shortcutsEditRegion(name),
                           focusRingRadius: 4,
                           inset: 2,
                           child: Row(
@@ -1357,7 +1358,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
                               const SizedBox(width: 12),
                               Flexible(
                                 child: Text(
-                                  _labelFor(cmd),
+                                  name,
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: t.labelPrimary,
@@ -1412,11 +1413,9 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
                   Padding(
                     padding: const EdgeInsets.only(right: 5),
                     child: Tooltip(
-                      message:
-                          '${KeyWords.current.system} or another app already '
-                          'uses this combination, so it never reaches '
-                          'Orthant.\n'
-                          'Click the shortcut to pick a different one.',
+                      message: l.shortcutsUnavailableTooltip(
+                        KeyWords.current.system,
+                      ),
                       // The row's label already ends in ", unavailable"; the
                       // icon is how the same thing is said to a sighted user.
                       excludeFromSemantics: true,
@@ -1441,7 +1440,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
                   child: binding.isBound
                       ? KeycapRow(chord: binding.chord)
                       : SetShortcutPill(
-                          label: 'Click to set',
+                          label: l.shortcutsClickToSet,
                           hovered: isHovered,
                         ),
                 ),
@@ -1478,7 +1477,7 @@ class _ShortcutsScreenState extends State<ShortcutsScreen> {
                           maintainInteractivity: true,
                           child: _ClearButton(
                             tokens: t,
-                            command: _labelFor(cmd),
+                            command: name,
                             // Ends a recording first, like every other control
                             // in this pane that re-registers the hotkey set.
                             // Hover reveals this button on *any* row, so it is
@@ -1543,12 +1542,12 @@ class _ClearButton extends StatelessWidget {
     return Align(
       alignment: Alignment.centerRight,
       child: Tooltip(
-        message: 'Remove shortcut',
+        message: context.l10n.shortcutsRemove,
         waitDuration: const Duration(milliseconds: 500),
         excludeFromSemantics: true, // MacControl announces it
         child: MacControl(
           onPressed: onPressed,
-          semanticLabel: 'Remove $command shortcut',
+          semanticLabel: context.l10n.shortcutsRemoveLabel(command),
           focusRingRadius: 8,
           inset: 1,
           child: Icon(Icons.cancel, size: 15, color: tokens.labelTertiary),
@@ -1578,7 +1577,7 @@ class _ResetButton extends StatelessWidget {
           border: Border.all(color: tokens.keycapBorder),
         ),
         child: Text(
-          'Reset Shortcuts',
+          context.l10n.shortcutsReset,
           style: TextStyle(fontSize: 12.5, color: tokens.labelPrimary),
         ),
       ),

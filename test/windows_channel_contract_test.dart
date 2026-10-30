@@ -68,6 +68,92 @@ List<({int id, int modifiers, int vk})> _grabTable(String cpp) {
 /// `MissingPluginException`, and several callers neither await nor catch: W0's
 /// plan missed `configFirstFrame` exactly this way, and only review caught it.
 /// This test is that sweep, run on every change.
+/// SHA-256 of [bytes], as lowercase hex. The suite has no crypto package and
+/// this is all it needs of one, so it is written out; [main] pins it to two
+/// known answers before it is trusted with a vendored file.
+String _sha256(List<int> bytes) {
+  const k = <int>[
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1,
+    0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+    0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786,
+    0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147,
+    0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+    0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+    0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a,
+    0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+    0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+  ];
+  const mask = 0xffffffff;
+  int rotr(int x, int n) => ((x >> n) | (x << (32 - n))) & mask;
+  var h = <int>[
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+  ];
+  final padded = <int>[...bytes, 0x80];
+  while (padded.length % 64 != 56) {
+    padded.add(0);
+  }
+  final bits = bytes.length * 8;
+  for (var i = 7; i >= 0; i--) {
+    padded.add((bits >> (i * 8)) & 0xff);
+  }
+  for (var o = 0; o < padded.length; o += 64) {
+    final w = List<int>.filled(64, 0);
+    for (var t = 0; t < 16; t++) {
+      w[t] = (padded[o + 4 * t] << 24) |
+          (padded[o + 4 * t + 1] << 16) |
+          (padded[o + 4 * t + 2] << 8) |
+          padded[o + 4 * t + 3];
+    }
+    for (var t = 16; t < 64; t++) {
+      final s0 = rotr(w[t - 15], 7) ^ rotr(w[t - 15], 18) ^ (w[t - 15] >> 3);
+      final s1 = rotr(w[t - 2], 17) ^ rotr(w[t - 2], 19) ^ (w[t - 2] >> 10);
+      w[t] = (w[t - 16] + s0 + w[t - 7] + s1) & mask;
+    }
+    var [a, b, c, d, e, f, g, hh] = h;
+    for (var t = 0; t < 64; t++) {
+      final big1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+      final ch = (e & f) ^ (~e & mask & g);
+      final t1 = (hh + big1 + ch + k[t] + w[t]) & mask;
+      final big0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+      final maj = (a & b) ^ (a & c) ^ (b & c);
+      final t2 = (big0 + maj) & mask;
+      hh = g;
+      g = f;
+      f = e;
+      e = (d + t1) & mask;
+      d = c;
+      c = b;
+      b = a;
+      a = (t1 + t2) & mask;
+    }
+    final next = [a, b, c, d, e, f, g, hh];
+    h = [for (var i = 0; i < 8; i++) (h[i] + next[i]) & mask];
+  }
+  return h.map((x) => x.toRadixString(16).padLeft(8, '0')).join();
+}
+
+/// The lines of one section of an Inno Setup script: its name without the
+/// brackets, then the lines under it with comments and blanks dropped. A
+/// directive in a comment is no directive, so no check may see one.
+Map<String, List<String>> _sections(String iss) {
+  final sections = <String, List<String>>{};
+  var current = '';
+  for (final raw in iss.split('\n')) {
+    final line = raw.replaceAll('\uFEFF', '').trim();
+    if (line.isEmpty || line.startsWith(';') || line.startsWith('//')) continue;
+    final header = RegExp(r'^\[(\w+)\]$').firstMatch(line);
+    if (header != null) {
+      current = header.group(1)!;
+      continue;
+    }
+    sections.putIfAbsent(current, () => []).add(line);
+  }
+  return sections;
+}
+
 void main() {
   final constants = <String, String>{
     for (final m in _constant
@@ -314,7 +400,8 @@ void main() {
 
   test("every key the Windows controller and the overlay write, the runner "
       'reads', () {
-    expect(keys(writeKey, windowsSources).difference(runnerReads), isEmpty,
+    expect(
+        keys(writeKey, windowsSources).difference(runnerReads), isEmpty,
         reason: 'Dart sends these and the runner ignores them');
   });
 
@@ -372,6 +459,32 @@ void main() {
     };
     expect(sends, hasLength(5));
     expect(reads, sends);
+  });
+
+  // The app's language is resolved once, in the main engine, and reaches each
+  // panel's own engine only inside the summon: Dart hands it to the runner
+  // with the grid's settings and the runner puts it in every payload. A seam
+  // that dropped it would leave the grid English for a Chinese reader, and no
+  // Dart test would notice.
+  test('the language crosses the runner: setOverlayGrid reads it and every '
+      'summon carries it', () {
+    expect(
+        RegExp(r'Field\([^;]*?,\s*"locale"\)').hasMatch(
+            span(cpp, 'method == "setOverlayGrid"', '} else if (method ==')),
+        isTrue,
+        reason: 'window_channel.cpp does not read setOverlayGrid\'s locale');
+    expect(
+        span(overlayCpp, 'flutter::EncodableMap WindowsOverlaySet::SummonPayload(',
+            '\n}\n'),
+        contains('EncodableValue("locale")'));
+  });
+
+  test('on macOS the same: the channel reads the locale and the summon '
+      'payload carries it', () {
+    expect(File('macos/Runner/MainFlutterWindow.swift').readAsStringSync(),
+        contains('a["locale"]'));
+    expect(File('macos/Runner/OverlayPanelSet.swift').readAsStringSync(),
+        contains('"locale":'));
   });
 
   test('Dart\'s shortcut ids end just below the runner\'s first grab id', () {
@@ -436,5 +549,176 @@ void main() {
     expect(chords, hasLength(grabs.length),
         reason: 'the table must hold each chord once');
     expect(chords, {for (final g in windowsOverlayGrabs) (g.modifiers, g.vk)});
+  });
+  // The installer speaks English, Simplified and Traditional Chinese by
+  // Windows' display language (spec, "The installer"). Inno Setup 6.7.1 has no
+  // official Chinese, so the two translations are vendored; and Orthant's own
+  // texts live in [CustomMessages], one definition per language, because a
+  // literal in the script would be English for everyone.
+  group('the installer\'s languages', () {
+    const dir = 'windows/installer';
+    const languages = ['english', 'chinesesimplified', 'chinesetraditional'];
+
+    String read(String path) =>
+        File(path).readAsStringSync().replaceAll('\r\n', '\n');
+    final iss = read('$dir/orthant.iss');
+    final sections = _sections(iss);
+
+    test('the SHA-256 written here agrees with two known answers', () {
+      expect(_sha256(const []),
+          'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+      expect(_sha256('abc'.codeUnits),
+          'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+      // Longer than one block, so the padding and the chaining are both used.
+      expect(
+          _sha256(('abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq')
+              .codeUnits),
+          '248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1');
+    });
+
+    test('Setup picks by the display language and never asks', () {
+      final setup = sections['Setup']!;
+      // ShowLanguageDialog=no: the default would show "Select Language" to
+      // everyone whose Windows is neither English nor Chinese.
+      expect(setup, contains('ShowLanguageDialog=no'));
+      // UsePreviousLanguage=no: its default reuses the language the last
+      // install recorded, which for every existing install is English.
+      expect(setup, contains('UsePreviousLanguage=no'));
+    });
+
+    test('[Languages] names English and the two vendored Chinese files', () {
+      final entries = {
+        for (final line in sections['Languages']!)
+          RegExp(r'Name: "(\w+)"').firstMatch(line)!.group(1)!:
+              RegExp(r'MessagesFile: "([^"]+)"').firstMatch(line)!.group(1)!,
+      };
+      expect(entries, {
+        'english': 'compiler:Default.isl',
+        'chinesesimplified': 'ChineseSimplified.isl',
+        'chinesetraditional': 'ChineseTraditional.isl',
+      });
+      for (final name in ['ChineseSimplified.isl', 'ChineseTraditional.isl']) {
+        expect(File('$dir/$name').existsSync(), isTrue, reason: name);
+      }
+    });
+
+    test('each vendored file is the bytes the script says it is', () {
+      // Recorded beside [Languages]: the file, where it came from, its hash.
+      final recorded = RegExp(
+              r'^; +(\w+\.isl)\n; +(https://\S+)\n; +sha256 ([0-9a-f]{64})$',
+              multiLine: true)
+          .allMatches(iss)
+          .toList();
+      expect([for (final m in recorded) m.group(1)],
+          ['ChineseSimplified.isl', 'ChineseTraditional.isl']);
+      for (final m in recorded) {
+        final name = m.group(1)!;
+        expect(
+            m.group(2),
+            'https://raw.githubusercontent.com/jrsoftware/issrc/is-6_7_1/'
+            'Files/Languages/Unofficial/$name',
+            reason: '$name comes from the tag the release runner compiles with');
+        expect(_sha256(File('$dir/$name').readAsBytesSync()), m.group(3),
+            reason: '$name was changed after it was vendored, or git rewrote '
+                'its line endings');
+      }
+    });
+
+    test('git stores the vendored files as they are', () {
+      // Without this a checkout that converts line endings (a Windows
+      // runner's default) changes the bytes, and the hash above with them.
+      final attributes = File('.gitattributes').readAsStringSync();
+      expect(attributes.split('\n').map((l) => l.trim()),
+          contains('windows/installer/*.isl -text'));
+    });
+
+    test('every custom message is defined for all three languages', () {
+      final defined = <String, Map<String, String>>{};
+      for (final line in sections['CustomMessages']!) {
+        final m = RegExp(r'^(\w+)\.(\w+)=(.+)$').firstMatch(line);
+        expect(m, isNotNull, reason: 'unreadable line: $line');
+        expect(languages, contains(m!.group(1)),
+            reason: 'not a language of [Languages]: $line');
+        final byLanguage = defined.putIfAbsent(m.group(2)!, () => {});
+        expect(byLanguage, isNot(contains(m.group(1))),
+            reason: 'defined twice: $line');
+        byLanguage[m.group(1)!] = m.group(3)!;
+      }
+      expect(defined, isNotEmpty);
+      for (final MapEntry(key: name, value: byLanguage) in defined.entries) {
+        expect(byLanguage.keys.toSet(), languages.toSet(), reason: name);
+        for (final text in byLanguage.values) {
+          expect(text.trim(), isNotEmpty, reason: name);
+          expect(text, isNot(contains('—')),
+              reason: '$name: no em dash, in any language');
+        }
+      }
+      // And every message the script uses is one of them.
+      final used = {
+        for (final m in RegExp(r"CustomMessage\('(\w+)'\)").allMatches(iss))
+          m.group(1)!,
+        for (final m in RegExp(r'\{cm:(\w+)').allMatches(iss)) m.group(1)!,
+      };
+      expect(used, isNotEmpty);
+      expect(defined.keys.toSet(), used,
+          reason: 'a message nothing uses, or one used and not defined');
+    });
+
+    test('English is what it was before the installer was translated', () {
+      final english = {
+        for (final line in sections['CustomMessages']!)
+          if (line.startsWith('english.'))
+            line.substring(8, line.indexOf('=')): line.substring(line.indexOf('=') + 1),
+      };
+      expect(english.values.toSet(), {
+        'Launch Orthant',
+        'Orthant is still running. Quit it from its icon in the notification '
+            'area, then run Setup again.',
+        'Orthant could not be updated, and some of its files were already '
+            'replaced, so it was not started again. Run the installer again '
+            'to finish installing it, or download Orthant from orthant.app.',
+        'Orthant could not be updated, and whether its files are still whole '
+            'could not be verified, so it was not started again. Run the '
+            'installer again to finish installing it, or download Orthant '
+            'from orthant.app.',
+        'Orthant is still running. Quit it from its icon in the notification '
+            'area, then uninstall it again.',
+      });
+    });
+
+    test('no text a person reads is an English literal in the script', () {
+      // A message box, the text Setup refuses with (`Result :=` in
+      // PrepareToInstall) and a [Run] description each go through a custom
+      // message. An English word pair inside a string literal on any of those
+      // lines is the regression this guards; a computed answer such as
+      // `Result := Found.Count > 0` carries none.
+      final english = RegExp(r'[A-Za-z]{2,} [A-Za-z]{2,}');
+      final literals = RegExp(r"'(?:[^']|'')*'|" r'"[^"]*"');
+      var checked = 0;
+      for (final MapEntry(key: section, value: lines) in sections.entries) {
+        if (section == 'CustomMessages') continue;
+        for (final line in lines) {
+          if (!(line.contains('MsgBox(') ||
+              line.startsWith('Result :=') ||
+              line.contains('Description:'))) {
+            continue;
+          }
+          checked++;
+          for (final literal in literals.allMatches(line)) {
+            expect(english.hasMatch(literal.group(0)!), isFalse,
+                reason: 'English text in: $line');
+          }
+        }
+      }
+      expect(checked, greaterThanOrEqualTo(5),
+          reason: 'the description and the four message texts were all seen');
+      // And the five are each a custom message: not merely free of English,
+      // which a literal in some other language would also be.
+      expect(
+          RegExp(r"(MsgBox|Result :=)[^\n]*CustomMessage\('").allMatches(iss),
+          hasLength(4));
+      expect(
+          RegExp(r'Description: "\{cm:\w+\}"').allMatches(iss), hasLength(1));
+    });
   });
 }

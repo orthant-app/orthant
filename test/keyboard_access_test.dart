@@ -6,14 +6,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/grid_config.dart';
 import 'package:orthant/core/window_controller.dart';
+import 'package:orthant/l10n/strings.dart';
 import 'package:orthant/settings/platform_theme.dart';
 import 'package:orthant/settings/settings.dart';
 import 'package:orthant/settings/settings_window.dart';
+import 'package:orthant/settings/shortcuts_screen.dart';
 import 'package:orthant/shortcuts/bindings.dart';
 import 'package:orthant/shortcuts/command_ref.dart';
+import 'package:orthant/shortcuts/custom_region.dart';
 import 'package:orthant/shortcuts/shortcut_command.dart';
 
 import 'support/carbon_terms.dart';
+import 'support/locales.dart';
+import 'support/localized_host.dart';
 
 /// The window's controls were bare `GestureDetector`s: unreachable by Tab,
 /// unusable by Space or Return, with no focus ring and nothing for VoiceOver to
@@ -523,5 +528,147 @@ void main() {
       expect(find.bySemanticsLabel('Remove Center shortcut'), findsNothing);
       handle.dispose();
     });
+  });
+
+  group('the Shortcuts rows, read out in the language of the app', () {
+    // A row is one control whose label replaces everything inside it, so each
+    // state's whole sentence is one message: nothing is joined from pieces, and
+    // a language can order the command, the combination and the owner as it
+    // needs. The controls keep their actions in every language, because a label
+    // a screen reader can read is not one it can press.
+    const generated = CustomRegion(
+      id: 'g', name: 'Left ⅔', cols: 3, rows: 1, c0: 0, c1: 1, r0: 0, r1: 0,
+    );
+    const authored = CustomRegion(
+      id: 'a', name: 'Reading pane', cols: 3, rows: 1, c0: 1, c1: 2, r0: 0, r1: 0,
+    );
+
+    for (final (locale, words) in [
+      (
+        kSimplified,
+        (
+          left: '左半屏',
+          right: '右半屏',
+          center: '居中',
+          bound: '左半屏，⌃⌥←',
+          unbound: '居中，未设置快捷键',
+          unavailable: '左半屏，⌃⌥←，不可用',
+          listening: '左半屏，等待输入组合键',
+          collision: '左半屏，⌃⌥→ 已被 右半屏 使用。再按一次即可在此使用，或按 Esc 取消。',
+          remove: '移除 左半屏 的快捷键',
+          editGenerated: '编辑 左侧 ⅔',
+          editAuthored: '编辑 Reading pane',
+          add: '添加区域',
+        ),
+      ),
+      (
+        kTraditional,
+        (
+          left: '左半部',
+          right: '右半部',
+          center: '置中',
+          bound: '左半部，⌃⌥←',
+          unbound: '置中，未設定快速鍵',
+          unavailable: '左半部，⌃⌥←，無法使用',
+          listening: '左半部，等待輸入組合鍵',
+          collision: '左半部，⌃⌥→ 已被 右半部 使用。再按一次即可在此使用，或按 Esc 取消。',
+          remove: '移除 左半部 的快速鍵',
+          editGenerated: '編輯 左 ⅔',
+          editAuthored: '編輯 Reading pane',
+          add: '新增區域',
+        ),
+      ),
+    ]) {
+      final tag = locale.toLanguageTag();
+
+      Future<SemanticsHandle> open(
+        WidgetTester tester, {
+        List<Binding>? bindings,
+        Set<CommandRef> unavailable = const {},
+      }) async {
+        setAppStrings(locale);
+        addTearDown(() => setAppStrings(kEnglish));
+        final handle = tester.ensureSemantics();
+        await tester.binding.setSurfaceSize(const Size(600, 1100));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.pumpWidget(localizedApp(
+          locale,
+          ShortcutsScreen(
+            bindings: bindings ?? macDefaults,
+            regions: const [generated, authored],
+            unavailable: unavailable,
+            onRebound: (_) {},
+            onRestoreBindings: (_) {},
+            onRegionSaved: (_) {},
+            onRegionDeleted: (_) {},
+          ),
+        ));
+        await tester.pumpAndSettle();
+        return handle;
+      }
+
+      SemanticsData data(WidgetTester tester, String label) => tester
+          .getSemantics(find.bySemanticsLabel(label))
+          .getSemanticsData();
+
+      testWidgets('a bound row reads its combination ($tag)', (tester) async {
+        final handle = await open(tester);
+        expect(find.bySemanticsLabel(words.bound), findsOneWidget);
+        handle.dispose();
+      });
+
+      testWidgets('an unbound and a refused row say so ($tag)',
+          (tester) async {
+        final handle = await open(
+          tester,
+          bindings: withRebind(macDefaults,
+              Binding.unbound(const BuiltIn(ShortcutCommand.center))),
+          unavailable: {const BuiltIn(ShortcutCommand.leftHalf)},
+        );
+        expect(find.bySemanticsLabel(words.unavailable), findsOneWidget);
+        expect(find.bySemanticsLabel(words.unbound), findsOneWidget);
+        expect(find.bySemanticsLabel(words.bound), findsNothing,
+            reason: 'a refused row says so instead of just its combination');
+        handle.dispose();
+      });
+
+      testWidgets('a row that is listening, and one that is asking ($tag)',
+          (tester) async {
+        final handle = await open(tester);
+        await tester.tap(find.text(words.left));
+        await tester.pumpAndSettle();
+        expect(find.bySemanticsLabel(words.listening), findsOneWidget);
+
+        // Right half's chord, tried on Left half: the question is on the row
+        // itself, because the footer has no live region and the recorder
+        // answers every key, so Tab cannot reach the footer's button.
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+        await tester.pumpAndSettle();
+        expect(find.bySemanticsLabel(words.collision), findsOneWidget);
+        expect(find.bySemanticsLabel(words.listening), findsNothing);
+        handle.dispose();
+      });
+
+      testWidgets('the controls in a row are named and still pressable '
+          '($tag)', (tester) async {
+        final handle = await open(tester);
+        for (final label in [
+          words.remove,
+          words.editGenerated,
+          words.editAuthored,
+          words.add,
+        ]) {
+          expect(find.bySemanticsLabel(label), findsOneWidget, reason: label);
+          expect(data(tester, label).hasAction(SemanticsAction.tap), isTrue,
+              reason: '$label: a name a reader can say is not an action it '
+                  'can send');
+        }
+        handle.dispose();
+      });
+    }
   });
 }

@@ -7,6 +7,8 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/geometry.dart';
+import 'package:orthant/core/key_chord.dart';
+import 'package:orthant/l10n/strings.dart';
 import 'package:orthant/settings/keycap.dart';
 import 'package:orthant/settings/mac_control.dart';
 import 'package:orthant/settings/platform_theme.dart';
@@ -15,6 +17,9 @@ import 'package:orthant/settings/region_picker_sheet.dart';
 import 'package:orthant/shortcuts/custom_region.dart';
 
 import 'support/carbon_terms.dart';
+import 'support/localized_host.dart';
+import 'support/locales.dart';
+import 'support/no_english.dart';
 
 const _leftTwoThirds = CustomRegion(
   id: 'r1',
@@ -949,5 +954,341 @@ void main() {
     expect(submitted!.region.rows, 1);
     expect(submitted!.region.c1, 1);
     expect(submitted!.region.name, 'Reading pane');
+  });
+  group('names across languages', () {
+    // The stored name is always the English suggestion (a format older installs
+    // share); what the field shows is the suggestion in the current language.
+    // Whether the name is the suggestion or the user's own is decided once, from
+    // the stored name, and then by whether the user has edited the field. It is
+    // never read back from the field's text.
+    Widget inLanguage(Locale locale, Widget sheet) =>
+        localizedApp(locale, SizedBox(width: 600, height: 700, child: sheet));
+
+    RegionPickerSheet sheet({
+      CustomRegion? initial,
+      void Function(RegionDraft)? onSubmit,
+      bool withChord = false,
+      String? Function(KeyChord)? conflictName,
+    }) =>
+        RegionPickerSheet(
+          initial: initial,
+          initialChord:
+              withChord ? carbon(123, kControlOption | kShiftKey) : null,
+          gridCols: 6,
+          gridRows: 6,
+          onSubmit: onSubmit ?? (_) {},
+          onCancel: () {},
+          onDelete: initial == null ? null : () {},
+          conflictName: conflictName,
+        );
+
+    Future<void> save(WidgetTester tester) async {
+      await tester.tap(find.byKey(const ValueKey('region-submit')));
+      await tester.pumpAndSettle();
+    }
+
+    /// A sheet opened from nothing. Pumping a second sheet over the first
+    /// would update its state in place and keep the first one's combination,
+    /// name and collision answer.
+    Future<void> openFresh(
+        WidgetTester tester, Locale locale, RegionPickerSheet s) async {
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(inLanguage(locale, s));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a new region under Chinese shows the Chinese suggestion and '
+        'stores the English one', (tester) async {
+      RegionDraft? submitted;
+      await tester.pumpWidget(inLanguage(
+          kSimplified, sheet(onSubmit: (d) => submitted = d)));
+
+      await _dragCells(tester, cols: 6, rows: 6, c0: 0, r0: 0, c1: 3, r1: 5);
+      expect(find.text('左侧 ⅔'), findsOneWidget);
+      expect(find.text('Left ⅔'), findsNothing);
+
+      await save(tester);
+      expect(submitted!.region.name, 'Left ⅔',
+          reason: 'the stored format is English whatever language showed');
+    });
+
+    for (final (locale, words) in [
+      (kEnglish, 'Full screen'),
+      (kSimplified, '全屏'),
+      (kTraditional, '整個螢幕'),
+      (kHongKong, '整個螢幕'),
+    ]) {
+      testWidgets('a stored generated name opens in the current language '
+          '(${locale.toLanguageTag()})', (tester) async {
+        const stored = CustomRegion(
+          id: 'r2',
+          name: 'Full screen',
+          cols: 1,
+          rows: 1,
+          c0: 0,
+          c1: 0,
+          r0: 0,
+          r1: 0,
+        );
+        await tester.pumpWidget(inLanguage(locale, sheet(initial: stored)));
+        expect(find.text(words), findsOneWidget);
+        if (locale != kEnglish) {
+          expect(find.text('Full screen'), findsNothing);
+        }
+      });
+    }
+
+    testWidgets('reshaping a generated region keeps following the shape, in '
+        'the current language', (tester) async {
+      RegionDraft? submitted;
+      await tester.pumpWidget(inLanguage(kSimplified,
+          sheet(initial: _leftTwoThirds, onSubmit: (d) => submitted = d)));
+      expect(find.text('左侧 ⅔'), findsOneWidget);
+
+      await _dragCells(tester, cols: 6, rows: 6, c0: 0, r0: 0, c1: 1, r1: 5);
+      expect(find.text('左侧 ⅓'), findsOneWidget);
+
+      await _dragCells(tester, cols: 6, rows: 6, c0: 0, r0: 0, c1: 5, r1: 2);
+      expect(find.text('顶部 ½'), findsOneWidget);
+
+      await save(tester);
+      expect(submitted!.region.name, 'Top ½');
+    });
+
+    testWidgets('saving a generated region without touching it stores it '
+        'byte for byte, English name included', (tester) async {
+      RegionDraft? submitted;
+      await tester.pumpWidget(inLanguage(kSimplified,
+          sheet(initial: _leftTwoThirds, onSubmit: (d) => submitted = d)));
+
+      await save(tester);
+      expect(submitted!.region, _leftTwoThirds);
+    });
+
+    testWidgets('typing in the field makes the name the user\'s own',
+        (tester) async {
+      RegionDraft? submitted;
+      await tester.pumpWidget(inLanguage(kSimplified,
+          sheet(initial: _leftTwoThirds, onSubmit: (d) => submitted = d)));
+
+      await tester.enterText(find.byType(TextField), '阅读区');
+      await _dragCells(tester, cols: 6, rows: 6, c0: 0, r0: 0, c1: 1, r1: 5);
+      expect(find.text('阅读区'), findsOneWidget,
+          reason: 'a typed name is not overwritten by a later drag');
+
+      await save(tester);
+      expect(submitted!.region.name, '阅读区');
+    });
+
+    testWidgets('retyping exactly the suggestion is still the user\'s own',
+        (tester) async {
+      // Generated status is never derived from the field's text: the user
+      // chose these words, so a later reshape must not take them back.
+      RegionDraft? submitted;
+      await tester.pumpWidget(inLanguage(kSimplified,
+          sheet(initial: _leftTwoThirds, onSubmit: (d) => submitted = d)));
+
+      // Cleared first: entering text the field already holds changes nothing,
+      // so it fires no edit, exactly as it would not for a person.
+      await tester.enterText(find.byType(TextField), '');
+      await tester.enterText(find.byType(TextField), '左侧 ⅔');
+      await _dragCells(tester, cols: 6, rows: 6, c0: 0, r0: 0, c1: 1, r1: 5);
+      expect(find.text('左侧 ⅔'), findsOneWidget);
+
+      await save(tester);
+      expect(submitted!.region.name, '左侧 ⅔');
+    });
+
+    for (final locale in [kEnglish, kSimplified, kTraditional, kHongKong]) {
+      testWidgets('opening an authored name that equals the translated '
+          'suggestion and saving stores it unchanged '
+          '(${locale.toLanguageTag()})', (tester) async {
+        // A user who wrote the suggestion's words for a left two-thirds
+        // region (左侧 ⅔ in Simplified, 左 ⅔ in Traditional) wrote it: the
+        // stored format is English, so this is not a generated name, however
+        // much it looks like the suggestion in the language on screen.
+        final mine = locale == kSimplified ? '左侧 ⅔' : '左 ⅔';
+        final theirs = CustomRegion(
+          id: 'r1',
+          name: mine,
+          cols: 3,
+          rows: 1,
+          c0: 0,
+          c1: 1,
+          r0: 0,
+          r1: 0,
+        );
+        RegionDraft? submitted;
+        await tester.pumpWidget(inLanguage(
+            locale, sheet(initial: theirs, onSubmit: (d) => submitted = d)));
+        expect(find.text(mine), findsOneWidget);
+
+        await save(tester);
+        expect(submitted!.region.name, mine);
+        expect(submitted!.region, theirs,
+            reason: 'nothing about it changes, so nothing is rewritten');
+      });
+    }
+
+    testWidgets('an authored name is not re-suggested when the shape changes',
+        (tester) async {
+      RegionDraft? submitted;
+      await tester.pumpWidget(inLanguage(
+          kSimplified,
+          sheet(
+              initial: _leftTwoThirds.copyWith(name: '左侧 ⅔'),
+              onSubmit: (d) => submitted = d)));
+
+      await _dragCells(tester, cols: 6, rows: 6, c0: 0, r0: 0, c1: 1, r1: 5);
+      expect(find.text('左侧 ⅔'), findsOneWidget);
+
+      await save(tester);
+      expect(submitted!.region.name, '左侧 ⅔');
+      expect(submitted!.region.c1, 1);
+    });
+
+    testWidgets('a name saved in Chinese reads as generated by the same sheet '
+        'in English, and by an older build\'s round trip', (tester) async {
+      RegionDraft? saved;
+      await tester.pumpWidget(
+          inLanguage(kSimplified, sheet(onSubmit: (d) => saved = d)));
+      await _dragCells(tester, cols: 6, rows: 6, c0: 0, r0: 0, c1: 3, r1: 5);
+      await save(tester);
+
+      // Through today's serializer, which an older build reads and rewrites.
+      final back = CustomRegion.tryFromJson(saved!.region.toJson())!;
+      RegionDraft? resaved;
+      await openFresh(tester, kEnglish,
+          sheet(initial: back, onSubmit: (d) => resaved = d));
+      expect(find.text('Left ⅔'), findsOneWidget);
+
+      await _dragCells(tester, cols: 6, rows: 6, c0: 0, r0: 0, c1: 1, r1: 5);
+      expect(find.text('Left ⅓'), findsOneWidget,
+          reason: 'still following the shape after the round trip');
+      await save(tester);
+      expect(resaved!.region.name, 'Left ⅓');
+    });
+
+    testWidgets('a language change while the sheet is open moves a generated '
+        'name and leaves an authored one', (tester) async {
+      await tester.pumpWidget(
+          inLanguage(kEnglish, sheet(initial: _leftTwoThirds)));
+      expect(find.text('Left ⅔'), findsOneWidget);
+
+      await tester.pumpWidget(
+          inLanguage(kSimplified, sheet(initial: _leftTwoThirds)));
+      await tester.pumpAndSettle();
+      expect(find.text('左侧 ⅔'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), 'Reading pane');
+      await tester.pumpWidget(
+          inLanguage(kTraditional, sheet(initial: _leftTwoThirds)));
+      await tester.pumpAndSettle();
+      expect(find.text('Reading pane'), findsOneWidget);
+    });
+
+    testWidgets('the sheet\'s own labels are translated', (tester) async {
+      await tester.pumpWidget(inLanguage(
+          kSimplified, sheet(initial: _leftTwoThirds, withChord: true)));
+      expect(find.text('编辑区域'), findsOneWidget);
+      expect(find.text('名称'), findsOneWidget);
+      expect(find.text('快捷键'), findsOneWidget);
+      expect(find.text('删除'), findsOneWidget);
+      expect(find.text('取消'), findsOneWidget);
+      expect(find.text('保存'), findsOneWidget);
+      expect(find.textContaining('方向键移动'), findsOneWidget);
+
+      await openFresh(tester, kTraditional, sheet());
+      expect(find.text('新增區域'), findsOneWidget);
+      expect(find.text('快速鍵'), findsOneWidget);
+      expect(find.text('按一下以錄製'), findsOneWidget);
+      expect(find.text('新增'), findsOneWidget);
+    });
+
+    for (final locale in [kSimplified, kTraditional, kHongKong]) {
+      testWidgets('no English is left in the sheet (${locale.toLanguageTag()})',
+          (tester) async {
+        // Creating, with nothing set.
+        await openFresh(tester, locale, sheet());
+        expectNoEnglish(tester);
+
+        // Editing a generated region with a combination and a way to delete.
+        await openFresh(
+            tester, locale, sheet(initial: _leftTwoThirds, withChord: true));
+        expectNoEnglish(tester);
+
+        // A collision, before and after it is accepted. The owner's name is
+        // whatever the list calls the command, so the test hands in Chinese.
+        await openFresh(
+            tester,
+            locale,
+            sheet(
+              initial: _leftTwoThirds,
+              withChord: true,
+              conflictName: (_) => '左半屏',
+            ));
+        expect(find.textContaining('左半屏'), findsOneWidget);
+        expectNoEnglish(tester);
+        await tester.tap(find.byKey(const ValueKey('region-take-anyway')));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('左半屏'), findsOneWidget);
+        expectNoEnglish(tester);
+      });
+    }
+
+    for (final locale in [kSimplified, kTraditional, kHongKong]) {
+      testWidgets('no English is left while the shortcut field listens '
+          '(${locale.toLanguageTag()})', (tester) async {
+        // The state the sheet's other no-English test never reached: the
+        // field has become the shared recorder, which draws its own prompt and
+        // the modifiers it hears.
+        await openFresh(tester, locale, sheet());
+        await tester.tap(find.byKey(const ValueKey('region-record')));
+        await tester.pumpAndSettle();
+        expect(find.byType(RecordingField), findsOneWidget);
+        expectNoEnglish(tester);
+
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.pump();
+        expectNoEnglish(tester);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+        await tester.pump();
+      });
+
+      testWidgets('and a key Windows cannot use is refused in the language '
+          '(${locale.toLanguageTag()})', (tester) async {
+        // The recorder's refusal is drawn by the sheet under its field.
+        setAppStrings(locale);
+        addTearDown(() => setAppStrings(kEnglish));
+        await openFresh(tester, locale, sheet());
+        await tester.tap(find.byKey(const ValueKey('region-record')));
+        await tester.pumpAndSettle();
+
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.sendKeyEvent(LogicalKeyboardKey.numpad1);
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Windows'), findsOneWidget,
+            reason: 'the refusal is on screen');
+        expect(find.byType(RecordingField), findsOneWidget,
+            reason: 'still listening: a refusal is not a cancel');
+        expectNoEnglish(tester);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
+    }
+
+    testWidgets('the collision notice is one whole message each way',
+        (tester) async {
+      await tester.pumpWidget(inLanguage(
+          kSimplified,
+          sheet(
+            initial: _leftTwoThirds,
+            withChord: true,
+            conflictName: (_) => 'Left half',
+          )));
+      expect(find.text('“Left half”已使用此组合键。'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('region-take-anyway')));
+      await tester.pumpAndSettle();
+      expect(find.text('保存后，“Left half”将不再使用此组合键。'), findsOneWidget);
+    });
   });
 }

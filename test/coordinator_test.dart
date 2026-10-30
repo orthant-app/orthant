@@ -1,10 +1,15 @@
 import 'dart:async';
+import 'dart:ui' show Locale;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/app/coordinator.dart';
 import 'package:orthant/core/geometry.dart';
 import 'package:orthant/core/window_controller.dart';
+import 'package:orthant/l10n/app_localizations.dart';
+import 'package:orthant/l10n/languages.dart';
+import 'package:orthant/l10n/strings.dart';
 import 'package:orthant/permission/permission_controller.dart';
 import 'package:orthant/settings/settings.dart';
 import 'package:orthant/settings/settings_store.dart';
@@ -18,6 +23,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:orthant/shortcuts/custom_region.dart';
 
 import 'support/carbon_terms.dart';
+import 'support/locales.dart';
+import 'support/no_english.dart';
 
 /// Records what the app asked the platform to do, and lets a test decide what
 /// the platform says back.
@@ -112,10 +119,15 @@ class _FakeWc implements WindowController {
     required int rows,
     required double gap,
     required bool saveHint,
+    required String locale,
   }) async {
     grid = (cols: cols, rows: rows, gap: gap, saveHint: saveHint);
+    gridLocales.add(locale);
     calls.add('setOverlayGrid');
   }
+
+  /// The language tag each grid push carried, in order.
+  final List<String> gridLocales = [];
 
   Map<int, String> labels = const {};
   @override
@@ -135,6 +147,31 @@ class _FakeWc implements WindowController {
     await Future<void>.delayed(Duration.zero);
     events.add('accent answered');
     return accent;
+  }
+
+  /// The OS's preferred languages and the stored choice, as the platform
+  /// answers them; [overrideWrites] is every tag the app stored, in order.
+  List<Locale> system = const [];
+  String? storedOverride;
+  int systemReads = 0;
+  final List<String?> overrideWrites = [];
+
+  /// Makes the next [setLanguageOverride] fail, as macOS's can.
+  Object? overrideWriteError;
+  @override
+  Future<List<Locale>> systemLocales() async {
+    systemReads++;
+    return system;
+  }
+  @override
+  Future<String?> languageOverride() async => storedOverride;
+  @override
+  Future<void> setLanguageOverride(String? tag) async {
+    calls.add('setLanguageOverride');
+    final error = overrideWriteError;
+    if (error != null) throw error;
+    overrideWrites.add(tag);
+    storedOverride = tag;
   }
 
   @override
@@ -1606,6 +1643,266 @@ void main() {
       t.wc.commitSucceeds = true;
       await t.app.overlaySaveRegion(6, const WinRect(0, 0, 10, 10), block);
       expect(t.app.pendingRegion?.c1, 2);
+    });
+  });
+
+  group('the language', () {
+    // appStrings is process-wide, and a coordinator that resolves Chinese
+    // points it there.
+    tearDown(() => setAppStrings(kEnglish));
+
+    Locale tag(String t) => parseLanguageTag(t);
+
+    /// The tray's rows, separators left out.
+    List<String> labels(OrthantCoordinator app) =>
+        [for (final e in app.trayMenu) if (!e.isSeparator) e.label];
+
+    test('before anything is loaded the app is English', () {
+      final t = build();
+      expect(t.app.languageChoice, isNull);
+      expect(t.app.locale, kEnglish);
+      expect(t.app.strings.l10nProbeLocale, 'en');
+      expect(t.wc.systemReads, 0, reason: 'a constructor asks nothing');
+    });
+
+    test('a Traditional Chinese system shows a Traditional tray', () async {
+      final t = build();
+      t.wc.system = [tag('zh-TW')];
+      await t.app.loadLanguage();
+      final zh = lookupAppLocalizations(kTraditional);
+
+      expect(t.app.locale, kTraditional);
+      expect(t.app.strings.l10nProbeLocale, 'zh_Hant');
+      expect(appStrings.l10nProbeLocale, 'zh_Hant',
+          reason: 'code with no context follows the coordinator');
+      // Ungranted, so the permission row shows and the grid has no combo.
+      expect(labels(t.app), [
+        zh.trayEnableAccessibility,
+        zh.trayOpenGrid,
+        zh.traySettings,
+        zh.trayAbout,
+        zh.trayCheckForUpdates,
+        zh.trayQuit,
+      ]);
+      expectNoEnglishIn(labels(t.app));
+      expect(t.app.trayToolTip, 'Orthant');
+    });
+
+    test('a granted Simplified tray keeps the combo beside the name, with no '
+        'English left', () async {
+      final t = build(granted: true);
+      t.wc.system = [tag('zh-CN')];
+      await t.app.start();
+      final zh = lookupAppLocalizations(kSimplified);
+
+      final overlay = t.app.trayMenu.firstWhere((e) => e.key == 'overlay');
+      expect(overlay.label, startsWith(zh.trayOpenGrid));
+      expect(overlay.label, contains('⌃⌥O'));
+      expect(labels(t.app), contains(zh.traySettings));
+      expectNoEnglishIn(labels(t.app));
+    });
+
+    test('on Windows the legends stay English and nothing else does', () async {
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      final t = build(granted: true);
+      t.wc.system = [tag('zh-Hant-TW')];
+      await t.app.start();
+      final zh = lookupAppLocalizations(kTraditional);
+
+      expect(t.app.openGridLabel, startsWith(zh.trayOpenGrid));
+      expect(t.app.openGridLabel, contains('Win+Ctrl+Shift+O'));
+      expectNoEnglishIn(labels(t.app));
+    });
+
+    test('the update row and the tooltip follow the language, with and '
+        'without an update', () async {
+      final t = build(granted: true);
+      t.wc.system = [tag('zh-TW')];
+      await t.app.loadLanguage();
+      final zh = lookupAppLocalizations(kTraditional);
+      expect(t.app.trayToolTip, 'Orthant');
+
+      t.wc.availableUpdate.value = const AvailableUpdate('1.0.4', 8);
+      final item = t.app.trayMenu.firstWhere((e) => e.key == 'install-update');
+      expect(item.label, zh.trayUpdateTo('1.0.4'));
+      expect(item.label, contains('1.0.4'));
+      expect(t.app.trayToolTip, zh.trayTooltipUpdate('1.0.4'));
+      expect(t.app.trayToolTip, contains('1.0.4'));
+      expectNoEnglishIn([item.label, t.app.trayToolTip]);
+
+      t.wc.availableUpdate.value = null;
+      expect(t.app.trayToolTip, 'Orthant');
+    });
+
+    test('English output is what 1.1.1 showed, character for character',
+        () async {
+      final t = build();
+      t.wc.system = [tag('en-US')];
+      await t.app.loadLanguage();
+      t.wc.availableUpdate.value = const AvailableUpdate('1.0.4', 8);
+      expect(labels(t.app), [
+        'Enable Accessibility…',
+        'Open Grid',
+        'Settings…',
+        'About Orthant',
+        'Update to Orthant 1.0.4…',
+        'Check for Updates…',
+        'Quit Orthant',
+      ]);
+      expect(t.app.trayToolTip, 'Orthant: update 1.0.4 available');
+    });
+
+    test('the language is resolved before the first grid push (Review '
+        'Focus 3)', () async {
+      final t = build();
+      t.wc.system = [tag('zh-TW')];
+      await t.app.start();
+      expect(t.wc.gridLocales, isNotEmpty);
+      expect(t.wc.gridLocales.first, 'zh-Hant',
+          reason: 'a first push in English would open the overlay in English '
+              'until the next settings change');
+      expect(t.wc.gridLocales, everyElement('zh-Hant'));
+    });
+
+    test('start resolves once, and not at all when loadLanguage already ran',
+        () async {
+      final loaded = build();
+      loaded.wc.system = [tag('zh-TW')];
+      await loaded.app.loadLanguage();
+      await loaded.app.start();
+      expect(loaded.wc.systemReads, 1);
+      expect(loaded.wc.gridLocales.first, 'zh-Hant');
+
+      final fresh = build();
+      fresh.wc.system = [tag('zh-TW')];
+      await fresh.app.start();
+      expect(fresh.wc.systemReads, 1, reason: 'start loads it when nobody did');
+      expect(fresh.app.locale, kTraditional);
+    });
+
+    test('a stored choice is read at launch and kept whole', () async {
+      final t = build();
+      t.wc.system = [tag('en-US')];
+      t.wc.storedOverride = 'zh-Hant-HK';
+      await t.app.loadLanguage();
+      expect(t.app.languageChoice, 'zh-Hant-HK');
+      expect(t.app.locale, kHongKong,
+          reason: 'the per-app Hong Kong choice keeps its region');
+      expect(t.app.strings.l10nProbeLocale, 'zh_Hant_HK');
+    });
+
+    test('a stored choice no file covers behaves as System (Review Focus 4)',
+        () async {
+      final t = build();
+      t.wc.system = [tag('zh-TW')];
+      t.wc.storedOverride = 'ja';
+      await t.app.loadLanguage();
+      expect(t.app.locale, kTraditional,
+          reason: 'taken from the system list, as System is');
+      expect(t.app.languageChoice, 'ja', reason: 'the stored tag is not edited');
+
+      final none = build();
+      none.wc.storedOverride = 'ja';
+      await none.app.loadLanguage();
+      expect(none.app.locale, kEnglish);
+    });
+
+    test('an empty or blank stored choice is System, on either platform',
+        () async {
+      for (final stored in <String>['', '   ', '\t']) {
+        final t = build();
+        t.wc.system = [tag('zh-CN')];
+        t.wc.storedOverride = stored;
+        await t.app.loadLanguage();
+        expect(t.app.languageChoice, isNull, reason: 'for "$stored"');
+        expect(t.app.locale, kSimplified, reason: 'for "$stored"');
+      }
+    });
+
+    test('choosing a language stores it, shows it and tells the overlay',
+        () async {
+      final t = build(granted: true);
+      t.wc.system = [tag('en-US')];
+      await t.app.start();
+      expect(t.app.locale, kEnglish);
+      final pushes = t.wc.gridLocales.length;
+      var notified = 0;
+      t.app.addListener(() => notified++);
+
+      await t.app.setLanguageChoice('zh-Hans');
+
+      expect(t.wc.overrideWrites, ['zh-Hans']);
+      expect(t.app.languageChoice, 'zh-Hans');
+      expect(t.app.locale, kSimplified);
+      expect(t.wc.gridLocales.skip(pushes), ['zh'],
+          reason: 'one push, in the new language, as the wire tag');
+      expect(notified, greaterThan(0));
+      expect(appStrings.l10nProbeLocale, 'zh');
+      final zh = lookupAppLocalizations(kSimplified);
+      expect(labels(t.app), contains(zh.traySettings));
+      expectNoEnglishIn(labels(t.app));
+      expect(t.wc.systemReads, 1, reason: 'the same system list is reused');
+    });
+
+    test('choosing System stores nothing and goes back to the system\'s '
+        'language', () async {
+      final t = build();
+      t.wc.system = [tag('en-US')];
+      await t.app.start();
+      await t.app.setLanguageChoice('zh-Hans');
+      expect(t.app.locale, kSimplified);
+
+      await t.app.setLanguageChoice(null);
+
+      expect(t.wc.overrideWrites, ['zh-Hans', null]);
+      expect(t.wc.storedOverride, isNull);
+      expect(t.app.languageChoice, isNull);
+      expect(t.app.locale, kEnglish);
+      expect(t.wc.gridLocales.last, 'en');
+      expect(labels(t.app), contains('Settings…'));
+    });
+
+    test('a blank choice is stored as System', () async {
+      final t = build();
+      await t.app.start();
+      await t.app.setLanguageChoice('  ');
+      expect(t.wc.overrideWrites, [null]);
+      expect(t.app.languageChoice, isNull);
+    });
+
+    test('when the platform refuses the write the pick still shows, and '
+        'nothing escapes (R10)', () async {
+      final t = build();
+      t.wc.system = [tag('en-US')];
+      await t.app.start();
+      final pushes = t.wc.gridLocales.length;
+      t.wc.overrideWriteError =
+          PlatformException(code: 'unavailable', message: 'no defaults');
+
+      // A fire-and-forget caller (the picker) has nobody to catch this.
+      await expectLater(t.app.setLanguageChoice('zh-Hant'), completes);
+
+      expect(t.wc.calls, contains('setLanguageOverride'));
+      expect(t.app.locale, kTraditional,
+          reason: 'applied for this session: the click is not eaten');
+      expect(t.app.languageChoice, 'zh-Hant');
+      expect(t.wc.gridLocales.skip(pushes), ['zh-Hant'],
+          reason: 'the overlay follows the session, not the failed write');
+      expect(labels(t.app), contains(lookupAppLocalizations(kTraditional).traySettings));
+    });
+
+    test('two quick picks end on the last, in the platform and on screen',
+        () async {
+      final t = build();
+      t.wc.system = [tag('en-US')];
+      await t.app.start();
+      final first = t.app.setLanguageChoice('zh-Hans');
+      final second = t.app.setLanguageChoice('zh-Hant');
+      await Future.wait([first, second]);
+      expect(t.wc.overrideWrites, ['zh-Hans', 'zh-Hant']);
+      expect(t.app.locale, kTraditional);
+      expect(t.wc.gridLocales.last, 'zh-Hant');
     });
   });
 }

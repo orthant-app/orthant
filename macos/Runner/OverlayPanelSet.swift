@@ -88,13 +88,20 @@ final class OverlayPanelSet {
   /// `regions.isEmpty`); this only carries the answer to the panels.
   private var saveHint = false
 
-  /// Set from the channel. Plain numbers, never a preferences read — Swift must
-  /// not become a second reader of a Dart-owned schema.
-  func setGrid(cols: Int, rows: Int, gap: Double, saveHint: Bool) {
+  /// The language the overlay speaks and draws in, as the tag of the locale
+  /// Dart resolved (`en`, `zh`, `zh-Hant`, ...). Carried to each panel's own
+  /// engine in the summon payload, which is the only way it can learn it, and
+  /// never parsed here: Dart decides what a tag means.
+  private var locale = "en"
+
+  /// Set from the channel. Plain numbers and a string, never a preferences read
+  /// — Swift must not become a second reader of a Dart-owned schema.
+  func setGrid(cols: Int, rows: Int, gap: Double, saveHint: Bool, locale: String) {
     self.gridCols = cols
     self.gridRows = rows
     self.gap = gap
     self.saveHint = saveHint
+    self.locale = locale
   }
 
   /// Which resident panels are actually shown *this* summon — a subset of
@@ -204,6 +211,9 @@ final class OverlayPanelSet {
         "rows": gridRows,
         "gap": gap,
         "saveHint": saveHint,
+        // Pushed with the grid, like the settings above, for the same reason:
+        // the overlay's engine cannot ask the main one which language it is in.
+        "locale": locale,
         // Panel points times this are global placement units: 1 here, where a
         // panel's points are the display's. Windows sends its monitor's DPI
         // scale, and the overlay converts with it where the two spaces meet.

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../l10n/strings.dart';
 import 'key_chord.dart';
 
 /// What the platform calls the keys of a shortcut.
@@ -11,6 +12,15 @@ import 'key_chord.dart';
 /// keys and punctuation read alike, so the shared table in `bindings.dart`
 /// labels those and this names only what differs. macOS's words are exactly
 /// what 1.0.x shows.
+///
+/// The words that are not glyphs are translatable strings, read from
+/// `appStrings` each time [windows] or [macOS] is asked for, so they follow the
+/// language the app is shown in: Windows' (`keyCtrl`, `keyEnter`, ...) and
+/// macOS's two, `esc` and Return (`keyMacEscape`, `keyMacReturn`; Return is in
+/// `OverlayCopy`). They are the legends printed on the keys, and every language
+/// shipped so far keeps them in English; a language whose keyboards print
+/// `STRG` can say so without a code change. macOS's modifiers are glyphs
+/// (⌃⌥⇧⌘), which no language changes, and stay constants.
 ///
 /// Free of any widget tree on purpose: the tray, which has none, labels the
 /// grid's chord with these, and so does the settings window.
@@ -47,8 +57,12 @@ class KeyWords {
   /// usage.
   final Map<int, String> named;
 
-  static const macOS = KeyWords._(
-    modifiers: [
+  /// The words macOS uses: the glyphs are constants, `esc` is the language's.
+  ///
+  /// A getter for the same reason [windows] is: a language change reaches the
+  /// next read. Do not hold on to the result across one.
+  static KeyWords get macOS => KeyWords._(
+    modifiers: const [
       (flag: Modifiers.ctrl, name: '⌃'),
       (flag: Modifiers.alt, name: '⌥'),
       (flag: Modifiers.shift, name: '⇧'),
@@ -59,32 +73,41 @@ class KeyWords {
     // tray_manager 0.5.3 sets no key equivalent on macOS, so the combo goes
     // inline in the label (`main.dart`).
     menuGap: '   ',
-    escape: 'esc',
+    escape: appStrings.keyMacEscape,
     system: 'macOS',
-    named: {},
+    named: const {},
   );
 
-  static const windows = KeyWords._(
-    modifiers: [
-      (flag: Modifiers.meta, name: 'Win'),
-      (flag: Modifiers.ctrl, name: 'Ctrl'),
-      (flag: Modifiers.alt, name: 'Alt'),
-      (flag: Modifiers.shift, name: 'Shift'),
-    ],
-    joiner: '+',
-    spacedJoiner: '+',
-    // A native menu draws whatever follows a tab in its right-aligned
-    // accelerator column.
-    menuGap: '\t',
-    escape: 'Esc',
-    system: 'Windows',
-    named: {
-      0x00070028: 'Enter', 0x0007002C: 'Space', 0x0007002B: 'Tab',
-      0x0007002A: 'Backspace', 0x00070029: 'Esc', 0x0007004A: 'Home',
-      0x0007004D: 'End', 0x0007004B: 'PgUp', 0x0007004E: 'PgDn',
-      0x0007004C: 'Del', 0x00070053: 'Num Lock', 0x00070058: 'Num Enter',
-    },
-  );
+  /// The words Windows uses, in the language of [appStrings] as it is now.
+  ///
+  /// A getter, so a language change reaches the next read; do not hold on to
+  /// the result across one. It is cheap (a list of four and a map of twelve),
+  /// which matters because every Shortcuts row and the tray label read it.
+  static KeyWords get windows {
+    final s = appStrings;
+    return KeyWords._(
+      modifiers: [
+        (flag: Modifiers.meta, name: s.keyWin),
+        (flag: Modifiers.ctrl, name: s.keyCtrl),
+        (flag: Modifiers.alt, name: s.keyAlt),
+        (flag: Modifiers.shift, name: s.keyShift),
+      ],
+      joiner: '+',
+      spacedJoiner: '+',
+      // A native menu draws whatever follows a tab in its right-aligned
+      // accelerator column.
+      menuGap: '\t',
+      escape: s.keyEsc,
+      system: 'Windows',
+      named: {
+        0x00070028: s.keyEnter, 0x0007002C: s.keySpace, 0x0007002B: s.keyTab,
+        0x0007002A: s.keyBackspace, 0x00070029: s.keyEsc,
+        0x0007004A: s.keyHome, 0x0007004D: s.keyEnd, 0x0007004B: s.keyPageUp,
+        0x0007004E: s.keyPageDown, 0x0007004C: s.keyDelete,
+        0x00070053: s.keyNumLock, 0x00070058: s.keyNumEnter,
+      },
+    );
+  }
 
   /// The app runs on macOS and Windows only; anything else (a test host)
   /// reads as macOS, where it began.
@@ -114,9 +137,13 @@ class KeyWords {
   String menuItem(String label, String shortcut) => '$label$menuGap$shortcut';
 
   /// Every modifier, the way a sentence lists the ones a combination needs.
+  /// The list is a string of the language's own (`keyListAnyModifier`), for
+  /// both platforms: macOS's four glyphs read "⌃, ⌥, ⇧ or ⌘" in English and
+  /// "⌃、⌥、⇧ 或 ⌘" in Chinese.
   String get anyModifier {
-    final names = [for (final m in modifiers) m.name];
-    return '${names.take(names.length - 1).join(', ')} or ${names.last}';
+    assert(modifiers.length == 4, 'the list sentence names exactly four keys');
+    final n = [for (final m in modifiers) m.name];
+    return appStrings.keyListAnyModifier(n[0], n[1], n[2], n[3]);
   }
 
   /// Shift, as a sentence names it.

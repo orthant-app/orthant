@@ -6,7 +6,7 @@
 #   tool/reset_state.sh settings        # grid, gaps, launch-at-login back to defaults
 #   tool/reset_state.sh bindings        # every shortcut back to its default, custom regions deleted
 #   tool/reset_state.sh accessibility   # revoke the Accessibility grant
-#   tool/reset_state.sh all             # all of the above — a true first launch
+#   tool/reset_state.sh all             # all of the above, plus the Language choice (the app's AppleLanguages): a true first launch
 #
 #   tool/reset_state.sh all --relaunch  # …and start the app afterwards
 #
@@ -66,6 +66,13 @@ case "$WHAT" in
   settings|all)
     step 'Settings (grid, gaps)'
     forget 'flutter.orthant.settings.v1'
+    ;;&
+  all)
+    step 'Language choice'
+    # The Language picker writes the app's own AppleLanguages (macOS), in the
+    # app's domain and not the global one, so this leaves the system's own
+    # list alone. Only `all` clears it: a true first launch has no choice yet.
+    forget 'AppleLanguages'
     ;;&
   bindings|all)
     step 'Shortcut bindings'

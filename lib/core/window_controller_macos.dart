@@ -1,5 +1,8 @@
+import 'dart:ui' show Locale;
+
 import 'package:flutter/foundation.dart' show ValueListenable, ValueNotifier;
 import 'package:flutter/services.dart';
+import '../l10n/languages.dart' show parseLanguageTag;
 import 'carbon_keys.dart';
 import 'channel.dart';
 import 'geometry.dart';
@@ -111,12 +114,14 @@ class MacosWindowController implements WindowController {
     required int rows,
     required double gap,
     required bool saveHint,
+    required String locale,
   }) =>
       _channel.invokeMethod<void>(kSetOverlayGrid, {
         'cols': cols,
         'rows': rows,
         'gap': gap,
         'saveHint': saveHint,
+        'locale': locale,
       });
 
   @override
@@ -149,6 +154,43 @@ class MacosWindowController implements WindowController {
     if (!argb(light) || !argb(dark)) return null;
     return AccentColors(light: light as int, dark: dark as int);
   }
+
+  @override
+  Future<List<Locale>> systemLocales() async {
+    // Read on the way to showing the first window, so a failure here is "the
+    // OS did not say" (the resolver then falls back to English), never a
+    // launch that stops.
+    final Object? reply;
+    try {
+      reply = await _channel.invokeMethod<Object?>(kSystemLanguages);
+    } on PlatformException {
+      return const [];
+    } on MissingPluginException {
+      return const [];
+    }
+    if (reply is! List) return const [];
+    return [
+      for (final tag in reply)
+        if (tag is String && tag.isNotEmpty) parseLanguageTag(tag),
+    ];
+  }
+
+  @override
+  Future<String?> languageOverride() async {
+    final Object? reply;
+    try {
+      reply = await _channel.invokeMethod<Object?>(kLanguageOverride);
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+    return reply is String && reply.isNotEmpty ? reply : null;
+  }
+
+  @override
+  Future<void> setLanguageOverride(String? tag) =>
+      _channel.invokeMethod<void>(kSetLanguageOverride, tag);
 
   // Nothing on macOS waits for the commands to finish.
   @override

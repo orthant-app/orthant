@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show Locale;
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart';
@@ -7,6 +8,7 @@ import 'package:orthant/core/channel.dart';
 import 'package:orthant/core/geometry.dart';
 import 'package:orthant/core/window_controller.dart';
 import 'package:orthant/core/window_controller_windows.dart';
+import 'package:orthant/core/windows_language_store.dart';
 import 'package:orthant/core/windows_login_item.dart';
 import 'package:orthant/core/windows_updater.dart';
 import 'package:orthant/core/windows_window_ops.dart';
@@ -29,6 +31,8 @@ class _Sparkle implements SparkleApi {
   void setAppBuildVersion(String build) {}
   @override
   void setAutomaticCheck(bool on) => calls.add('automatic $on');
+  @override
+  void setLang(String language) => calls.add('lang $language');
   @override
   void setShutdownRequestCallback(void Function() onRequest) {}
   @override
@@ -71,6 +75,21 @@ class _Store implements UpdateStore {
   void writeFound(AvailableUpdate? update) => found = update;
   @override
   String? readSkipped() => null;
+}
+
+/// The stored language choice, held in memory.
+class _Language implements LanguageStore {
+  String? stored;
+  final List<String?> writes = [];
+
+  @override
+  String? read() => stored;
+
+  @override
+  void write(String? tag) {
+    writes.add(tag);
+    stored = tag;
+  }
 }
 
 class _ThrowingDesktop extends FakeDesktop {
@@ -203,6 +222,185 @@ void main() {
     expect(await withReader(() => throw StateError('advapi32 went away'))
         .accentColor(), isNull, reason: 'display data never throws');
     expect(calls, isEmpty);
+  });
+
+  group('language', () {
+    WindowsWindowController withLanguage(
+            {List<Locale> Function()? systemLocales, LanguageStore? store}) =>
+        WindowsWindowController.forTest(
+            readVersion: () => null,
+            desktop: NoWindows(),
+            placer: NoWindows(),
+            systemLocales: systemLocales,
+            languageStore: store);
+
+    test('the system languages are the OS list, in its order', () async {
+      final wanted = [
+        Locale.fromSubtags(
+            languageCode: 'zh', scriptCode: 'Hant', countryCode: 'TW'),
+        const Locale('en', 'US'),
+      ];
+      expect(await withLanguage(systemLocales: () => wanted).systemLocales(),
+          wanted);
+      expect(calls, isEmpty, reason: 'the runner knows nothing about it');
+    });
+
+    test('with no function injected a suite has no OS to ask: none', () async {
+      // Never the platform dispatcher's list, which on Windows is empty until
+      // main() first awaits (the embedder sends the locales after it starts
+      // the engine); production asks Windows itself (readSystemLocales).
+      expect(await withLanguage().systemLocales(), isEmpty);
+    });
+
+    test('the stored choice round trips as the whole tag', () async {
+      final store = _Language();
+      final c = withLanguage(store: store);
+      expect(await c.languageOverride(), isNull);
+      await c.setLanguageOverride('zh-Hant-HK');
+      expect(store.stored, 'zh-Hant-HK');
+      expect(await c.languageOverride(), 'zh-Hant-HK');
+      await c.setLanguageOverride('en');
+      expect(await c.languageOverride(), 'en');
+      expect(calls, isEmpty, reason: 'Windows keeps this in the registry');
+    });
+
+    test('System is null, which clears the stored choice', () async {
+      final store = _Language()..stored = 'zh-Hans';
+      final c = withLanguage(store: store);
+      await c.setLanguageOverride(null);
+      expect(store.writes, [null]);
+      expect(await c.languageOverride(), isNull);
+    });
+
+    test('a garbage stored value is returned as it is', () async {
+      // Task 2's resolver reads an unparsable choice as System; this seam
+      // neither validates nor repairs what the user's registry holds.
+      for (final garbage in ['!!', 'klingon-QQ-x', ' zh ']) {
+        final c = withLanguage(store: _Language()..stored = garbage);
+        expect(await c.languageOverride(), garbage);
+      }
+    });
+  });
+
+  group('the language WinSparkle is given', () {
+    // Always Orthant's own resolved language, System included: left to detect
+    // one itself, WinSparkle would give a Japanese Windows an English Orthant
+    // with a Japanese update window (spec, "Windows").
+    Locale zh(String script, [String? country]) => Locale.fromSubtags(
+        languageCode: 'zh', scriptCode: script, countryCode: country);
+
+    test('System follows the OS list as the app does, in order', () {
+      expect(updaterLanguage([const Locale('en', 'US')], null), 'en');
+      expect(updaterLanguage([const Locale('zh', 'CN')], null), 'zh-CN');
+      expect(updaterLanguage([zh('Hans', 'CN')], null), 'zh-CN');
+      expect(updaterLanguage([zh('Hant', 'TW')], null), 'zh-TW');
+      expect(
+          updaterLanguage([
+            const Locale('ja', 'JP'),
+            const Locale('en', 'US'),
+            zh('Hant', 'TW'),
+          ], null),
+          'en',
+          reason: 'English ranks above Traditional Chinese here');
+    });
+
+    test('Hong Kong has no WinSparkle language of its own: Traditional', () {
+      expect(updaterLanguage([const Locale('zh', 'HK')], null), 'zh-TW');
+      expect(updaterLanguage([zh('Hant', 'HK')], null), 'zh-TW');
+    });
+
+    test('a system with nothing Orthant has gets English, not WinSparkle\'s '
+        'guess', () {
+      expect(updaterLanguage([const Locale('ja', 'JP')], null), 'en');
+      expect(updaterLanguage(const [], null), 'en');
+    });
+
+    test('a language chosen in Settings beats the system\'s', () {
+      final english = [const Locale('en', 'US')];
+      expect(updaterLanguage(english, 'zh-Hant'), 'zh-TW');
+      expect(updaterLanguage(english, 'zh-Hans'), 'zh-CN');
+      expect(updaterLanguage(english, 'zh-Hant-HK'), 'zh-TW');
+      expect(updaterLanguage([zh('Hant', 'TW')], 'zh-Hans'), 'zh-CN');
+      expect(updaterLanguage([const Locale('zh', 'CN')], 'en'), 'en');
+    });
+
+    test('an empty or unreadable stored value is no choice at all', () {
+      // The registry read can hand back '' for an empty value, and the
+      // coordinator reads that as System too.
+      final chinese = [const Locale('zh', 'CN')];
+      for (final stored in ['', '  ', '!!', 'klingon-QQ-x']) {
+        expect(updaterLanguage(chinese, stored), 'zh-CN', reason: '"$stored"');
+      }
+    });
+  });
+
+  group('one source for the system languages', () {
+    // On Windows the dispatcher's list is empty during main()'s synchronous
+    // start, where the updater is configured and the first language is read,
+    // so both ask the OS through one injected function (production:
+    // readSystemLocales) and neither asks the dispatcher.
+    final taiwan = [const Locale('zh', 'TW'), const Locale('en', 'US')];
+
+    ({WindowsUpdater updater, _Sparkle api}) fresh() {
+      final api = _Sparkle();
+      return (
+        updater: WindowsUpdater(api, _Store(),
+            (url) => Future.error(StateError('no feed in this test')),
+            feedUrl: 'f',
+            publicKey: 'k',
+            system: () => (major: 10, minor: 0, build: 22631, servicePack: 0)),
+        api: api,
+      );
+    }
+
+    bool start(WindowsUpdater updater, List<Locale> Function() source,
+            [LanguageStore? store]) =>
+        startUpdater(updater,
+            build: '8',
+            display: '1.1.0',
+            onShutdownRequested: () {},
+            systemLocales: source,
+            languageStore: store ?? _Language());
+
+    test('the updater\'s language comes from the injected source', () {
+      final t = fresh();
+      expect(start(t.updater, () => taiwan), isTrue);
+      expect(t.api.calls, ['lang zh-tw', 'automatic false', 'init']);
+    });
+
+    test('the controller\'s systemLocales() is the same source, read afresh',
+        () async {
+      var reads = 0;
+      List<Locale> source() {
+        reads++;
+        return taiwan;
+      }
+
+      final t = fresh();
+      start(t.updater, source);
+      expect(reads, 1, reason: 'the updater read it');
+      final c = WindowsWindowController.forTest(
+          readVersion: () => null,
+          desktop: NoWindows(),
+          placer: NoWindows(),
+          systemLocales: source);
+      expect(await c.systemLocales(), taiwan);
+      expect(reads, 2, reason: 'and so does the controller, every time');
+      expect(updaterLanguage(await c.systemLocales(), null), 'zh-TW');
+    });
+
+    test('a source that says nothing is English, not WinSparkle\'s guess', () {
+      final t = fresh();
+      start(t.updater, () => const []);
+      expect(t.api.calls, ['lang en', 'automatic false', 'init']);
+    });
+
+    test('a language chosen in Settings still beats the source', () {
+      final t = fresh();
+      start(t.updater, () => [const Locale('en', 'US')],
+          _Language()..stored = 'zh-Hant');
+      expect(t.api.calls.first, 'lang zh-tw');
+    });
   });
 
   group('launch at login', () {
@@ -705,9 +903,18 @@ void main() {
         sent = call.arguments;
         return null;
       };
-      await wc().setOverlayGrid(cols: 4, rows: 3, gap: 8, saveHint: true);
+      await wc().setOverlayGrid(
+          cols: 4, rows: 3, gap: 8, saveHint: true, locale: 'zh-Hant');
       expect(calls, [kSetOverlayGrid]);
-      expect(sent, {'cols': 4, 'rows': 3, 'gap': 8.0, 'saveHint': true});
+      // The language rides with the grid because the overlay's engine cannot
+      // ask for it (it has no preferences of its own to read).
+      expect(sent, {
+        'cols': 4,
+        'rows': 3,
+        'gap': 8.0,
+        'saveHint': true,
+        'locale': 'zh-Hant',
+      });
     });
 
     test('a summon captures first, then names the session by the capture id',

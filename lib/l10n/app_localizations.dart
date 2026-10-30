@@ -1,0 +1,1233 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:intl/intl.dart' as intl;
+
+import 'app_localizations_en.dart';
+import 'app_localizations_zh.dart';
+
+// ignore_for_file: type=lint
+
+/// Callers can lookup localized strings with an instance of AppLocalizations
+/// returned by `AppLocalizations.of(context)`.
+///
+/// Applications need to include `AppLocalizations.delegate()` in their app's
+/// `localizationDelegates` list, and the locales they support in the app's
+/// `supportedLocales` list. For example:
+///
+/// ```dart
+/// import 'l10n/app_localizations.dart';
+///
+/// return MaterialApp(
+///   localizationsDelegates: AppLocalizations.localizationsDelegates,
+///   supportedLocales: AppLocalizations.supportedLocales,
+///   home: MyApplicationHome(),
+/// );
+/// ```
+///
+/// ## Update pubspec.yaml
+///
+/// Please make sure to update your pubspec.yaml to include the following
+/// packages:
+///
+/// ```yaml
+/// dependencies:
+///   # Internationalization support.
+///   flutter_localizations:
+///     sdk: flutter
+///   intl: any # Use the pinned version from flutter_localizations
+///
+///   # Rest of dependencies
+/// ```
+///
+/// ## iOS Applications
+///
+/// iOS applications define key application metadata, including supported
+/// locales, in an Info.plist file that is built into the application bundle.
+/// To configure the locales supported by your app, you’ll need to edit this
+/// file.
+///
+/// First, open your project’s ios/Runner.xcworkspace Xcode workspace file.
+/// Then, in the Project Navigator, open the Info.plist file under the Runner
+/// project’s Runner folder.
+///
+/// Next, select the Information Property List item, select Add Item from the
+/// Editor menu, then select Localizations from the pop-up menu.
+///
+/// Select and expand the newly-created Localizations item then, for each
+/// locale your application supports, add a new item and select the locale
+/// you wish to add from the pop-up menu in the Value field. This list should
+/// be consistent with the languages listed in the AppLocalizations.supportedLocales
+/// property.
+abstract class AppLocalizations {
+  AppLocalizations(String locale)
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+
+  final String localeName;
+
+  static AppLocalizations of(BuildContext context) {
+    return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
+  }
+
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
+
+  /// A list of this localizations delegate along with the default localizations
+  /// delegates.
+  ///
+  /// Returns a list of localizations delegates containing this delegate along with
+  /// GlobalMaterialLocalizations.delegate, GlobalCupertinoLocalizations.delegate,
+  /// and GlobalWidgetsLocalizations.delegate.
+  ///
+  /// Additional delegates can be added by appending to this list in
+  /// MaterialApp. This list does not have to be used at all if a custom list
+  /// of delegates is preferred or required.
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
+      <LocalizationsDelegate<dynamic>>[
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
+
+  /// A list of this localizations delegate's supported locales.
+  static const List<Locale> supportedLocales = <Locale>[
+    Locale('en'),
+    Locale('zh'),
+    Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
+    Locale.fromSubtags(
+      languageCode: 'zh',
+      countryCode: 'HK',
+      scriptCode: 'Hant',
+    ),
+  ];
+
+  /// Never shown. Tests use it to prove each language resolves to its own file.
+  ///
+  /// In en, this message translates to:
+  /// **'en'**
+  String get l10nProbeLocale;
+
+  /// Never shown. Tests use it to prove each language resolves to its own file.
+  ///
+  /// In en, this message translates to:
+  /// **'Latn'**
+  String get l10nProbeScript;
+
+  /// This language's own name, shown in the language picker whatever the UI language is.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get languageNativeName;
+
+  /// The menu-bar (tray) menu row that opens the onboarding window to ask for the macOS Accessibility permission. Shown only while the permission is missing. Accessibility is the name of the macOS Privacy pane.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Accessibility…'**
+  String get trayEnableAccessibility;
+
+  /// The tray menu row that opens the grid overlay. The grid shortcut, if it has one, is added after this text by the app.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Grid'**
+  String get trayOpenGrid;
+
+  /// The tray menu row that opens the Settings window.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings…'**
+  String get traySettings;
+
+  /// The tray menu row that opens Settings on the About pane. Orthant is the app name and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'About Orthant'**
+  String get trayAbout;
+
+  /// The tray menu row that offers an update a check found. {version} is the new version, such as 1.1.2.
+  ///
+  /// In en, this message translates to:
+  /// **'Update to Orthant {version}…'**
+  String trayUpdateTo(String version);
+
+  /// The tray menu row that checks for a new version of the app.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for Updates…'**
+  String get trayCheckForUpdates;
+
+  /// The tray menu row that quits the app. Orthant is the app name and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Quit Orthant'**
+  String get trayQuit;
+
+  /// The tray icon's tooltip on Windows while an update is waiting to be installed. {version} is the new version, such as 1.1.2.
+  ///
+  /// In en, this message translates to:
+  /// **'Orthant: update {version} available'**
+  String trayTooltipUpdate(String version);
+
+  /// The small caption under the grid panel, shown until the user has a custom region. {key} is the chord that places the window and offers the shape as a shortcut, such as ⌘S or Ctrl+S, and stays as written. Two spaces follow it.
+  ///
+  /// In en, this message translates to:
+  /// **'{key}  save this shape as a shortcut'**
+  String overlaySaveHint(String key);
+
+  /// The grid's accessibility hint, read by a screen reader after the grid's label and value. {place} is the key that places the window, such as Return or Enter. Key names stay in English in every language.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrow keys move. Shift and arrow keys extend. {place} places the window. Escape cancels.'**
+  String overlayGridHint(String place);
+
+  /// Spoken by a screen reader when the grid opens. {target} is the name of the app whose window will be moved, or the text of "the captured window" when there is no name. {columns} and {rows} are the grid's size, such as "6 columns" and "4 rows". {place} is the key that places the window, such as Return or Enter. Key names stay in English in every language.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid open for {target}. {columns}, {rows}. Arrow keys move, Shift and arrows extend, {place} places, Escape cancels.'**
+  String overlayOpened(
+    String target,
+    String columns,
+    String rows,
+    String place,
+  );
+
+  /// Stands in for the app's name in the spoken opening of the grid when the app has no name: the window the grid is about to move.
+  ///
+  /// In en, this message translates to:
+  /// **'the captured window'**
+  String get overlayCapturedWindow;
+
+  /// The number of columns in the grid, as a phrase in the grid's spoken label and its spoken opening. A column runs top to bottom.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 column} other{{count} columns}}'**
+  String overlayColumns(int count);
+
+  /// The number of rows in the grid, as a phrase in the grid's spoken label and its spoken opening. A row runs left to right.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 row} other{{count} rows}}'**
+  String overlayRows(int count);
+
+  /// The grid's accessibility label, read first by a screen reader. {app} is the app whose window will be moved. {columns} and {rows} are the grid's size, such as "6 columns" and "4 rows".
+  ///
+  /// In en, this message translates to:
+  /// **'Window grid for {app}, {columns}, {rows}'**
+  String overlayGridLabel(String app, String columns, String rows);
+
+  /// Spoken by a screen reader when the grid is dismissed without placing a window.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid closed.'**
+  String get overlayGridClosed;
+
+  /// Spoken by a screen reader when the user places the window from the grid.
+  ///
+  /// In en, this message translates to:
+  /// **'Placing window.'**
+  String get overlayPlacingWindow;
+
+  /// The grid's accessibility value while nothing is selected.
+  ///
+  /// In en, this message translates to:
+  /// **'No cells selected.'**
+  String get overlayNoCellsSelected;
+
+  /// Part of the grid's spoken selection: one row is selected. {row} counts from 1, from the top. Joined by the next messages into a sentence.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {row}'**
+  String overlayRowOne(int row);
+
+  /// Part of the grid's spoken selection: several rows are selected. {first} and {last} count from 1, from the top.
+  ///
+  /// In en, this message translates to:
+  /// **'Rows {first} to {last}'**
+  String overlayRowRange(int first, int last);
+
+  /// Part of the grid's spoken selection: one column is selected. {column} counts from 1, from the left. It follows the row text after a comma.
+  ///
+  /// In en, this message translates to:
+  /// **'column {column}'**
+  String overlayColumnOne(int column);
+
+  /// Part of the grid's spoken selection: several columns are selected. {first} and {last} count from 1, from the left.
+  ///
+  /// In en, this message translates to:
+  /// **'columns {first} to {last}'**
+  String overlayColumnRange(int first, int last);
+
+  /// The grid's accessibility value and its spoken announcement when the selection changes. {rowText} and {columnText} are the selected rows and columns, such as "Row 2" and "columns 1 to 2". x and y are the left and top of the window's target position, and width and height its size; all four are already formatted numbers. {unit} is "points" or "pixels", the next two messages, and applies to all four numbers.
+  ///
+  /// In en, this message translates to:
+  /// **'{rowText}, {columnText}. Target: x {x}, y {y}, width {width}, height {height} {unit}.'**
+  String overlaySelection(
+    String rowText,
+    String columnText,
+    String x,
+    String y,
+    String width,
+    String height,
+    String unit,
+  );
+
+  /// The unit of the target position and size the grid speaks on macOS: points, the screen's logical units. Used where {unit} appears in the selection sentence.
+  ///
+  /// In en, this message translates to:
+  /// **'points'**
+  String get overlayUnitPoints;
+
+  /// The unit of the target position and size the grid speaks on Windows: physical screen pixels. Used where {unit} appears in the selection sentence.
+  ///
+  /// In en, this message translates to:
+  /// **'pixels'**
+  String get overlayUnitPixels;
+
+  /// The name of a button in the grid's accessibility tree that moves the selection one cell. {direction} is left, right, up or down.
+  ///
+  /// In en, this message translates to:
+  /// **'{direction, select, left{Move left} right{Move right} up{Move up} down{Move down} other{Move}}'**
+  String overlayMove(String direction);
+
+  /// The name of a button in the grid's accessibility tree that grows the selection by one cell. {direction} is left, right, up or down.
+  ///
+  /// In en, this message translates to:
+  /// **'{direction, select, left{Extend left} right{Extend right} up{Extend up} down{Extend down} other{Extend}}'**
+  String overlayExtend(String direction);
+
+  /// The name of a button in the grid's accessibility tree that moves the captured window to the selection.
+  ///
+  /// In en, this message translates to:
+  /// **'Place window'**
+  String get overlayPlaceWindow;
+
+  /// The name of a button in the grid's accessibility tree that moves the captured window to the selection and offers the selection as a new shortcut.
+  ///
+  /// In en, this message translates to:
+  /// **'Place window and save shortcut'**
+  String get overlayPlaceAndSave;
+
+  /// The name of a button in the grid's accessibility tree that closes the grid without moving anything.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel grid'**
+  String get overlayCancelGrid;
+
+  /// The Windows logo key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Win'**
+  String get keyWin;
+
+  /// The Control key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Ctrl'**
+  String get keyCtrl;
+
+  /// The Alt key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Alt'**
+  String get keyAlt;
+
+  /// The Shift key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift'**
+  String get keyShift;
+
+  /// The Enter key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter'**
+  String get keyEnter;
+
+  /// The Space bar, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Space'**
+  String get keySpace;
+
+  /// The Tab key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Tab'**
+  String get keyTab;
+
+  /// The Backspace key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Backspace'**
+  String get keyBackspace;
+
+  /// The Escape key, as written in Windows shortcuts and in the Shortcuts hint "Listening… press a combination, or Esc to cancel." Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Esc'**
+  String get keyEsc;
+
+  /// The Home key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get keyHome;
+
+  /// The End key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get keyEnd;
+
+  /// The Page Up key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'PgUp'**
+  String get keyPageUp;
+
+  /// The Page Down key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'PgDn'**
+  String get keyPageDown;
+
+  /// The Delete key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Del'**
+  String get keyDelete;
+
+  /// The Num Lock key, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Num Lock'**
+  String get keyNumLock;
+
+  /// The Enter key on the numeric keypad, as written in Windows shortcuts such as Win+Ctrl+Shift+← in Settings, the tray menu and the grid's hints. Use the legend printed on the key.
+  ///
+  /// In en, this message translates to:
+  /// **'Num Enter'**
+  String get keyNumEnter;
+
+  /// The Escape key as macOS shortcut hints write it, lowercase as the key is printed on Mac keyboards, in the Shortcuts hint "Listening… press a combination, or esc to cancel." Chinese keeps the English word, because that is what the key says.
+  ///
+  /// In en, this message translates to:
+  /// **'esc'**
+  String get keyMacEscape;
+
+  /// The Return key as the grid names it on macOS, as the key that places the window, in the grid's accessibility hint and spoken announcement ("Return places the window"). Windows says Enter. Chinese keeps the English word, because that is what the key says.
+  ///
+  /// In en, this message translates to:
+  /// **'Return'**
+  String get keyMacReturn;
+
+  /// A key on the numeric keypad, as written in shortcuts on both macOS and Windows, such as Num 5 or Num /. {key} is the character on the key. Use the legend printed on the keypad.
+  ///
+  /// In en, this message translates to:
+  /// **'Num {key}'**
+  String keyNumpad(String key);
+
+  /// The four modifier keys as a list in a sentence, in the Shortcuts hint "Click a shortcut to change it. Combinations need Win, Ctrl, Alt or Shift." Each placeholder is one key name (a glyph such as ⌃ on macOS). Use your language's list pattern, ending with its word for "or".
+  ///
+  /// In en, this message translates to:
+  /// **'{a}, {b}, {c} or {d}'**
+  String keyListAnyModifier(String a, String b, String c, String d);
+
+  /// The Settings window's first tab, for everything that is not a keyboard shortcut. On macOS it is also the name of a System Settings pane, so use Apple's word for General.
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get settingsTabGeneral;
+
+  /// The Settings window's second tab, the list of keyboard shortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcuts'**
+  String get settingsTabShortcuts;
+
+  /// The Settings window's third tab, showing the version and the update check.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get settingsTabAbout;
+
+  /// What a screen reader calls one tab of the Settings window. Never drawn on screen. {tab} is the tab's name, written by the three messages above.
+  ///
+  /// In en, this message translates to:
+  /// **'{tab} tab'**
+  String settingsTabLabel(String tab);
+
+  /// The label of the General tab's row that shows whether Orthant has the macOS Accessibility permission. It is the name of a macOS Privacy & Security pane, so use Apple's word for Accessibility. Shown on macOS only.
+  ///
+  /// In en, this message translates to:
+  /// **'Accessibility'**
+  String get generalGroupAccessibility;
+
+  /// The label of the General tab's row that shows the shortcut which opens the grid.
+  ///
+  /// In en, this message translates to:
+  /// **'Open grid'**
+  String get generalGroupOpenGrid;
+
+  /// The label of the General tab's group of two steppers that set the grid's columns and rows.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid'**
+  String get generalGroupGrid;
+
+  /// The label of the General tab's group that sets the space left between windows and the screen's edge when a window is placed.
+  ///
+  /// In en, this message translates to:
+  /// **'Gaps'**
+  String get generalGroupGaps;
+
+  /// The label of the General tab's group holding the launch-at-login checkbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Startup'**
+  String get generalGroupStartup;
+
+  /// The label of the General tab's last group, which holds the pop-up button that picks the language Orthant shows. Also the name a screen reader gives that button.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get generalGroupLanguage;
+
+  /// The first entry of the language pop-up button on the General tab, and what it shows by default: follow the language of the operating system. Use the wording your language's own settings screens use for "follow the system". The other entries are language names, each written in its own language and never translated.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get languageSystem;
+
+  /// A note under the language pop-up button on the General tab, shown on Windows. The window that offers and installs updates belongs to the operating system's updater and takes the new language only when Orthant is next started, unlike the rest of Orthant, which changes at once. Orthant stays as written. macOS shows generalLanguageRelaunchNoteMac instead.
+  ///
+  /// In en, this message translates to:
+  /// **'The update window changes language the next time Orthant starts.'**
+  String get generalLanguageUpdaterNote;
+
+  /// A note under the language pop-up button on the General tab, shown on macOS in place of generalLanguageUpdaterNote. Two things take the new language only when Orthant is next started, unlike the rest of Orthant, which changes at once: the menu bar (the macOS menu bar menu Orthant lives in, which the system draws) and the window that offers and installs updates, which belongs to the operating system's updater. Use the word your language's macOS uses for the menu bar. Orthant stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'The menu bar and the update window change language the next time Orthant starts.'**
+  String get generalLanguageRelaunchNoteMac;
+
+  /// The caption of the General tab's stepper for the number of columns in the grid. A column runs top to bottom. Keep it short: the caption has room for about five characters.
+  ///
+  /// In en, this message translates to:
+  /// **'Columns'**
+  String get generalColumns;
+
+  /// The caption of the General tab's stepper for the number of rows in the grid. A row runs left to right. Keep it short: the caption has room for about five characters.
+  ///
+  /// In en, this message translates to:
+  /// **'Rows'**
+  String get generalRows;
+
+  /// The caption of the General tab's stepper for how large a gap is, beside the unit (pt on macOS, px on Windows).
+  ///
+  /// In en, this message translates to:
+  /// **'Size'**
+  String get generalGapSize;
+
+  /// The label of the General tab's checkbox that turns gaps between placed windows and the screen's edge on or off.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave gaps'**
+  String get generalLeaveGaps;
+
+  /// The button at the foot of the General tab that puts the grid size and the gaps back to their defaults. It changes nothing else, and the name says so.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Grid & Gaps'**
+  String get generalResetGridAndGaps;
+
+  /// Beside a green dot on the General tab, when Orthant has the macOS Accessibility permission. Shown on macOS only.
+  ///
+  /// In en, this message translates to:
+  /// **'Granted'**
+  String get generalAccessibilityGranted;
+
+  /// Beside a warning dot on the General tab, when Orthant lacks the macOS Accessibility permission. It has no final full stop in English. Shown on macOS only.
+  ///
+  /// In en, this message translates to:
+  /// **'Not granted. Shortcuts and the grid do nothing'**
+  String get generalAccessibilityNotGranted;
+
+  /// The button under the missing-permission warning that opens the macOS Accessibility pane. Accessibility is the name of that pane. Shown on macOS only.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Accessibility Settings…'**
+  String get generalOpenAccessibilitySettings;
+
+  /// The tooltip on the warning icon beside the grid shortcut on the General tab, when the system refused to give Orthant that key combination. {system} is the operating system's name, macOS or Windows, and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'{system} or another app already uses this combination, so it never reaches Orthant.'**
+  String generalSummonUnavailable(String system);
+
+  /// The link beside the grid shortcut on the General tab that opens the Shortcuts tab, where it is changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Change…'**
+  String get generalChange;
+
+  /// Shown where a command has no keyboard shortcut yet, such as the grid shortcut on the General tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get shortcutNotSet;
+
+  /// The label of the General tab's checkbox that starts Orthant when the user signs in, on macOS and on Windows.
+  ///
+  /// In en, this message translates to:
+  /// **'Launch at login'**
+  String get generalLaunchAtLogin;
+
+  /// A note under the Launch at login checkbox on macOS, when the system answered with a state Orthant does not know. macOS stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'macOS reported a login-item state Orthant does not recognise. Switching this on may still work.'**
+  String get generalLoginUnrecognisedMac;
+
+  /// A note under the Launch at login checkbox on Windows, when the system answered with a state Orthant does not know. Windows stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Windows reported a startup state Orthant does not recognise. Switching this on may still work.'**
+  String get generalLoginUnrecognisedWindows;
+
+  /// A note under the Launch at login checkbox on macOS 13 and 14, when the user has switched Orthant off in System Settings. One whole sentence: it names three System Settings screens in order, joined by ▸, and each name is copied exactly from Apple's own words for that macOS version. The macOS 15 and later version is the next message.
+  ///
+  /// In en, this message translates to:
+  /// **'Turned off in System Settings ▸ General ▸ Login Items, so Orthant will not start automatically.'**
+  String get generalLoginTurnedOffMac13;
+
+  /// A note under the Launch at login checkbox on macOS 15 and later, when the user has switched Orthant off in System Settings. One whole sentence: it names three System Settings screens in order, joined by ▸, and each name is copied exactly from Apple's own words for macOS 15 and later, where the last screen is called Login Items & Extensions.
+  ///
+  /// In en, this message translates to:
+  /// **'Turned off in System Settings ▸ General ▸ Login Items & Extensions, so Orthant will not start automatically.'**
+  String get generalLoginTurnedOffMac15;
+
+  /// A note under the Launch at login checkbox on Windows, when the user has switched Orthant off in Windows Settings. One whole sentence: it names three Windows Settings screens in order, joined by ▸, and each name is copied exactly from that Windows language's own Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Turned off in Settings ▸ Apps ▸ Startup, so Orthant will not start automatically.'**
+  String get generalLoginTurnedOffWindows;
+
+  /// The link under the macOS note that opens the System Settings pane for Login Items, on macOS 13 and 14. It names that pane exactly as the previous note does.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Login Items…'**
+  String get generalOpenLoginItemsMac13;
+
+  /// The link under the macOS note that opens the System Settings pane for Login Items & Extensions, on macOS 15 and later. It names that pane exactly as the previous note does.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Login Items & Extensions…'**
+  String get generalOpenLoginItemsMac15;
+
+  /// The link under the Windows note that opens the Windows Settings page for startup apps (Settings, Apps, Startup).
+  ///
+  /// In en, this message translates to:
+  /// **'Open Startup Apps…'**
+  String get generalOpenStartupApps;
+
+  /// What a screen reader says for a stepper that has no unit: its caption, then its value, such as "Columns 6". Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'{caption} {value}'**
+  String generalStepperValue(String caption, int value);
+
+  /// What a screen reader says for a stepper that has a unit: its caption, its value and the unit, such as "Size 8 pt". {unit} is pt on macOS and px on Windows and stays as written. Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'{caption} {value} {unit}'**
+  String generalStepperValueUnit(String caption, int value, String unit);
+
+  /// What a screen reader calls the up arrow of a stepper. {label} is what the stepper announces (its caption and value), such as "Columns 6". Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'{label}, increase'**
+  String stepperIncrease(String label);
+
+  /// What a screen reader calls the down arrow of a stepper. {label} is what the stepper announces (its caption and value), such as "Columns 6". Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'{label}, decrease'**
+  String stepperDecrease(String label);
+
+  /// The caption under the grid preview on the General tab when gaps are on: the grid's size and the largest gap a placement keeps (it shrinks for a window too small to keep it). {cols} and {rows} are the grid's size, and the × between them stays. {gap} is the gap, a whole number, and {unit} is pt on macOS and px on Windows and stays as written. English says "gaps" even for 1, because the word counts the gaps between cells; a language whose plural needs a form for one may add it.
+  ///
+  /// In en, this message translates to:
+  /// **'{gap, plural, other{{cols} × {rows} · up to {gap} {unit} gaps}}'**
+  String gridPreviewCaptionGaps(int cols, int rows, int gap, String unit);
+
+  /// Shown inside a shortcut field while it listens for a key combination and no modifier key is held yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Press keys…'**
+  String get recordingPressKeys;
+
+  /// The version line on the About tab. {version} is the release name, such as 1.1.2 or 1.1.2-beta.1, or the version with its build number in brackets for a development build.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String aboutVersion(String version);
+
+  /// A line on the About tab when an update check found a newer release, above the Update button. {name} is the new version, such as 1.1.3. Orthant stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Orthant {name} is available.'**
+  String aboutUpdateAvailable(String name);
+
+  /// The button on the About tab that opens the updater's offer, shown only while an update is waiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Update…'**
+  String get aboutUpdate;
+
+  /// The button on the About tab that checks for a new version of the app.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for Updates…'**
+  String get aboutCheckForUpdates;
+
+  /// The label of the About tab's checkbox that lets the app look for new versions on its own schedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates automatically'**
+  String get aboutAutomaticChecks;
+
+  /// The one-line description of the app at the foot of the About tab. It names no operating system.
+  ///
+  /// In en, this message translates to:
+  /// **'A grid-based window manager.'**
+  String get aboutTagline;
+
+  /// The name given to a custom region that covers the whole screen, shown in the region picker's name field and in the Shortcuts list. A generated name: the app suggests it from the shape and shows it in the current language, but always stores the English text.
+  ///
+  /// In en, this message translates to:
+  /// **'Full screen'**
+  String get regionNameFullScreen;
+
+  /// The name given to a custom region that fills the full height from the left edge, such as "Left ⅔". {fraction} is how much of the width it spans, as a fraction glyph or digits such as ⅔ or 3/7, and stays as written. A generated name, shown in the region picker's name field and the Shortcuts list.
+  ///
+  /// In en, this message translates to:
+  /// **'Left {fraction}'**
+  String regionNameLeft(String fraction);
+
+  /// The name given to a custom region that fills the full height from the right edge, such as "Right ⅓". {fraction} is how much of the width it spans, as a fraction glyph or digits such as ⅓ or 3/7, and stays as written. A generated name, shown in the region picker's name field and the Shortcuts list.
+  ///
+  /// In en, this message translates to:
+  /// **'Right {fraction}'**
+  String regionNameRight(String fraction);
+
+  /// The name given to a custom region that fills the full width from the top edge, such as "Top ½". {fraction} is how much of the height it spans, as a fraction glyph or digits such as ½ or 3/7, and stays as written. A generated name, shown in the region picker's name field and the Shortcuts list.
+  ///
+  /// In en, this message translates to:
+  /// **'Top {fraction}'**
+  String regionNameTop(String fraction);
+
+  /// The name given to a custom region that fills the full width from the bottom edge, such as "Bottom ¼". {fraction} is how much of the height it spans, as a fraction glyph or digits such as ¼ or 3/7, and stays as written. A generated name, shown in the region picker's name field and the Shortcuts list.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom {fraction}'**
+  String regionNameBottom(String fraction);
+
+  /// The name given to a custom region whose shape none of the other generated names describes, such as a block in the middle of the screen. A generated name, shown in the region picker's name field and the Shortcuts list.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom region'**
+  String get regionNameCustom;
+
+  /// The title of the region picker sheet while a new custom region is being drawn. The sheet opens over the Shortcuts tab.
+  ///
+  /// In en, this message translates to:
+  /// **'New region'**
+  String get regionSheetTitleNew;
+
+  /// The title of the region picker sheet while an existing custom region is being edited.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit region'**
+  String get regionSheetTitleEdit;
+
+  /// The one-line instruction under the region picker's grid. {shift} is the Shift key as the platform draws it: the symbol ⇧ on macOS, the word Shift on Windows. The dot between the two halves stays.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to draw · arrows to move, {shift} to extend'**
+  String regionSheetHint(String shift);
+
+  /// The label of the name field in the region picker sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get regionSheetName;
+
+  /// The label of the shortcut field in the region picker sheet, beside the keys bound to the region.
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcut'**
+  String get regionSheetShortcut;
+
+  /// What a screen reader says for the region picker's shortcut field when no key combination is set. Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Record shortcut, none set'**
+  String get regionSheetRecordNone;
+
+  /// What a screen reader says for the region picker's shortcut field when a key combination is set. {combo} is the combination as the platform writes it, such as ⌃⌥← or Win+Ctrl+Shift+Left, and stays as written. Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Record shortcut, currently {combo}'**
+  String regionSheetRecordCurrent(String combo);
+
+  /// The button-like prompt in the region picker's shortcut field while no combination is set. Pressing it starts listening for the combination.
+  ///
+  /// In en, this message translates to:
+  /// **'Click to record'**
+  String get regionSheetClickToRecord;
+
+  /// A notice in the region picker sheet: the key combination the user chose belongs to another command. {command} is that command's name as the Shortcuts list shows it, such as "Left half" or the name of another custom region.
+  ///
+  /// In en, this message translates to:
+  /// **'{command} already uses this combination.'**
+  String regionSheetConflict(String command);
+
+  /// A notice in the region picker sheet after the user chose to take a key combination from another command: saving will leave that command without it. {command} is that command's name as the Shortcuts list shows it.
+  ///
+  /// In en, this message translates to:
+  /// **'{command} will lose this combination when you save.'**
+  String regionSheetConflictTaking(String command);
+
+  /// The small link in the region picker's collision notice that takes the key combination from the other command for this region.
+  ///
+  /// In en, this message translates to:
+  /// **'Use it here'**
+  String get regionSheetUseHere;
+
+  /// What a screen reader says for the link that takes a key combination from another command for this region. Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this combination here'**
+  String get regionSheetUseHereLabel;
+
+  /// The button that closes the region picker sheet without saving.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get regionSheetCancel;
+
+  /// The button on the region picker sheet, shown while editing, that deletes the custom region. Drawn short; a screen reader says the longer regionSheetDeleteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get regionSheetDelete;
+
+  /// What a screen reader says for the region picker's Delete button. Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete region'**
+  String get regionSheetDeleteLabel;
+
+  /// The default button on the region picker sheet while a new custom region is being created. Drawn short; a screen reader says the longer regionSheetAddLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get regionSheetAdd;
+
+  /// What a screen reader says for the region picker's Add button. Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Add region'**
+  String get regionSheetAddLabel;
+
+  /// The default button on the region picker sheet while an existing custom region is being edited. Drawn short; a screen reader says the longer regionSheetSaveLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get regionSheetSave;
+
+  /// What a screen reader says for the region picker's Save button. Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Save region'**
+  String get regionSheetSaveLabel;
+
+  /// The name of the command that opens the grid, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Open grid'**
+  String get commandOpenGrid;
+
+  /// The name of the command that places the frontmost window in the left half of its display, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Left half'**
+  String get commandLeftHalf;
+
+  /// The name of the command that places the frontmost window in the right half of its display, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Right half'**
+  String get commandRightHalf;
+
+  /// The name of the command that places the frontmost window in the top half of its display, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Top half'**
+  String get commandTopHalf;
+
+  /// The name of the command that places the frontmost window in the bottom half of its display, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom half'**
+  String get commandBottomHalf;
+
+  /// The name of the command that places the frontmost window in the top-left quarter of its display, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Top-left quarter'**
+  String get commandTopLeft;
+
+  /// The name of the command that places the frontmost window in the top-right quarter of its display, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Top-right quarter'**
+  String get commandTopRight;
+
+  /// The name of the command that places the frontmost window in the bottom-left quarter of its display, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom-left quarter'**
+  String get commandBottomLeft;
+
+  /// The name of the command that places the frontmost window in the bottom-right quarter of its display, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom-right quarter'**
+  String get commandBottomRight;
+
+  /// The name of the command that makes the frontmost window fill its display, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximize'**
+  String get commandMaximize;
+
+  /// The name of the command that centers the frontmost window on its display without resizing it, as the Shortcuts list, its notices and the screen reader call it. It is also read inside sentences, so keep it a short name.
+  ///
+  /// In en, this message translates to:
+  /// **'Center'**
+  String get commandCenter;
+
+  /// The title at the top of the Shortcuts tab. The tab itself is named by settingsTabShortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcuts'**
+  String get shortcutsTitle;
+
+  /// The line under the Shortcuts tab's title. It says what the shortcuts below do. "Its own display" means the display the window is on, not the one the pointer is on.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the grid, or snap the frontmost window straight to a region of its own display.'**
+  String get shortcutsSubtitle;
+
+  /// The heading over the eleven commands Orthant ships with, in the Shortcuts list. English draws it in capital letters.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in'**
+  String get shortcutsGroupBuiltIn;
+
+  /// The heading over the custom regions the user has drawn, in the Shortcuts list, with the Add region row at its end. English draws it in capital letters.
+  ///
+  /// In en, this message translates to:
+  /// **'Your regions'**
+  String get shortcutsGroupRegions;
+
+  /// The line under the regions heading in the Shortcuts list. It explains the two ways to make a custom region: draw it in the region picker, or select it on the grid and press the save chord. {key} is that chord as the platform writes it, such as ⌘S or Ctrl+S, and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Bind a shape the built-ins don\'t cover. Draw it here, or select it in the grid and press {key}.'**
+  String shortcutsRegionsHint(String key);
+
+  /// The warning above the Shortcuts list while Orthant lacks the macOS Accessibility permission. Accessibility is the name of that System Settings pane. The link "Open Accessibility Settings…" follows it on the same line, after two spaces the app adds. Shown on macOS only.
+  ///
+  /// In en, this message translates to:
+  /// **'None of these will fire until Orthant has Accessibility permission. You can still change them.'**
+  String get shortcutsNotGranted;
+
+  /// The footer of the Shortcuts tab while a row is recording a new key combination. {escape} is the Escape key as the platform prints it, esc on macOS and Esc on Windows, and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening… press a combination, or {escape} to cancel.'**
+  String shortcutsListening(String escape);
+
+  /// The footer of the Shortcuts tab when nothing is happening. {modifiers} is the list of modifier keys, one of which every combination must include, already written as the platform writes them, such as "⌃, ⌥, ⇧ or ⌘" or "Win, Ctrl, Alt or Shift", and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Click a shortcut to change it. Combinations need {modifiers}.'**
+  String shortcutsHint(String modifiers);
+
+  /// The footer notice on the Shortcuts tab when the user records a key combination another command already owns. The row keeps listening; pressing the same combination again, or the "Use it here" link beside the notice, takes it. {combo} is the combination as the platform writes it, such as ⌃⌥→, and stays as written. {owner} is the name of the command that has it, such as "Left half".
+  ///
+  /// In en, this message translates to:
+  /// **'{combo} is used by {owner}. Press it again to use it here.'**
+  String shortcutsCollision(String combo, String owner);
+
+  /// The link beside the collision notice on the Shortcuts tab that takes the key combination from the other command for this row.
+  ///
+  /// In en, this message translates to:
+  /// **'Use it here'**
+  String get shortcutsUseHere;
+
+  /// The footer notice on the Shortcuts tab after a key combination was taken from another command: that command now has no shortcut. An Undo link follows it. {command} is that command's name, such as "Left half". {combo} is the combination as the platform writes it, such as ⌃⌥←, and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'{command} lost {combo}.'**
+  String shortcutsDisplaced(String command, String combo);
+
+  /// The link beside a notice on the Shortcuts tab that puts back what the change just made replaced: a taken key combination, a reset, or a deleted region. On macOS use Apple's word for Undo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get shortcutsUndo;
+
+  /// The footer notice on the Shortcuts tab after a custom region was deleted, with an Undo link. {name} is the region's name as the list shows it, either one Orthant generated, such as "Left ⅔", or one the user typed, and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} deleted.'**
+  String shortcutsRegionDeleted(String name);
+
+  /// The footer notice on the Shortcuts tab after Reset Shortcuts, with an Undo link.
+  ///
+  /// In en, this message translates to:
+  /// **'All shortcuts reset to their defaults.'**
+  String get shortcutsResetDone;
+
+  /// The button at the foot of the Shortcuts tab that puts every shortcut back to its default. It leaves custom regions in the list and clears their key combinations.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Shortcuts'**
+  String get shortcutsReset;
+
+  /// The last row of the Shortcuts list, which opens the region picker to draw a new custom region. The ellipsis says a window opens. A screen reader says shortcutsAddRegionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Add region…'**
+  String get shortcutsAddRegion;
+
+  /// What a screen reader says for the Add region row of the Shortcuts list. Never drawn on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Add region'**
+  String get shortcutsAddRegionLabel;
+
+  /// What a screen reader says for the name of a custom region in the Shortcuts list, which opens the region picker on it. Never drawn on screen. {name} is the region's name as the list shows it, and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit {name}'**
+  String shortcutsEditRegion(String name);
+
+  /// The button-like prompt on a Shortcuts row that has no key combination. Pressing the row starts listening for one.
+  ///
+  /// In en, this message translates to:
+  /// **'Click to set'**
+  String get shortcutsClickToSet;
+
+  /// The tooltip on the small button at the end of a Shortcuts row that clears the row's key combination. A screen reader says shortcutsRemoveLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove shortcut'**
+  String get shortcutsRemove;
+
+  /// What a screen reader says for the button at the end of a Shortcuts row that clears the row's key combination. Never drawn on screen. {command} is the command's name as the list shows it.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {command} shortcut'**
+  String shortcutsRemoveLabel(String command);
+
+  /// The tooltip on the warning icon beside a key combination on the Shortcuts tab that the system refused to give Orthant. {system} is the operating system's name, macOS or Windows, and stays as written. The line break before the second sentence stays.
+  ///
+  /// In en, this message translates to:
+  /// **'{system} or another app already uses this combination, so it never reaches Orthant.\nClick the shortcut to pick a different one.'**
+  String shortcutsUnavailableTooltip(String system);
+
+  /// What a screen reader says for a Shortcuts row that has a key combination: the command, then the combination. Never drawn on screen. {command} is the command's name as the list shows it. {combo} is the combination as the platform writes it, such as ⌃⌥←, and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'{command}, {combo}'**
+  String shortcutRowBound(String command, String combo);
+
+  /// What a screen reader says for a Shortcuts row that has no key combination. Never drawn on screen. {command} is the command's name as the list shows it.
+  ///
+  /// In en, this message translates to:
+  /// **'{command}, no shortcut'**
+  String shortcutRowUnbound(String command);
+
+  /// What a screen reader says for a Shortcuts row whose key combination the system refused to give Orthant, so it is stored and shown but never fires. Never drawn on screen; sighted users see a warning icon. {command} is the command's name as the list shows it. {combo} is the combination as the platform writes it, and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'{command}, {combo}, unavailable'**
+  String shortcutRowUnavailable(String command, String combo);
+
+  /// What a screen reader says for a Shortcuts row that is recording a new key combination. Never drawn on screen. {command} is the command's name as the list shows it.
+  ///
+  /// In en, this message translates to:
+  /// **'{command}, listening for a combination'**
+  String shortcutRowListening(String command);
+
+  /// What a screen reader says for a Shortcuts row that is recording when the combination just pressed belongs to another command: the same question the footer shows, so someone who cannot see the footer hears it. Never drawn on screen. {command} is the row's command. {combo} is the combination as the platform writes it, and stays as written. {owner} is the command that has it. The key is called Escape here because it is spoken.
+  ///
+  /// In en, this message translates to:
+  /// **'{command}, {combo} is used by {owner}. Press it again to use it here, or escape to cancel.'**
+  String shortcutRowCollision(String command, String combo, String owner);
+
+  /// Shown under the shortcut recorder, and spoken, on Windows when the user presses a keypad digit, decimal point or = with a modifier held. Each of those is a different key depending on Num Lock, so no shortcut on one fires in both states. Windows is the operating system's name and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Windows can\'t use the keypad\'s digits, decimal point or = in a shortcut.'**
+  String get refusalKeypad;
+
+  /// Shown under the shortcut recorder, and spoken, on Windows when the user presses a key, with a modifier held, that Windows has no way to register as a shortcut. Windows is the operating system's name and stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Windows can\'t use that key in a shortcut.'**
+  String get refusalUnregistrable;
+
+  /// The heading of the first-run window that asks for the macOS Accessibility permission. Accessibility is the name of that System Settings pane, so use Apple's word for it. Shown on macOS only.
+  ///
+  /// In en, this message translates to:
+  /// **'Orthant needs Accessibility permission'**
+  String get onboardingTitle;
+
+  /// The paragraph under the first-run heading. It is one whole message because its second sentence is an instruction that names two System Settings screens in order, joined by ▸: write each name exactly as Apple's own words for that language and region, since the Hong Kong and Taiwan versions of macOS name Privacy & Security differently. “Orthant” in quotation marks is the name of the row the user switches on. Shown on macOS only.
+  ///
+  /// In en, this message translates to:
+  /// **'Orthant moves your windows using macOS Accessibility. Enable “Orthant” under Privacy & Security ▸ Accessibility and Orthant will pick it up straight away.'**
+  String get onboardingBody;
+
+  /// The paragraph under the first-run heading on macOS 27 and later, in place of onboardingBody there: macOS 27 renamed the Privacy & Security list that holds the Accessibility permission from Accessibility to Device Control and Data Access. It is one whole message for the same reason as onboardingBody: its second sentence is an instruction that names two System Settings screens in order, joined by ▸, each written exactly as Apple's own words for that language and region on macOS 27. “Orthant” in quotation marks is the name of the row the user switches on. Shown on macOS only.
+  ///
+  /// In en, this message translates to:
+  /// **'Orthant moves your windows using macOS Accessibility. Enable “Orthant” under Privacy & Security ▸ Device Control and Data Access and Orthant will pick it up straight away.'**
+  String get onboardingBodyMac27;
+
+  /// The button of the first-run window that opens the macOS Accessibility pane. Accessibility is the name of that pane. It has no ellipsis, unlike the same button on the General tab. Shown on macOS only.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Accessibility Settings'**
+  String get onboardingOpenAccessibility;
+
+  /// Beside a green check mark at the foot of the first-run window, once the user has switched the permission on.
+  ///
+  /// In en, this message translates to:
+  /// **'Permission granted'**
+  String get onboardingGranted;
+
+  /// Beside a grey dots icon at the foot of the first-run window, until the user has switched the permission on. Ends with an ellipsis.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for permission…'**
+  String get onboardingWaiting;
+
+  /// The heading of the window shown once, straight after the user grants the permission. Orthant stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Orthant is ready'**
+  String get readyTitle;
+
+  /// The line under the heading of the ready window. The two ways are the two cards below it: the grid and the direct shortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Two ways to put a window where you want it.'**
+  String get readySubtitle;
+
+  /// The caption on the ready window's first card, which shows the keyboard shortcut that opens the grid. {shift} is the key that extends the selection and {place} the key that places the window, as the platform writes them (⇧ and ↩ on macOS, Shift and Enter on Windows); key names stay as written in every language. A block is a rectangle of grid cells.
+  ///
+  /// In en, this message translates to:
+  /// **'Opens the grid. Drag across it to pick any block: thirds, two-thirds, anything. Or use the arrow keys, {shift} to extend, {place} to place.'**
+  String readyGridCaption(String shift, String place);
+
+  /// The caption on the ready window's second card, which shows two direct shortcuts and, beside them, a drawing of a custom region. “The third one” is that third drawing, a region the built-in shortcuts cannot make.
+  ///
+  /// In en, this message translates to:
+  /// **'Snaps straight to a half, a quarter, or full screen. No aiming, and you can add shapes of your own, like the third one.'**
+  String get readyDirectCaption;
+
+  /// The link at the lower left of the ready window that opens the Shortcuts tab of Settings. Ends with an ellipsis.
+  ///
+  /// In en, this message translates to:
+  /// **'Change these shortcuts…'**
+  String get readyChangeShortcuts;
+
+  /// The button at the lower right of the ready window that closes it.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get readyDone;
+
+  /// Shown on the ready window's grid card in place of the key combination, when the user has removed the shortcut that opens the grid.
+  ///
+  /// In en, this message translates to:
+  /// **'No shortcut set'**
+  String get readyNoShortcutSet;
+
+  /// The tooltip on the warning icon beside a key combination on the ready window, when the system refused to give Orthant that combination. {system} is the operating system's name, macOS or Windows, and stays as written. The line break before the second sentence stays; “below” points at the link “Change these shortcuts…” under the cards.
+  ///
+  /// In en, this message translates to:
+  /// **'{system} or another app already uses this combination, so it never reaches Orthant.\nPick a different one below.'**
+  String readyUnavailableTooltip(String system);
+}
+
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
+  const _AppLocalizationsDelegate();
+
+  @override
+  Future<AppLocalizations> load(Locale locale) {
+    return SynchronousFuture<AppLocalizations>(lookupAppLocalizations(locale));
+  }
+
+  @override
+  bool isSupported(Locale locale) =>
+      <String>['en', 'zh'].contains(locale.languageCode);
+
+  @override
+  bool shouldReload(_AppLocalizationsDelegate old) => false;
+}
+
+AppLocalizations lookupAppLocalizations(Locale locale) {
+  // Lookup logic when language+script+country codes are specified.
+  switch (locale.toString()) {
+    case 'zh_Hant_HK':
+      return AppLocalizationsZhHantHk();
+  }
+
+  // Lookup logic when language+script codes are specified.
+  switch (locale.languageCode) {
+    case 'zh':
+      {
+        switch (locale.scriptCode) {
+          case 'Hant':
+            return AppLocalizationsZhHant();
+        }
+        break;
+      }
+  }
+
+  // Lookup logic when only language code is specified.
+  switch (locale.languageCode) {
+    case 'en':
+      return AppLocalizationsEn();
+    case 'zh':
+      return AppLocalizationsZh();
+  }
+
+  throw FlutterError(
+    'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
+}

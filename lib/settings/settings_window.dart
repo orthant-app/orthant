@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
 import '../core/window_controller.dart';
+import '../l10n/app_localizations.dart';
+import '../l10n/strings.dart';
 import '../shortcuts/bindings.dart';
 import '../shortcuts/command_ref.dart';
 import '../shortcuts/custom_region.dart';
@@ -43,6 +45,9 @@ class SettingsWindow extends StatefulWidget {
     this.onPendingConsumed,
     this.permissionGranted = true,
     this.loginStatus = LoginItemStatus.unavailable,
+    this.loginItemsHasExtensions = true,
+    this.languageChoice,
+    this.onLanguageChanged,
     this.onSetLoginItem,
     this.onOpenLoginItems,
     this.onOpenAccessibility,
@@ -76,6 +81,15 @@ class SettingsWindow extends StatefulWidget {
   final VoidCallback? onPendingConsumed;
   final bool permissionGranted;
   final LoginItemStatus loginStatus;
+
+  /// Whether this macOS names its pane "Login Items & Extensions" (15 and
+  /// later) rather than "Login Items". See [GeneralPane.loginItemsHasExtensions].
+  final bool loginItemsHasExtensions;
+
+  /// The language picked in Settings and the way to change it. See
+  /// [GeneralPane.languageChoice].
+  final String? languageChoice;
+  final ValueChanged<String?>? onLanguageChanged;
 
   /// What the running bundle reports itself to be, for the About pane. An
   /// unknown version renders no version line rather than a half-formed one.
@@ -171,6 +185,9 @@ class _SettingsWindowState extends State<SettingsWindow> {
                   onSettingsChanged: widget.onSettingsChanged,
                   permissionGranted: widget.permissionGranted,
                   loginStatus: widget.loginStatus,
+                  loginItemsHasExtensions: widget.loginItemsHasExtensions,
+                  languageChoice: widget.languageChoice,
+                  onLanguageChanged: widget.onLanguageChanged,
                   bindings: widget.bindings,
                   summonUnavailable: widget.unavailable.contains(
                     const BuiltIn(ShortcutCommand.showGrid),
@@ -231,10 +248,16 @@ class _TabBar extends StatelessWidget {
   final void Function(SettingsTab) onSelect;
   final PlatformTokens tokens;
 
-  static const _labels = {
-    SettingsTab.general: ('General', Icons.tune),
-    SettingsTab.shortcuts: ('Shortcuts', Icons.keyboard_outlined),
-    SettingsTab.about: ('About', Icons.info_outline),
+  static const _icons = {
+    SettingsTab.general: Icons.tune,
+    SettingsTab.shortcuts: Icons.keyboard_outlined,
+    SettingsTab.about: Icons.info_outline,
+  };
+
+  static String _name(AppLocalizations l, SettingsTab tab) => switch (tab) {
+    SettingsTab.general => l.settingsTabGeneral,
+    SettingsTab.shortcuts => l.settingsTabShortcuts,
+    SettingsTab.about => l.settingsTabAbout,
   };
 
   @override
@@ -258,7 +281,9 @@ class _TabBar extends StatelessWidget {
             explicitChildNodes: true,
             child: Row(
               mainAxisSize: MainAxisSize.min,
-              children: [for (final tab in SettingsTab.values) _segment(tab)],
+              children: [
+                for (final tab in SettingsTab.values) _segment(context, tab),
+              ],
             ),
           ),
         ),
@@ -266,12 +291,14 @@ class _TabBar extends StatelessWidget {
     );
   }
 
-  Widget _segment(SettingsTab tab) {
+  Widget _segment(BuildContext context, SettingsTab tab) {
     final selected = tab == current;
-    final (label, icon) = _TabBar._labels[tab]!;
+    final l = context.l10n;
+    final label = _name(l, tab);
+    final icon = _icons[tab]!;
     return MacControl(
       onPressed: () => onSelect(tab),
-      semanticLabel: '$label tab',
+      semanticLabel: l.settingsTabLabel(label),
       selected: selected,
       role: SemanticsRole.tab,
       focusRingRadius: 6,

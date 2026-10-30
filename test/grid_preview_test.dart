@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/settings/grid_preview.dart';
 
+import 'support/locales.dart';
+import 'support/localized_host.dart';
+import 'support/no_english.dart';
+
 void main() {
   GridPreviewPainter painter({int cols = 6, int rows = 6, double gap = 0}) =>
       GridPreviewPainter(
@@ -89,5 +93,50 @@ void main() {
         home: Center(
             child: GridPreview(cols: 10, rows: 4, gap: 12, unit: 'pt'))));
     expect(find.text('10 × 4 · up to 12 pt gaps'), findsOneWidget);
+  });
+
+  group('the caption', () {
+    Future<void> pump(WidgetTester tester, double gap,
+            {Locale? locale, int cols = 6, int rows = 6}) =>
+        tester.pumpWidget(locale == null
+            ? MaterialApp(
+                home: Center(
+                  child: GridPreview(
+                      cols: cols, rows: rows, gap: gap, unit: 'pt'),
+                ),
+              )
+            : localizedApp(
+                locale,
+                Center(
+                  child: GridPreview(
+                      cols: cols, rows: rows, gap: gap, unit: 'pt'),
+                ),
+              ));
+
+    testWidgets('English is what it always was, a single point included',
+        (tester) async {
+      await pump(tester, 8);
+      expect(find.text('6 × 6 · up to 8 pt gaps'), findsOneWidget);
+      // "gaps" counts the gaps between cells, not the points, so one point is
+      // still "gaps". Pinned because a plural form for one is easy to add and
+      // changes today's English.
+      await pump(tester, 1);
+      expect(find.text('6 × 6 · up to 1 pt gaps'), findsOneWidget);
+      await pump(tester, 0);
+      expect(find.text('6 × 6'), findsOneWidget);
+    });
+
+    testWidgets('Chinese keeps the unit and says up to once', (tester) async {
+      await pump(tester, 8, locale: kSimplified, cols: 7, rows: 3);
+      expect(find.text('7 × 3 · 间距最多 8 pt'), findsOneWidget);
+      expectNoEnglish(tester);
+
+      await pump(tester, 8, locale: kTraditional, cols: 7, rows: 3);
+      expect(find.text('7 × 3 · 間距最多 8 pt'), findsOneWidget);
+      expectNoEnglish(tester);
+
+      await pump(tester, 0, locale: kTraditional);
+      expect(find.text('6 × 6'), findsOneWidget);
+    });
   });
 }

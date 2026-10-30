@@ -1,10 +1,12 @@
 import 'dart:async' show Timer, unawaited;
 import 'dart:io' show Platform;
 import 'dart:isolate' show Isolate;
+import 'dart:ui' show Locale;
 
 import 'package:flutter/foundation.dart'
     show ValueListenable, debugPrint, kReleaseMode, visibleForTesting;
 import 'package:flutter/services.dart';
+import '../l10n/languages.dart';
 import 'channel.dart';
 import 'geometry.dart';
 import 'window_controller.dart';
@@ -12,12 +14,47 @@ import 'windows_accent.dart';
 import 'windows_app_icon.dart';
 import 'windows_capture.dart';
 import 'windows_keys.dart';
+import 'windows_language_store.dart';
 import 'windows_login_item.dart';
 import 'windows_placement.dart';
+import 'windows_system_languages.dart';
 import 'windows_updater.dart';
 import 'windows_version_resource.dart';
 import 'windows_win32_ops.dart';
 import 'windows_window_ops.dart';
+
+/// The language WinSparkle's windows are shown in: Orthant's own resolved
+/// language for the OS's [systemLocales] and the stored [choice] (the registry
+/// value, null for System), as canonical tags (`zh-CN`, `zh-TW`).
+/// [WindowsUpdater.start] lowercases them at the WinSparkle API boundary.
+///
+/// Always the resolved one, System included: left to detect a language itself,
+/// WinSparkle would pick ones Orthant does not have, so that a Japanese Windows
+/// got an English Orthant with a Japanese update window. An empty or
+/// unreadable [choice] resolves as System, as it does for the app.
+@visibleForTesting
+String updaterLanguage(List<Locale> systemLocales, String? choice) =>
+    winSparkleLanguage(resolveAppLocale(systemLocales, choice: choice));
+
+/// Starts [updater] in Orthant's language ([updaterLanguage] of what
+/// [systemLocales] and [languageStore] say now). [systemLocales] is the very
+/// function the controller answers `systemLocales()` from: one source for
+/// both, which on Windows is the OS itself ([readSystemLocales]) and never
+/// `PlatformDispatcher.locales`, which is empty until `main()` first awaits.
+@visibleForTesting
+bool startUpdater(
+  WindowsUpdater updater, {
+  required String build,
+  required String display,
+  required void Function() onShutdownRequested,
+  required List<Locale> Function() systemLocales,
+  required LanguageStore languageStore,
+}) =>
+    updater.start(
+        build: build,
+        display: display,
+        onShutdownRequested: onShutdownRequested,
+        language: updaterLanguage(systemLocales(), languageStore.read()));
 
 /// The Windows backend of the seam.
 ///
@@ -47,7 +84,9 @@ class WindowsWindowController implements WindowController {
       this._exePath,
       this._openStartupApps,
       this._updater,
-      this._releaseName);
+      this._releaseName,
+      this._systemLocales,
+      this._languageStore);
 
   /// The one way to obtain the controller in production.
   ///
@@ -59,6 +98,7 @@ class WindowsWindowController implements WindowController {
   /// installer, asks the app to quit.
   static WindowsWindowController start({void Function()? onUpdaterShutdown}) {
     final win32 = FfiWin32WindowOps();
+    const languageStore = RegistryLanguageStore();
     final updater = WindowsUpdater(
         FfiSparkleApi(), const RegistryUpdateStore(), winInetGet,
         feedUrl: kUpdateFeedUrl,
@@ -67,12 +107,14 @@ class WindowsWindowController implements WindowController {
         log: _log);
     final version = readFixedFileVersion();
     try {
-      updater.start(
+      startUpdater(updater,
           build: version?.build ?? '',
           display: kReleaseName.isNotEmpty
               ? kReleaseName
               : version?.short ?? '',
-          onShutdownRequested: onUpdaterShutdown ?? () {});
+          onShutdownRequested: onUpdaterShutdown ?? () {},
+          systemLocales: readSystemLocales,
+          languageStore: languageStore);
     } catch (e) {
       // A missing or broken WinSparkle.dll costs updates, never the launch:
       // the tray comes up after this.
@@ -100,7 +142,9 @@ class WindowsWindowController implements WindowController {
         () => Platform.resolvedExecutable,
         openStartupAppsSettings,
         updater,
-        kReleaseName);
+        kReleaseName,
+        readSystemLocales,
+        languageStore);
   }
 
   /// [readAppIconPng] blocks, so it runs on an isolate of its own.
@@ -123,6 +167,8 @@ class WindowsWindowController implements WindowController {
     bool Function()? openStartupApps,
     WindowsUpdater? updater,
     String releaseName = '',
+    List<Locale> Function()? systemLocales,
+    LanguageStore? languageStore,
   }) =>
       WindowsWindowController._(
           readVersion,
@@ -145,7 +191,9 @@ class WindowsWindowController implements WindowController {
                         build: 0,
                         servicePack: 0
                       )),
-          releaseName);
+          releaseName,
+          systemLocales ?? () => const <Locale>[],
+          languageStore ?? const _NoLanguageStore());
 
   final VersionReader _readVersion;
   final Win32Desktop _desktop;
@@ -177,6 +225,13 @@ class WindowsWindowController implements WindowController {
 
   /// The tag's own name in a release build ([kReleaseName]), else empty.
   final String _releaseName;
+
+  /// The OS's preferred languages, for [systemLocales] and the updater's
+  /// language: [readSystemLocales] in production, nothing in a suite.
+  final List<Locale> Function() _systemLocales;
+
+  /// The stored language choice ([RegistryLanguageStore]).
+  final LanguageStore _languageStore;
 
   /// Icons by executable path, null for an app that has none to read. Read
   /// once per app per run: an executable's icon does not change while it
@@ -420,12 +475,14 @@ class WindowsWindowController implements WindowController {
     required int rows,
     required double gap,
     required bool saveHint,
+    required String locale,
   }) =>
       _channel.invokeMethod<void>(kSetOverlayGrid, {
         'cols': cols,
         'rows': rows,
         'gap': gap,
         'saveHint': saveHint,
+        'locale': locale,
       });
 
   /// Capture, then ask the runner to show the panels for that capture.
@@ -689,6 +746,20 @@ class WindowsWindowController implements WindowController {
 
   @override
   ValueListenable<AvailableUpdate?> get availableUpdate => _updater.found;
+
+  // Windows has no per-app language setting, so the OS's list is the system's
+  // (asked of Windows itself, not of the dispatcher, which is empty until
+  // main() first awaits) and the choice is Orthant's own registry value.
+  // Neither goes near the runner.
+  @override
+  Future<List<Locale>> systemLocales() async => _systemLocales();
+
+  @override
+  Future<String?> languageOverride() async => _languageStore.read();
+
+  @override
+  Future<void> setLanguageOverride(String? tag) async =>
+      _languageStore.write(tag);
 }
 
 /// No WinSparkle at all, for a suite that names none: it never starts.
@@ -707,6 +778,8 @@ class _NoSparkle implements SparkleApi {
   @override
   void setAutomaticCheck(bool on) {}
   @override
+  void setLang(String language) {}
+  @override
   void setShutdownRequestCallback(void Function() onRequest) {}
   @override
   void setSkippedCallback(void Function() onSkipped) {}
@@ -716,6 +789,15 @@ class _NoSparkle implements SparkleApi {
   void init() {}
   @override
   void checkWithUi() {}
+}
+
+/// No stored language choice, for a suite that names no store.
+class _NoLanguageStore implements LanguageStore {
+  const _NoLanguageStore();
+  @override
+  String? read() => null;
+  @override
+  void write(String? tag) {}
 }
 
 /// Nothing stored, with [_NoSparkle].

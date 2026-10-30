@@ -854,11 +854,12 @@ double WindowsOverlaySet::PressTick(LONG message_time) {
 }
 
 void WindowsOverlaySet::SetGrid(int cols, int rows, double gap,
-                                bool save_hint) {
+                                bool save_hint, const std::string& locale) {
   cols_ = cols;
   rows_ = rows;
   gap_ = gap;
   save_hint_ = save_hint;
+  locale_ = locale;
 }
 
 flutter::EncodableMap WindowsOverlaySet::SummonPayload(
@@ -890,6 +891,9 @@ flutter::EncodableMap WindowsOverlaySet::SummonPayload(
       {flutter::EncodableValue("rows"), flutter::EncodableValue(rows_)},
       {flutter::EncodableValue("gap"), flutter::EncodableValue(gap_)},
       {flutter::EncodableValue("saveHint"), flutter::EncodableValue(save_hint_)},
+      // The language the overlay speaks in, pushed with the grid: the panel's
+      // engine cannot ask the main one.
+      {flutter::EncodableValue("locale"), flutter::EncodableValue(locale_)},
   };
   if (!app_icon.empty()) {
     payload[flutter::EncodableValue("appIcon")] =

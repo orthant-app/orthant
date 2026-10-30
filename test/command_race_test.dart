@@ -1,3 +1,5 @@
+import 'dart:ui' show Locale;
+
 import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/geometry.dart';
@@ -82,6 +84,7 @@ class _SlottedWc implements WindowController {
     required int rows,
     required double gap,
     required bool saveHint,
+    required String locale,
   }) async {}
   // Launch-at-login is not what any of these tests exercise; the seam just
   // requires an answer. `unavailable` is the honest default for a fake.
@@ -89,6 +92,13 @@ class _SlottedWc implements WindowController {
   Future<Map<int, String>> keyboardLabels() async => const {};
   @override
   Future<AccentColors?> accentColor() async => null;
+
+  @override
+  Future<List<Locale>> systemLocales() async => const [];
+  @override
+  Future<String?> languageOverride() async => null;
+  @override
+  Future<void> setLanguageOverride(String? tag) async {}
 
   @override
   Future<AppVersion> appVersion() async => const AppVersion('1.0.0', '1');

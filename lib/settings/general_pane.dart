@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 
 import '../core/key_words.dart';
 import '../core/window_controller.dart';
+import '../l10n/app_localizations.dart';
+import '../l10n/languages.dart';
+import '../l10n/strings.dart';
 import '../shortcuts/bindings.dart';
 import '../shortcuts/command_ref.dart';
 import '../shortcuts/shortcut_command.dart';
@@ -10,6 +13,7 @@ import 'grid_preview.dart';
 import 'keycap.dart';
 import 'mac_controls.dart';
 import 'mac_control.dart';
+import 'mac_popup_button.dart';
 import 'mac_stepper.dart';
 import 'platform_theme.dart';
 import 'settings.dart';
@@ -19,44 +23,63 @@ import 'settings.dart';
 /// the OS keeps the startup entry, and what a gap is counted in (points on
 /// macOS; on Windows the device-independent pixels its own controls are
 /// sized in). macOS's are exactly what 1.0.x says.
+///
+/// The sentences are the language's own, one whole message per platform (and,
+/// on macOS, per pane name): the screens a sentence names are an OS's words,
+/// and a path is never assembled from parts.
 class _Words {
   const _Words({
     required this.hasPermission,
-    required this.loginUnrecognised,
-    required this.loginTurnedOff,
-    required this.openLoginItems,
+    required this.isWindows,
     required this.gapUnit,
   });
 
   final bool hasPermission;
-  final String loginUnrecognised;
-  final String loginTurnedOff;
-  final String openLoginItems;
+  final bool isWindows;
   final String gapUnit;
 
   static const macOS = _Words(
     hasPermission: true,
-    loginUnrecognised: 'macOS reported a login-item state Orthant does not '
-        'recognise. Switching this on may still work.',
-    loginTurnedOff: 'Turned off in System Settings ▸ General ▸ Login Items, so '
-        'Orthant will not start automatically.',
-    openLoginItems: 'Open Login Items…',
+    isWindows: false,
     gapUnit: 'pt',
   );
 
   static const windows = _Words(
     hasPermission: false,
-    loginUnrecognised: 'Windows reported a startup state Orthant does not '
-        'recognise. Switching this on may still work.',
-    loginTurnedOff: 'Turned off in Settings ▸ Apps ▸ Startup, so Orthant '
-        'will not start automatically.',
-    openLoginItems: 'Open Startup Apps…',
+    isWindows: true,
     gapUnit: 'px',
   );
 
   /// Read at use, so a test can name its platform.
   static _Words get current =>
       defaultTargetPlatform == TargetPlatform.windows ? windows : macOS;
+
+  /// The note under the language picker. On macOS the menu bar takes the new
+  /// language at the next start as well as the update window; Windows has no
+  /// menu of its own to name.
+  String languageNote(AppLocalizations l) => isWindows
+      ? l.generalLanguageUpdaterNote
+      : l.generalLanguageRelaunchNoteMac;
+
+  String loginUnrecognised(AppLocalizations l) => isWindows
+      ? l.generalLoginUnrecognisedWindows
+      : l.generalLoginUnrecognisedMac;
+
+  /// macOS 15 renamed Login Items to Login Items & Extensions; [extensions]
+  /// says which one this Mac has. It means nothing on Windows.
+  String loginTurnedOff(AppLocalizations l, {required bool extensions}) =>
+      isWindows
+      ? l.generalLoginTurnedOffWindows
+      : extensions
+      ? l.generalLoginTurnedOffMac15
+      : l.generalLoginTurnedOffMac13;
+
+  String openLoginItems(AppLocalizations l, {required bool extensions}) =>
+      isWindows
+      ? l.generalOpenStartupApps
+      : extensions
+      ? l.generalOpenLoginItemsMac15
+      : l.generalOpenLoginItemsMac13;
 }
 
 /// The General tab: everything configurable that is not a keyboard shortcut.
@@ -73,6 +96,9 @@ class GeneralPane extends StatelessWidget {
     required this.permissionGranted,
     required this.loginStatus,
     required this.bindings,
+    this.loginItemsHasExtensions = true,
+    this.languageChoice,
+    this.onLanguageChanged,
     this.summonUnavailable = false,
     this.onEditShortcuts,
     this.onSetLoginItem,
@@ -102,6 +128,20 @@ class GeneralPane extends StatelessWidget {
   final bool permissionGranted;
 
   final LoginItemStatus loginStatus;
+
+  /// Whether this macOS calls its pane "Login Items & Extensions" (15 and
+  /// later) rather than "Login Items" (13 and 14), so the sentence names the
+  /// screen the user will actually find. Unknown is read as the newer one, the
+  /// state of most Macs by now. Windows ignores it.
+  final bool loginItemsHasExtensions;
+
+  /// The language the user picked, as the tag that is stored (`zh-Hant-HK`
+  /// stays that); null is System. The picker shows the entry it belongs to.
+  final String? languageChoice;
+
+  /// The user picked an entry other than the one shown: a language's tag, or
+  /// null for System.
+  final ValueChanged<String?>? onLanguageChanged;
   final void Function(bool)? onSetLoginItem;
   final VoidCallback? onOpenLoginItems;
   final VoidCallback? onOpenAccessibility;
@@ -113,6 +153,7 @@ class GeneralPane extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final l = context.l10n;
     // Scrolling content, pinned footer — the same shape as the Shortcuts pane.
     // `Reset Grid & Gaps` used to live at the bottom of the scroll area, so on
     // a window shorter than the content (an ungranted permission row, or simply
@@ -122,13 +163,13 @@ class GeneralPane extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(child: _fields(t)),
-        _footer(t),
+        Expanded(child: _fields(t, l)),
+        _footer(t, l),
       ],
     );
   }
 
-  Widget _footer(PlatformTokens t) => Padding(
+  Widget _footer(PlatformTokens t, AppLocalizations l) => Padding(
     padding: const EdgeInsets.fromLTRB(24, 10, 24, 16),
     child: Align(
       alignment: Alignment.centerRight,
@@ -137,14 +178,14 @@ class GeneralPane extends StatelessWidget {
       // the shortcuts (Settings holds no bindings) nor launch-at-login
       // (the OS owns that). The Shortcuts tab has its own.
       child: MacPushButton(
-        label: 'Reset Grid & Gaps',
+        label: l.generalResetGridAndGaps,
         tokens: t,
         onPressed: () => onSettingsChanged(const Settings()),
       ),
     ),
   );
 
-  Widget _fields(PlatformTokens t) {
+  Widget _fields(PlatformTokens t, AppLocalizations l) {
     return SingleChildScrollView(
       controller: scrollController,
       child: Padding(
@@ -158,14 +199,16 @@ class GeneralPane extends StatelessWidget {
             // debugging it wants to see. Spec §6 lists permission status as an M7
             // deliverable in its own right.
             if (_Words.current.hasPermission) ...[
-              _group(t, 'Accessibility', [_permissionRow(t)]),
+              _group(t, l.generalGroupAccessibility, [_permissionRow(t, l)]),
               _hairline(t),
             ],
-            _group(t, 'Open grid', [_summonRow(t)]),
+            _group(t, l.generalGroupOpenGrid, [_summonRow(t, l)]),
             _hairline(t),
-            _gridAndGaps(t),
+            _gridAndGaps(t, l),
             _hairline(t),
-            _group(t, 'Startup', [_loginRow(t)]),
+            _group(t, l.generalGroupStartup, [_loginRow(t, l)]),
+            _hairline(t),
+            _group(t, l.generalGroupLanguage, [_languageRow(t, l)]),
           ],
         ),
       ),
@@ -203,17 +246,18 @@ class GeneralPane extends StatelessWidget {
   /// Grid and Gaps share one preview: two groups of controls, one picture.
   /// That sharing is what makes an arbitrary 7 x 3 comprehensible, and so what
   /// lets the grid be two steppers rather than a list of safe presets.
-  Widget _gridAndGaps(PlatformTokens t) => Row(
+  Widget _gridAndGaps(PlatformTokens t, AppLocalizations l) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _group(t, 'Grid', [
+            _group(t, l.generalGroupGrid, [
               _stepperRow(
                 t,
-                'Columns',
+                l,
+                l.generalColumns,
                 settings.gridCols,
                 kMinGridAxis,
                 kMaxGridAxis,
@@ -222,7 +266,8 @@ class GeneralPane extends StatelessWidget {
               const SizedBox(height: 6),
               _stepperRow(
                 t,
-                'Rows',
+                l,
+                l.generalRows,
                 settings.gridRows,
                 kMinGridAxis,
                 kMaxGridAxis,
@@ -230,9 +275,9 @@ class GeneralPane extends StatelessWidget {
               ),
             ]),
             const SizedBox(height: 15),
-            _group(t, 'Gaps', [
+            _group(t, l.generalGroupGaps, [
               MacCheckbox(
-                label: 'Leave gaps',
+                label: l.generalLeaveGaps,
                 tokens: t,
                 value: settings.gaps,
                 onChanged: (v) => onSettingsChanged(settings.copyWith(gaps: v)),
@@ -243,7 +288,8 @@ class GeneralPane extends StatelessWidget {
               // returns it instead of a default.
               _stepperRow(
                 t,
-                'Size',
+                l,
+                l.generalGapSize,
                 settings.gapSize,
                 0,
                 kMaxGapSize,
@@ -269,6 +315,7 @@ class GeneralPane extends StatelessWidget {
 
   Widget _stepperRow(
     PlatformTokens t,
+    AppLocalizations l,
     String caption,
     int value,
     int min,
@@ -295,7 +342,9 @@ class GeneralPane extends StatelessWidget {
           onChanged: onChanged,
           // Two bare arrows announce nothing on their own, and this pane has
           // three pairs of them.
-          semanticLabel: '$caption $value${unit == null ? "" : " $unit"}',
+          semanticLabel: unit == null
+              ? l.generalStepperValue(caption, value)
+              : l.generalStepperValueUnit(caption, value, unit),
         ),
         if (unit != null) ...[
           const SizedBox(width: 6),
@@ -306,7 +355,7 @@ class GeneralPane extends StatelessWidget {
   );
 
   /// The summon's combo plus a way to the tab that owns it.
-  Widget _summonRow(PlatformTokens t) {
+  Widget _summonRow(PlatformTokens t, AppLocalizations l) {
     final summon = bindings.firstWhere(
       (b) => b.command == const BuiltIn(ShortcutCommand.showGrid),
       orElse: () => const Binding.unbound(BuiltIn(ShortcutCommand.showGrid)),
@@ -315,9 +364,7 @@ class GeneralPane extends StatelessWidget {
       children: [
         if (summonUnavailable && summon.isBound) ...[
           Tooltip(
-            message:
-                '${KeyWords.current.system} or another app already uses this '
-                'combination, so it never reaches Orthant.',
+            message: l.generalSummonUnavailable(KeyWords.current.system),
             child: Icon(
               Icons.warning_amber_rounded,
               size: 15,
@@ -326,14 +373,18 @@ class GeneralPane extends StatelessWidget {
           ),
           const SizedBox(width: 5),
         ],
-        KeycapRow(chord: summon.chord, unsetLabel: 'Not set'),
+        KeycapRow(chord: summon.chord, unsetLabel: l.shortcutNotSet),
         const SizedBox(width: 14),
-        _LinkButton(label: 'Change…', tokens: t, onPressed: onEditShortcuts),
+        _LinkButton(
+          label: l.generalChange,
+          tokens: t,
+          onPressed: onEditShortcuts,
+        ),
       ],
     );
   }
 
-  Widget _permissionRow(PlatformTokens t) {
+  Widget _permissionRow(PlatformTokens t, AppLocalizations l) {
     if (permissionGranted) {
       return Row(
         children: [
@@ -347,7 +398,7 @@ class GeneralPane extends StatelessWidget {
           ),
           const SizedBox(width: 7),
           Text(
-            'Granted',
+            l.generalAccessibilityGranted,
             style: TextStyle(fontSize: 13, color: t.labelPrimary),
           ),
         ],
@@ -377,7 +428,7 @@ class GeneralPane extends StatelessWidget {
             // in the pane and the window is only 560 pt wide.
             Flexible(
               child: Text(
-                'Not granted. Shortcuts and the grid do nothing',
+                l.generalAccessibilityNotGranted,
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.35,
@@ -389,7 +440,7 @@ class GeneralPane extends StatelessWidget {
         ),
         const SizedBox(height: 9),
         MacPushButton(
-          label: 'Open Accessibility Settings…',
+          label: l.generalOpenAccessibilitySettings,
           tokens: t,
           onPressed: onOpenAccessibility,
         ),
@@ -397,7 +448,51 @@ class GeneralPane extends StatelessWidget {
     );
   }
 
-  Widget _loginRow(PlatformTokens t) {
+  /// System, then one entry per translation Orthant has, each named in its own
+  /// language ([languageOptions]), so a new ARB file adds an entry with no
+  /// change here. The stored choice is shown as the entry it belongs to
+  /// ([optionTagFor]); the button reports nothing for choosing that entry
+  /// again, which is what keeps a Hong Kong choice made in System Settings
+  /// from being rewritten as plain Traditional Chinese.
+  Widget _languageRow(PlatformTokens t, AppLocalizations l) {
+    final options = languageOptions();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        MacPopUpButton<String?>(
+          value: optionTagFor(languageChoice, options),
+          items: [
+            (null, l.languageSystem),
+            for (final option in options) (option.tag, option.name),
+          ],
+          onChanged: onLanguageChanged,
+          tokens: t,
+          semanticLabel: l.generalGroupLanguage,
+          localeOf: _entryLocale,
+        ),
+        const SizedBox(height: 6),
+        SizedBox(
+          width: 320,
+          child: Text(
+            _Words.current.languageNote(l),
+            style: TextStyle(
+              fontSize: 11.5,
+              height: 1.45,
+              color: t.labelSecondary,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// The locale an entry of the Language picker is drawn in: its own, so the
+  /// font gives 简体中文 and 繁體中文 their own glyph forms whatever the UI's
+  /// language is. System and English keep the UI's.
+  static Locale? _entryLocale(String? tag) =>
+      tag == null || tag == 'en' ? null : parseLanguageTag(tag);
+
+  Widget _loginRow(PlatformTokens t, AppLocalizations l) {
     // Only `enabled` renders as on: `unavailable` means the OS would not say,
     // and a ticked box there would claim something nothing established.
     //
@@ -414,7 +509,7 @@ class GeneralPane extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         MacCheckbox(
-          label: 'Launch at login',
+          label: l.generalLaunchAtLogin,
           tokens: t,
           value: on,
           onChanged: (v) => onSetLoginItem?.call(v),
@@ -424,7 +519,7 @@ class GeneralPane extends StatelessWidget {
           SizedBox(
             width: 320,
             child: Text(
-              _Words.current.loginUnrecognised,
+              _Words.current.loginUnrecognised(l),
               style: TextStyle(
                 fontSize: 11.5,
                 height: 1.45,
@@ -438,7 +533,10 @@ class GeneralPane extends StatelessWidget {
           SizedBox(
             width: 320,
             child: Text(
-              _Words.current.loginTurnedOff,
+              _Words.current.loginTurnedOff(
+                l,
+                extensions: loginItemsHasExtensions,
+              ),
               style: TextStyle(
                 fontSize: 11.5,
                 height: 1.45,
@@ -448,7 +546,10 @@ class GeneralPane extends StatelessWidget {
           ),
           const SizedBox(height: 7),
           _LinkButton(
-            label: _Words.current.openLoginItems,
+            label: _Words.current.openLoginItems(
+              l,
+              extensions: loginItemsHasExtensions,
+            ),
             tokens: t,
             onPressed: onOpenLoginItems,
           ),

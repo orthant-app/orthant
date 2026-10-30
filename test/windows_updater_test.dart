@@ -32,6 +32,8 @@ class _FakeSparkle implements SparkleApi {
   @override
   void setAutomaticCheck(bool on) => calls.add('automatic $on');
   @override
+  void setLang(String language) => calls.add('lang $language');
+  @override
   void setShutdownRequestCallback(void Function() onRequest) {
     calls.add('shutdown callback');
     shutdown = onRequest;
@@ -173,6 +175,77 @@ void main() {
       'init',
     ]);
     expect(t.updater.running, isTrue);
+  });
+
+  test('WinSparkle is told Orthant\'s language before it starts, so that its '
+      'windows speak it, in the lowercase its catalogue lookup matches', () {
+    final t = make();
+    t.store.automatic = true;
+    expect(
+        t.updater.start(
+            build: '8',
+            display: '1.1.0',
+            onShutdownRequested: () {},
+            language: 'zh-TW'),
+        isTrue);
+    expect(t.api.calls, [
+      'registry $kUpdaterRegistryPath',
+      'feed $feed',
+      'key $key',
+      'details Orthant Orthant 1.1.0',
+      'build 8',
+      'lang zh-tw',
+      'automatic false',
+      'shutdown callback',
+      'skipped callback',
+      'not-found callback',
+      'init',
+    ]);
+  });
+
+  test('English is a language too: it is set, never left to WinSparkle to '
+      'guess', () {
+    // A Japanese Windows would otherwise get an English Orthant with a
+    // Japanese update window (spec, "Windows").
+    final t = make();
+    t.updater.start(
+        build: '8',
+        display: '1.1.0',
+        onShutdownRequested: () {},
+        language: 'en');
+    expect(t.api.calls.where((c) => c.startsWith('lang')), ['lang en']);
+    expect(t.api.calls.indexOf('lang en'),
+        lessThan(t.api.calls.indexOf('init')));
+  });
+
+  test('the tag goes to WinSparkle lowercased, whatever its region', () {
+    // wxWidgets 3.2.10 inside WinSparkle 0.9.4 lowercases the names of the
+    // DLL's catalogues (translation.cpp:1999) but matches the requested tag
+    // case-sensitively (:1595), so `zh-CN` and `pt-BR` find nothing and the
+    // window stays English; measured on the VM, `zh-cn`, `zh-tw` and `pt-br`
+    // find theirs.
+    for (final (given, passed) in [
+      ('zh-CN', 'zh-cn'),
+      ('zh-TW', 'zh-tw'),
+      ('pt-BR', 'pt-br'),
+      ('en', 'en'),
+      ('zh-tw', 'zh-tw'),
+    ]) {
+      final t = make();
+      t.updater.start(
+          build: '8',
+          display: '1.1.0',
+          onShutdownRequested: () {},
+          language: given);
+      expect(t.api.calls.where((c) => c.startsWith('lang')), ['lang $passed'],
+          reason: given);
+    }
+  });
+
+  test('with no language given it does not set one', () {
+    final t = make();
+    start(t.updater);
+    expect(t.api.calls.where((c) => c.startsWith('lang')), isEmpty);
   });
 
   test('WinSparkle\'s own schedule never starts, with checks on or off: it '

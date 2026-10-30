@@ -1,3 +1,5 @@
+import 'dart:ui' show Locale;
+
 import 'package:flutter/foundation.dart' show ValueListenable;
 
 import 'geometry.dart';
@@ -225,11 +227,17 @@ abstract class WindowController {
   /// [saveHint] is `regions.isEmpty` — the actual condition the hint exists to
   /// address, rather than a summon count nobody can defend. It needs no new
   /// persistence and it stops the moment it stops being true.
+  ///
+  /// [locale] is the language tag the app resolved (`en`, `zh`, `zh-Hant`,
+  /// `zh-Hant-HK`), the resolver's answer as `toLanguageTag()` gives it. The
+  /// overlay's engine cannot read the choice for itself, so the language
+  /// rides with the grid: a settings change that moves one moves the other.
   Future<void> setOverlayGrid({
     required int cols,
     required int rows,
     required double gap,
     required bool saveHint,
+    required String locale,
   });
 
   /// [pressedAtMs] is Windows only: the time of the key press that asked for
@@ -279,6 +287,33 @@ abstract class WindowController {
   /// only, and never throws: it is read on the way to showing the config
   /// window, which a throw would leave unshown.
   Future<AccentColors?> accentColor();
+
+  /// The languages the OS prefers, most preferred first, **ignoring** any
+  /// per-app choice. Empty when the platform cannot say.
+  ///
+  /// The ignoring is the point. On macOS the app's own language setting is the
+  /// same `AppleLanguages` key the OS list lives in, so `Locale.preferredLanguages`
+  /// and `PlatformDispatcher.locales` both return the per-app choice once one is
+  /// stored, and "System" in the picker would mean "whatever I last picked".
+  /// Read every time, never cached: the user can change it in System Settings
+  /// at any moment. Display data only, and never throws on a reply it did not
+  /// expect.
+  Future<List<Locale>> systemLocales();
+
+  /// The language the user chose for Orthant, as the whole tag they chose
+  /// (`zh-Hant-HK`, region kept); null for System, meaning follow the OS.
+  ///
+  /// A stored value that is not a tag is returned as it is; deciding what to
+  /// make of it is the resolver's (`lib/l10n/languages.dart`), which reads it as
+  /// System.
+  Future<String?> languageOverride();
+
+  /// Store the language choice: a tag, or null for System (the stored value is
+  /// removed). On macOS this is the app's own `AppleLanguages`, the setting
+  /// System Settings ▸ General ▸ Language & Region ▸ Applications edits, so the
+  /// two can never disagree and Sparkle follows it; on Windows it is Orthant's
+  /// own registry value.
+  Future<void> setLanguageOverride(String? tag);
 
   /// Whether the app currently launches at login, per the OS.
   Future<LoginItemStatus> loginItemStatus();

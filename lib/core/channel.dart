@@ -30,6 +30,14 @@ const String kKeyboardLayoutChanged = 'onKeyboardLayoutChanged';
 // macOS only: Windows reads the accent over FFI, never through the runner.
 const String kAccentColor = 'accentColor';
 
+// macOS only: Windows asks Windows itself for the OS's languages over FFI
+// (lib/core/windows_system_languages.dart), because the platform dispatcher is
+// still empty while main() runs its synchronous start, and keeps the language
+// choice in the registry, never through the runner.
+const String kSystemLanguages = 'systemLanguages';
+const String kLanguageOverride = 'languageOverride';
+const String kSetLanguageOverride = 'setLanguageOverride';
+
 // Windows only: the overlay's commit comes back to Dart, which owns the
 // captured window there.
 const String kOverlayCommit = 'onOverlayCommit';

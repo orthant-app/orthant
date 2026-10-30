@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../shortcuts/bindings.dart';
 import '../core/key_chord.dart';
 import '../core/key_words.dart';
+import '../l10n/strings.dart';
 import 'key_capture.dart';
 import 'keyboard_labels.dart';
 import 'platform_theme.dart';
@@ -100,7 +101,7 @@ class _RecordingFieldState extends State<RecordingField> {
     final chord = chordFromKeyEvent(event);
     if (chord != null) {
       widget.onCombo(chord);
-    } else if (refusalFor(event) case final why?) {
+    } else if (refusalFor(event, context.l10n) case final why?) {
       // Without a word, the refusal read as a field that was not listening.
       SemanticsService.sendAnnouncement(
           View.of(context), why, TextDirection.ltr);
@@ -134,7 +135,7 @@ class _RecordingFieldState extends State<RecordingField> {
         ),
         child: Text(
           symbols.isEmpty
-              ? 'Press keys…'
+              ? context.l10n.recordingPressKeys
               : KeyWords.current.joinSpaced(symbols),
           style: TextStyle(
             fontFamily: symbols.isEmpty ? null : t.keycapFamily,

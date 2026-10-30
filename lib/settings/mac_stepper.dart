@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/strings.dart';
 import 'mac_control.dart';
 import 'platform_theme.dart';
 
@@ -16,11 +17,12 @@ class MacStepper extends StatelessWidget {
     required this.max,
     required this.onChanged,
     this.enabled = true,
-    this.semanticLabel = 'Value',
+    required this.semanticLabel,
   });
 
-  /// What a screen reader calls this stepper. Two bare arrows announce nothing
-  /// on their own, and this pane has four of them.
+  /// What a screen reader calls this stepper, already in the app's language
+  /// and carrying the value (the caller owns both). Two bare arrows announce
+  /// nothing on their own, and this pane has four of them.
   final String semanticLabel;
 
   final int value;
@@ -35,6 +37,7 @@ class MacStepper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final l = context.l10n;
     final canRaise = enabled && value < max;
     final canLower = enabled && value > min;
 
@@ -83,14 +86,14 @@ class MacStepper extends StatelessWidget {
                       _Arrow(
                         up: true,
                         tokens: t,
-                        label: '$semanticLabel, increase',
+                        label: l.stepperIncrease(semanticLabel),
                         onPressed: canRaise ? () => onChanged(value + 1) : null,
                       ),
                       Container(height: 0.5, width: 17, color: t.keycapBorder),
                       _Arrow(
                         up: false,
                         tokens: t,
-                        label: '$semanticLabel, decrease',
+                        label: l.stepperDecrease(semanticLabel),
                         onPressed: canLower ? () => onChanged(value - 1) : null,
                       ),
                     ],

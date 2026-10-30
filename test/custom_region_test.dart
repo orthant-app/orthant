@@ -1,6 +1,12 @@
+import 'dart:ui' show Locale;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/core/geometry.dart';
+import 'package:orthant/l10n/app_localizations.dart';
 import 'package:orthant/shortcuts/custom_region.dart';
+
+import 'support/locales.dart';
+import 'support/no_english.dart';
 
 const _leftTwoThirds = CustomRegion(
   id: 'r7fk2',
@@ -121,6 +127,231 @@ void main() {
       expect(name(7, 7, 0, 2, 0, 6), 'Left 3/7');
     });
   });
+  group('region names across languages', () {
+    // The shapes the English suggestions are pinned on. Each row is a stored
+    // format: `suggestRegionName` is what an older install wrote into the
+    // preferences and what this build recognises as "generated", so changing
+    // any of these strings turns existing generated names into authored ones.
+    final shapes = <({
+      String english,
+      RegionNameKind kind,
+      String fraction,
+      int cols,
+      int rows,
+      int c0,
+      int c1,
+      int r0,
+      int r1,
+    })>[
+      (english: 'Full screen', kind: RegionNameKind.fullScreen, fraction: '',
+        cols: 6, rows: 6, c0: 0, c1: 5, r0: 0, r1: 5),
+      (english: 'Left ⅔', kind: RegionNameKind.left, fraction: '⅔',
+        cols: 6, rows: 6, c0: 0, c1: 3, r0: 0, r1: 5),
+      (english: 'Right ⅓', kind: RegionNameKind.right, fraction: '⅓',
+        cols: 6, rows: 6, c0: 4, c1: 5, r0: 0, r1: 5),
+      (english: 'Top ½', kind: RegionNameKind.top, fraction: '½',
+        cols: 6, rows: 6, c0: 0, c1: 5, r0: 0, r1: 2),
+      (english: 'Bottom ¼', kind: RegionNameKind.bottom, fraction: '¼',
+        cols: 4, rows: 4, c0: 0, c1: 3, r0: 3, r1: 3),
+      (english: 'Left 3/7', kind: RegionNameKind.left, fraction: '3/7',
+        cols: 7, rows: 7, c0: 0, c1: 2, r0: 0, r1: 6),
+      (english: 'Custom region', kind: RegionNameKind.custom, fraction: '',
+        cols: 6, rows: 6, c0: 1, c1: 3, r0: 1, r1: 3),
+    ];
+
+    CustomRegion regionOf(
+      ({
+        String english,
+        RegionNameKind kind,
+        String fraction,
+        int cols,
+        int rows,
+        int c0,
+        int c1,
+        int r0,
+        int r1,
+      }) s, {
+      String? name,
+    }) =>
+        CustomRegion(
+          id: 'g',
+          name: name ?? s.english,
+          cols: s.cols,
+          rows: s.rows,
+          c0: s.c0,
+          c1: s.c1,
+          r0: s.r0,
+          r1: s.r1,
+        );
+
+    ({RegionNameKind kind, String fraction}) suggestionOf(
+      CustomRegion r,
+    ) =>
+        suggestRegion(
+            cols: r.cols, rows: r.rows, c0: r.c0, c1: r.c1, r0: r.r0, r1: r.r1);
+
+    AppLocalizations strings(Locale l) => lookupAppLocalizations(l);
+
+    test('the English suggestions are pinned, being a stored format', () {
+      for (final s in shapes) {
+        expect(
+          suggestRegionName(
+              cols: s.cols, rows: s.rows, c0: s.c0, c1: s.c1, r0: s.r0, r1: s.r1),
+          s.english,
+          reason: 'changing this string orphans every name already stored',
+        );
+      }
+    });
+
+    test('suggestRegion names the kind and the fraction, free of language', () {
+      for (final s in shapes) {
+        expect(
+          suggestRegion(
+              cols: s.cols, rows: s.rows, c0: s.c0, c1: s.c1, r0: s.r0, r1: s.r1),
+          (kind: s.kind, fraction: s.fraction),
+          reason: s.english,
+        );
+      }
+      expect({for (final s in shapes) s.kind}, RegionNameKind.values.toSet(),
+          reason: 'the table must exercise every kind');
+    });
+
+    test('the English words, read through the localization, are the stored '
+        'format exactly', () {
+      for (final s in shapes) {
+        expect(
+          localizedSuggestion((kind: s.kind, fraction: s.fraction),
+              strings(kEnglish)),
+          s.english,
+        );
+      }
+    });
+
+    test('Simplified Chinese words for every kind, with the fraction glyph kept',
+        () {
+      final zh = strings(kSimplified);
+      expect({
+        for (final s in shapes)
+          s.english: localizedSuggestion((kind: s.kind, fraction: s.fraction), zh),
+      }, {
+        'Full screen': '全屏',
+        'Left ⅔': '左侧 ⅔',
+        'Right ⅓': '右侧 ⅓',
+        'Top ½': '顶部 ½',
+        'Bottom ¼': '底部 ¼',
+        'Left 3/7': '左侧 3/7',
+        'Custom region': '自定义区域',
+      });
+    });
+
+    test('Traditional Chinese words are Taiwan usage, and Hong Kong reads them',
+        () {
+      final expected = {
+        'Full screen': '整個螢幕',
+        'Left ⅔': '左 ⅔',
+        'Right ⅓': '右 ⅓',
+        'Top ½': '上 ½',
+        'Bottom ¼': '下 ¼',
+        'Left 3/7': '左 3/7',
+        'Custom region': '自訂區域',
+      };
+      for (final locale in [kTraditional, kHongKong]) {
+        final l = strings(locale);
+        expect({
+          for (final s in shapes)
+            s.english:
+                localizedSuggestion((kind: s.kind, fraction: s.fraction), l),
+        }, expected, reason: locale.toLanguageTag());
+      }
+    });
+
+    test('no English is left in any Chinese suggestion', () {
+      for (final locale in [kSimplified, kTraditional, kHongKong]) {
+        expectNoEnglishIn([
+          for (final s in shapes)
+            localizedSuggestion(
+                (kind: s.kind, fraction: s.fraction), strings(locale)),
+        ]);
+      }
+    });
+
+    test('a generated name is recognised by its English text and the shape',
+        () {
+      for (final s in shapes) {
+        expect(isGeneratedName(regionOf(s)), isTrue, reason: s.english);
+      }
+    });
+
+    test('a name that is not the English suggestion for the shape is authored',
+        () {
+      final left = shapes[1];
+      // Hand-written, and stale: a generated name that no longer matches the
+      // shape it sits on is not a suggestion any more.
+      expect(isGeneratedName(regionOf(left, name: 'Reading pane')), isFalse);
+      expect(isGeneratedName(regionOf(left, name: 'Left ½')), isFalse);
+      // The translated suggestion is not the stored format: a user who wrote
+      // it, or an older install in Chinese, wrote their own words.
+      expect(isGeneratedName(regionOf(left, name: '左侧 ⅔')), isFalse);
+      expect(isGeneratedName(regionOf(left, name: 'left ⅔')), isFalse,
+          reason: 'the stored format is compared exactly');
+    });
+
+    test('regionDisplayName shows a generated region in the current language',
+        () {
+      for (final s in shapes) {
+        final r = regionOf(s);
+        expect(regionDisplayName(r, strings(kEnglish)), s.english);
+        expect(regionDisplayName(r, strings(kSimplified)),
+            localizedSuggestion(suggestionOf(r), strings(kSimplified)));
+        expect(regionDisplayName(r, strings(kSimplified)), isNot(s.english));
+      }
+      expect(regionDisplayName(regionOf(shapes[1]), strings(kSimplified)),
+          '左侧 ⅔');
+      expect(regionDisplayName(regionOf(shapes[0]), strings(kTraditional)),
+          '整個螢幕');
+    });
+
+    test('regionDisplayName leaves an authored name exactly as written', () {
+      final left = shapes[1];
+      for (final name in [
+        'Reading pane',
+        '左侧 ⅔', // equal to the Simplified suggestion, and still theirs
+        'Left ½', // the English suggestion for a different shape
+        '全屏', // another language's word
+      ]) {
+        final r = regionOf(left, name: name);
+        for (final locale in [kEnglish, kSimplified, kTraditional, kHongKong]) {
+          expect(regionDisplayName(r, strings(locale)), name,
+              reason: '$name under ${locale.toLanguageTag()}');
+        }
+      }
+    });
+
+    test('an older build\'s round trip keeps generated generated and authored '
+        'authored', () {
+      // Today's serializer is what an older build reads and rewrites, and this
+      // plan does not change it: there is no field to lose. The English name
+      // is the whole marker.
+      for (final s in shapes) {
+        final generated = regionOf(s);
+        final authored = regionOf(s, name: 'Reading pane');
+        final g = CustomRegion.tryFromJson(generated.toJson())!;
+        final a = CustomRegion.tryFromJson(authored.toJson())!;
+        expect(isGeneratedName(g), isTrue, reason: s.english);
+        expect(isGeneratedName(a), isFalse, reason: s.english);
+        expect(g.name, s.english, reason: 'stored in English, whatever shows');
+      }
+    });
+
+    test('a region stores no field beyond the ones an older build knows', () {
+      expect(
+        regionOf(shapes[1]).toJson().keys,
+        unorderedEquals(
+            ['id', 'name', 'cols', 'rows', 'c0', 'c1', 'r0', 'r1']),
+      );
+    });
+  });
+
   group('refineForEditing', () {
     // Deliberately coarse: 3 columns, 1 row — "Left ⅔, full height" expressed
     // as economically as it can be, which is the shape that cannot be reshaped

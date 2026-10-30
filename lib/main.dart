@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'app/coordinator.dart';
+import 'core/os_version.dart';
 import 'core/window_controller_factory.dart';
+import 'l10n/app_localizations.dart';
 import 'overlay/overlay_main.dart';
 import 'permission/onboarding_screen.dart';
 import 'permission/permission_controller.dart';
@@ -28,6 +30,21 @@ void overlayMain() => runOverlayApp();
 /// The app's one coordinator. Everything that used to be a top-level global in
 /// this file now lives on it — see [OrthantCoordinator] for why.
 late final OrthantCoordinator app;
+
+/// Whether this Mac names the Login Items pane "Login Items & Extensions",
+/// which macOS 15 did. A version that cannot be read is taken as the newer
+/// one. Read once: the OS does not change under a running app, and Windows
+/// never looks at it.
+final bool _loginItemsHasExtensions =
+    (macOSMajorVersion(Platform.operatingSystemVersion) ?? 15) >= 15;
+
+/// Whether this Mac names the Privacy & Security list that holds the
+/// Accessibility permission "Device Control and Data Access", which macOS 27
+/// did. A version that cannot be read is taken as the newer one, as for
+/// [_loginItemsHasExtensions]. Read once, for the same reason; the onboarding
+/// window that uses it is macOS-only.
+final bool _privacyListIsDeviceControl =
+    (macOSMajorVersion(Platform.operatingSystemVersion) ?? 27) >= 27;
 
 /// Quits on Windows. Windows keeps a dead icon in the tray until the pointer
 /// sweeps it if the process exits without removing it, so destroy() is
@@ -65,6 +82,10 @@ Future<void> main() async {
     // screen.
     permissionGate: !Platform.isWindows,
   );
+
+  // The language before anything that shows it: the tray's first build and
+  // its Windows tooltip are just below, and `app.start()` pushes the grid.
+  await app.loadLanguage();
 
   // macOS: isTemplate, because the icon is solid black + alpha and the menu
   // bar tints it for the current appearance (white on dark, black on light);
@@ -189,12 +210,19 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
         labels: app.keyboardLabels,
         child: MaterialApp(
       debugShowCheckedModeBanner: false,
+      // The coordinator resolves the language (the system's, or the choice in
+      // Settings), so the app is told it rather than left to Flutter's own
+      // resolution, which gets Chinese scripts wrong.
+      locale: app.locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: orthantTheme(Brightness.light, accent: app.accent),
       darkTheme: orthantTheme(Brightness.dark, accent: app.accent),
       home: switch (app.screen) {
           AppScreen.onboarding => OnboardingScreen(
               controller: app.permissions,
               onOpenAccessibility: app.openAccessibility,
+              privacyListIsDeviceControl: _privacyListIsDeviceControl,
             ),
           AppScreen.ready => ReadyScreen(
               bindings: app.bindings,
@@ -211,6 +239,9 @@ class _OrthantAppState extends State<OrthantApp> with TrayListener {
               unavailable: app.unavailable,
               permissionGranted: app.permissions.granted,
               loginStatus: app.loginStatus,
+              loginItemsHasExtensions: _loginItemsHasExtensions,
+              languageChoice: app.languageChoice,
+              onLanguageChanged: app.setLanguageChoice,
               onSettingsChanged: app.settingsChanged,
               onSetLoginItem: app.setLoginItem,
               onOpenLoginItems: app.wc.openLoginItemsSettings,

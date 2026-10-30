@@ -668,8 +668,8 @@ jobs:
             printf 'Homebrew cask already matches orthant %s.\n' "$VERSION"
             exit 0
           fi
-          git -C tap config user.name 'Optimal One'
-          git -C tap config user.email 'o@optimalone.dev'
+          git -C tap config user.name 'Owen Ou'
+          git -C tap config user.email 'o@owenou.com'
           git -C tap commit -m "orthant $VERSION"
           git -C tap push
 

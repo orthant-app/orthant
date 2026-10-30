@@ -192,7 +192,7 @@ jobs:
             $started = [DateTime]::UtcNow
             # Include Inno's child output in diagnostics too: if a host cannot
             # open its trace file it falls back to stderr.
-            & .\tool\windows\make_installer.ps1 -ReleaseName $env:VERSION -SignTool $inno *>> $log
+            & .\tool\windows\make_installer.ps1 -ReleaseName $env:VERSION -SignTool $inno *>&1 | Add-Content -Path $log
             if ($LASTEXITCODE) { throw 'Installer signing failed; see encrypted diagnostics.' }
             & .\tool\windows\check_signing_runtime.ps1 -Root "$env:RUNNER_TEMP\orthant-dotnet" -CoreHostTrace $env:COREHOST_TRACEFILE -DotnetHostTrace $env:DOTNET_HOST_TRACEFILE -ExpectedLoads 2 -StartedUtc $started | Add-Content -Path $log
           } finally {

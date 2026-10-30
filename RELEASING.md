@@ -25,9 +25,10 @@ After merging a signing-tooling change, run `Release` from `main` with the
 gh workflow run release.yml --ref main -f windows_only=true
 ```
 
-This builds and signs the Windows app, uninstaller and installer, checks their
-signatures and runtime traces, and retains encrypted Windows diagnostics for one
-day. It skips macOS packaging and publishes nothing. No version bump is needed;
+This builds and signs the Windows app, uninstaller and installer, checks the app
+and installer Authenticode signatures and signing runtime traces, and retains
+encrypted Windows diagnostics for one day. It skips macOS packaging and publishes
+nothing. No version bump is needed;
 the all-platform dry run otherwise requires a build number above the live feeds.
 Tag-triggered releases always build both platforms; the input defaults to false.
 

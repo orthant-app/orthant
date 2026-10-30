@@ -16,6 +16,21 @@ push the tag → approve the `release` environment → verify → flip `publishe
 
 Two commits, and they are deliberately not one. See step 7.
 
+## Verify Windows signing without a release
+
+After merging a signing-tooling change, run `Release` from `main` with the
+`windows_only` input enabled and approve the `release` environment:
+
+```sh
+gh workflow run release.yml --ref main -f windows_only=true
+```
+
+This builds and signs the Windows app, uninstaller and installer, checks their
+signatures and runtime traces, and retains encrypted Windows diagnostics for one
+day. It skips macOS packaging and publishes nothing. No version bump is needed;
+the all-platform dry run otherwise requires a build number above the live feeds.
+Tag-triggered releases always build both platforms; the input defaults to false.
+
 ---
 
 ## Before you start (once per machine)

@@ -92,6 +92,10 @@ jobs:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Signing runtime guards
+        shell: powershell
+        run: .\tool\windows\test_signing_runtime.ps1
+
       - name: Resolve Flutter cache paths
         id: flutter-meta
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0

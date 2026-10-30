@@ -4,6 +4,11 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      windows_only:
+        description: 'Verify Windows signing only, without publishing'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -122,6 +127,24 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: .\tool\windows\check_release_build.ps1 -ReleaseName $env:VERSION -Feed $env:WINDOWS_FEED
 
+      - name: Prepare a fresh private signing runtime directory
+        shell: powershell
+        run: |
+          $root = "$env:RUNNER_TEMP\orthant-dotnet"
+          if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Recurse -Force }
+          New-Item -ItemType Directory -Path $root | Out-Null
+          foreach ($name in 'DOTNET_ROOT', 'DOTNET_ROOT_X64') {
+            Add-Content -Path $env:GITHUB_ENV -Value ("{0}={1}" -f $name, $root) -Encoding ASCII
+          }
+
+      - name: Install the private signing runtime
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}\orthant-dotnet
+        with:
+          dotnet-version: '10.0.403'
+          architecture: x64
+
       - name: Set up signing
         shell: powershell
         env:
@@ -148,10 +171,42 @@ jobs:
         run: |
           $log = "$env:RUNNER_TEMP\windows-diagnostics.log"
           $sign = @('/q', '/fd', 'SHA256', '/tr', 'http://timestamp.acs.microsoft.com', '/td', 'SHA256', '/dlib', $env:SIGNING_DLIB, '/dmdf', $env:SIGNING_METADATA)
-          & .\tool\windows\sign_files.ps1 -SignTool $env:SIGNTOOL -SignArgs $sign -Bundle build\windows\x64\runner\Release -Log $log
-          $inno = & .\tool\windows\sign_files.ps1 -SignTool $env:SIGNTOOL -SignArgs $sign -Log $log -InnoCommand
-          & .\tool\windows\make_installer.ps1 -ReleaseName $env:VERSION -SignTool $inno
+          # A new directory and separate phase files prevent an earlier load
+          # from supplying proof for this run. Native hosts append; Inno's
+          # direct SignTool command inherits these variables for both children.
+          $traces = Join-Path $env:RUNNER_TEMP ('signing-runtime-' + [Guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $traces | Out-Null
+          $env:COREHOST_TRACE = '1'
+          $env:COREHOST_TRACE_VERBOSITY = '4'
+          $env:DOTNET_HOST_TRACE = '1'
+          $env:DOTNET_HOST_TRACE_VERBOSITY = '4'
+          try {
+            & .\tool\windows\check_signing_runtime.ps1 -Root "$env:RUNNER_TEMP\orthant-dotnet" | Add-Content -Path $log
+            $env:COREHOST_TRACEFILE = Join-Path $traces 'app-ijw.log'
+            $env:DOTNET_HOST_TRACEFILE = Join-Path $traces 'app-host.log'
+            $started = [DateTime]::UtcNow
+            & .\tool\windows\sign_files.ps1 -SignTool $env:SIGNTOOL -SignArgs $sign -Bundle build\windows\x64\runner\Release -Log $log
+            if ($LASTEXITCODE) { throw 'App signing failed; see encrypted diagnostics.' }
+            $loads = @(Select-String -Path $log -Pattern '^\[sign ').Count
+            & .\tool\windows\check_signing_runtime.ps1 -Root "$env:RUNNER_TEMP\orthant-dotnet" -CoreHostTrace $env:COREHOST_TRACEFILE -DotnetHostTrace $env:DOTNET_HOST_TRACEFILE -ExpectedLoads $loads -StartedUtc $started | Add-Content -Path $log
+
+            $inno = & .\tool\windows\sign_files.ps1 -SignTool $env:SIGNTOOL -SignArgs $sign -Log $log -InnoCommand
+            if ($LASTEXITCODE) { throw 'Installer signing command failed; see encrypted diagnostics.' }
+            $env:COREHOST_TRACEFILE = Join-Path $traces 'installer-ijw.log'
+            $env:DOTNET_HOST_TRACEFILE = Join-Path $traces 'installer-host.log'
+            $started = [DateTime]::UtcNow
+            # Include Inno's child output in diagnostics too: if a host cannot
+            # open its trace file it falls back to stderr.
+            & .\tool\windows\make_installer.ps1 -ReleaseName $env:VERSION -SignTool $inno *>&1 | Add-Content -Path $log
+            if ($LASTEXITCODE) { throw 'Installer signing failed; see encrypted diagnostics.' }
+            & .\tool\windows\check_signing_runtime.ps1 -Root "$env:RUNNER_TEMP\orthant-dotnet" -CoreHostTrace $env:COREHOST_TRACEFILE -DotnetHostTrace $env:DOTNET_HOST_TRACEFILE -ExpectedLoads 2 -StartedUtc $started | Add-Content -Path $log
+          } finally {
+            foreach ($name in 'COREHOST_TRACE', 'COREHOST_TRACEFILE', 'COREHOST_TRACE_VERBOSITY', 'DOTNET_HOST_TRACE', 'DOTNET_HOST_TRACEFILE', 'DOTNET_HOST_TRACE_VERBOSITY') {
+              [Environment]::SetEnvironmentVariable($name, $null, 'Process')
+            }
+          }
           & .\tool\windows\check_signatures.ps1 -Path build\windows\x64\runner\Release, "build\dist\Orthant-$env:VERSION-setup.exe" -Log $log
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
       - name: Encrypt the Windows release for the macOS job
         if: always()
@@ -173,6 +228,9 @@ jobs:
             cp "$installer" windows-out/
           fi
           [[ -f windows-diagnostics.log ]] && cp windows-diagnostics.log windows-out/
+          for traces in signing-runtime-*/; do
+            [[ -d "$traces" ]] && cp -R "${traces%/}" windows-out/
+          done
           tar -cf windows.tar windows-out
           # The flags spelled out, not left to defaults: the macOS job decrypts
           # with whatever OpenSSL its image carries.
@@ -192,6 +250,7 @@ jobs:
 
   package:
     needs: validate
+    if: github.event_name != 'workflow_dispatch' || inputs.windows_only != true
     runs-on: macos-26
     timeout-minutes: 90
     environment: release
@@ -621,7 +680,7 @@ jobs:
           git -C tap push
 
   # winget, stable releases only, as Homebrew: a pull request to
-  # microsoft/winget-pkgs from optimalone's fork, which wingetcreate makes and
+  # microsoft/winget-pkgs from the token owner's fork, which wingetcreate makes and
   # keeps in step. Microsoft validates and merges it, hours to days later, so
   # it is not part of the release's own verification. Its token is a classic
   # one (public_repo; the only kind winget-pkgs pull requests accept), kept in

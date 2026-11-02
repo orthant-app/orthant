@@ -221,8 +221,8 @@ final class HotkeyManager {
   ///
   /// Return is included because it is not a convenience: the spec lists it as
   /// an MVP keyboard affordance ("`Esc` cancels; `Enter`/`Return` commits the
-  /// current selection" — orthant-mvp-spec-revised.md), added precisely because
-  /// being mouse-only is the most-cited weakness of this category of app.
+  /// current selection"), added precisely because being mouse-only is the
+  /// most-cited weakness of this category of app.
   ///
   /// Keypad Enter is the one allowed to fail. It is an alias for Return rather
   /// than a distinct affordance, so losing it costs a user with a numeric

@@ -9,9 +9,10 @@ struct WindowActivationFact: Equatable {
   /// e.g. "OverlayPanel". Deliberately not `NSStringFromClass`, which bridges
   /// a Swift class to Objective-C as `"<ModuleName>.<ClassName>"` — measured
   /// (Task 8) as `"Orthant.OverlayPanel"`, `"Orthant.MainFlutterWindow"`.
-  /// This app's module name already has to track `PRODUCT_NAME` for reasons
-  /// documented in CLAUDE.md's Commands section; coupling this list to it too
-  /// is one more place for the two to drift apart silently. AppKit's own
+  /// This app's module name already has to track `PRODUCT_NAME` (Xcode derives
+  /// the Swift module name from it, not from the target name, which is why
+  /// RunnerTests imports `Orthant`); coupling this list to it too is one more
+  /// place for the two to drift apart silently. AppKit's own
   /// private classes (`NSStatusBarWindow`) carry no such prefix either way,
   /// since they were never Swift types to begin with.
   let className: String

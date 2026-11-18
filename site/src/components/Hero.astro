@@ -8,14 +8,15 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
 ---
 <section class="hero wrap">
   {/* Split from one .copy block so the DOM order can put the figure right
-      after the headline: category -> headline -> compact scene -> supporting
-      copy and actions on small screens, with NEITHER `order:` NOR
+      after the headline and demo link: category -> headline -> demo link ->
+      compact scene -> supporting copy and actions on small screens, with NEITHER `order:` NOR
       `column-reverse` (both would desync focus order from visual order).
       grid-template-areas below reunites the two copy blocks in one column
       on the desktop two-column layout, without moving either in the DOM. */}
   <div class="copy-lead">
     <p class="eyebrow">A window manager for macOS and Windows</p>
     <h1>Draw where a window should go. Give it a shortcut.</h1>
+    <a class="btn btn-secondary demo-link-compact" href="#see-it-work">See it work</a>
   </div>
 
   <figure class="demo">
@@ -104,7 +105,7 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
           <a href="/download/windows">Windows 10 (1809+) or 11</a>
         </p>
       </div>
-      <a class="btn btn-secondary" href="#see-it-work">See it work</a>
+      <a class="btn btn-secondary demo-link-desktop" href="#see-it-work">See it work</a>
     </div>
   </div>
 </section>
@@ -126,6 +127,8 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
     grid-template-areas: "lead" "figure" "trail";
     gap: 24px; align-items: center;
   }
+  /* Hide the inactive anchor from both the layout and keyboard order. */
+  .demo-link-desktop { display: none; }
   /* Equal columns, and not before 980px: the install command is 41 monospace
      characters plus a Copy button, and a narrower column clips it — which
      reads as a broken command rather than a narrow box. */
@@ -139,6 +142,8 @@ const cols = Array.from({ length: COLS }, (_, c) => c);
          pixel-for-pixel unchanged. */
       gap: 0 56px;
     }
+    .demo-link-compact { display: none; }
+    .demo-link-desktop { display: inline-flex; }
   }
   .copy-lead { grid-area: lead; }
   .copy-trail { grid-area: trail; }

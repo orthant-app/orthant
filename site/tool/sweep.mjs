@@ -71,6 +71,50 @@ const browser = await chromium.launch();
 const page = await browser.newPage();
 const failures = [];
 
+// Start each homepage check at the top: a link scrolled into view by a prior
+// interaction does not prove a first-time phone visitor can reach it.
+for (const viewport of [
+  { width: 375, height: 667 },
+  { width: 390, height: 844 },
+  { width: 979, height: 900 },
+  { width: 980, height: 900 },
+  { width: 1440, height: 900 },
+]) {
+  await page.setViewportSize(viewport);
+  await page.goto(base + '/', { waitUntil: 'load' });
+  const links = page.getByRole('link', { name: 'See it work', exact: true });
+  const count = await links.count();
+  const label = `/ @${viewport.width}x${viewport.height}`;
+  if (count !== 1) {
+    failures.push(`${label} exposes ${count} See it work links, expected one`);
+    continue;
+  }
+  const link = links.first();
+  if (await link.getAttribute('href') !== '#see-it-work') {
+    failures.push(`${label} See it work does not target #see-it-work`);
+  }
+  if (viewport.width < 980) {
+    const heading = await page.locator('.hero h1').boundingBox();
+    const target = await link.boundingBox();
+    const figure = await page.locator('.hero figure').boundingBox();
+    if (!heading || !target || !figure) {
+      failures.push(`${label} cannot measure the headline, link and figure`);
+      continue;
+    }
+    const headingBottom = heading.y + heading.height;
+    const linkBottom = target.y + target.height;
+    console.log(`${label}: heading.bottom=${headingBottom}, link.top=${target.y}, link.bottom=${linkBottom}, figure.top=${figure.y}`);
+    if (headingBottom > target.y || linkBottom > figure.y || linkBottom > viewport.height) {
+      failures.push(`${label} See it work must fit below the headline and before the figure on the initial screen`);
+    }
+    if (!await link.evaluate((e) => Boolean(e.compareDocumentPosition(document.querySelector('.hero figure')) & Node.DOCUMENT_POSITION_FOLLOWING))) {
+      failures.push(`${label} See it work must precede the figure in source order`);
+    }
+  } else if (!await link.evaluate((e) => Boolean(e.closest('.hero .cta')))) {
+    failures.push(`${label} See it work must remain in the download action group`);
+  }
+}
+
 for (const path of PATHS) {
   await page.goto(base + path, { waitUntil: 'load' });
   for (const width of WIDTHS) {

@@ -1,10 +1,11 @@
 import 'dart:async';
-import 'dart:ui' show Locale;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' show PlatformException;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show MethodChannel, PlatformException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orthant/app/coordinator.dart';
+import 'package:orthant/core/channel.dart';
 import 'package:orthant/core/geometry.dart';
 import 'package:orthant/core/window_controller.dart';
 import 'package:orthant/l10n/app_localizations.dart';
@@ -14,6 +15,7 @@ import 'package:orthant/permission/permission_controller.dart';
 import 'package:orthant/settings/settings.dart';
 import 'package:orthant/settings/settings_store.dart';
 import 'package:orthant/settings/settings_window.dart';
+import 'package:orthant/settings/region_picker_sheet.dart';
 import 'package:orthant/shortcuts/bindings.dart';
 import 'package:orthant/shortcuts/command_ref.dart';
 import 'package:orthant/shortcuts/bindings_store.dart';
@@ -241,7 +243,7 @@ class _Counted<T> extends ValueNotifier<T> {
 typedef _Harness = ({OrthantCoordinator app, _FakeWc wc, _FakeRegistrar keys});
 
 void main() {
-  // For SharedPreferences' mock channel; no widget is built here.
+  // For SharedPreferences' mock channel and the Settings handoff regression.
   TestWidgetsFlutterBinding.ensureInitialized();
 
   final built = <OrthantCoordinator>[];
@@ -1508,6 +1510,109 @@ void main() {
 
       t.app.consumePendingRegion();
       expect(t.app.pendingRegion, isNull);
+    });
+
+    test('clears immediately but notifies after the current build', () async {
+      final t = build(granted: true);
+      await t.app.requestSaveRegion(block());
+      var notices = 0;
+      t.app.addListener(() => notices++);
+
+      t.app.consumePendingRegion();
+      expect(t.app.pendingRegion, isNull);
+      t.app.consumePendingRegion();
+      expect(notices, 0, reason: 'the listening parent may still be building');
+
+      await Future<void>.value();
+      expect(notices, 1, reason: 'only the consumed offer needs acknowledgment');
+    });
+
+    test('a queued acknowledgment preserves a newer offer', () async {
+      final t = build(granted: true);
+      await t.app.requestSaveRegion(block());
+      final first = t.app.pendingRegion!;
+      final seen = <CustomRegion?>[];
+      t.app.addListener(() => seen.add(t.app.pendingRegion));
+
+      t.app.consumePendingRegion();
+      final offering = t.app.requestSaveRegion(block(c1: 1));
+      final second = t.app.pendingRegion!;
+      expect(second.id, isNot(first.id));
+      await offering;
+
+      expect(t.app.pendingRegion, same(second));
+      expect(seen, isNotEmpty);
+      expect(seen, everyElement(same(second)));
+    });
+
+    test('can be disposed with an acknowledgment still queued', () async {
+      final t = build(granted: true);
+      await t.app.requestSaveRegion(block());
+      var notices = 0;
+      t.app.addListener(() => notices++);
+
+      t.app.consumePendingRegion();
+      built.remove(t.app);
+      t.app.dispose();
+      await Future<void>.value();
+
+      expect(notices, 0);
+    });
+
+    testWidgets('Columns keeps refreshing after cancelling a grid handoff',
+        (tester) async {
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      const channel = MethodChannel(kOrthantChannel);
+      messenger.setMockMethodCallHandler(channel, (_) async => null);
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      final t = build(granted: true);
+      await tester.runAsync(() => t.app.start());
+
+      // Like OrthantApp, the parent listens to the coordinator while the real
+      // Settings subtree consumes the offer during its build.
+      await tester.pumpWidget(ListenableBuilder(
+        listenable: t.app,
+        builder: (_, _) => MaterialApp(
+          home: SettingsWindow(
+            settings: t.app.settings,
+            bindings: t.app.bindings,
+            onSettingsChanged: t.app.settingsChanged,
+            onRebound: t.app.rebind,
+            onRegionSaved: t.app.saveRegion,
+            pendingRegion: t.app.pendingRegion,
+            onPendingConsumed: t.app.consumePendingRegion,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      await tester.runAsync(() => t.app.requestSaveRegion(block()));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull,
+          reason: 'consumption must not invalidate a parent still building');
+      expect(t.app.pendingRegion, isNull);
+      expect(find.byType(RegionPickerSheet), findsOneWidget);
+      await tester.tap(find.text('Cancel').last);
+      await tester.pumpAndSettle();
+      expect(find.byType(RegionPickerSheet), findsNothing);
+      await tester.tap(find.text('General').first);
+      await tester.pumpAndSettle();
+
+      final columns = find.ancestor(
+          of: find.text('Columns'), matching: find.byType(Row)).first;
+      expect(find.descendant(of: columns, matching: find.text('6')),
+          findsOneWidget);
+      for (final expected in [5, 4]) {
+        await tester.tap(find.descendant(
+            of: columns, matching: find.byIcon(Icons.arrow_drop_down)));
+        await tester.pumpAndSettle();
+        expect(find.descendant(of: columns, matching: find.text('$expected')),
+            findsOneWidget);
+        expect(t.app.settings.gridCols, expected);
+        expect((await SettingsStore().load()).gridCols, expected);
+      }
+      await tester.pumpWidget(const SizedBox.shrink());
     });
 
     test('the id does not collide with a region already held', () async {

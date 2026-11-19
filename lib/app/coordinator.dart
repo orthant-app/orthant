@@ -813,7 +813,11 @@ class OrthantCoordinator extends ChangeNotifier {
   void consumePendingRegion() {
     if (_pendingRegion == null) return;
     _pendingRegion = null;
-    notifyListeners();
+    // The picker consumes during build, while a listening parent may still be
+    // building. Let it finish before asking it to refresh.
+    scheduleMicrotask(() {
+      if (hasListeners) notifyListeners();
+    });
   }
 
   /// The next id this session will hand out. Only ever moves forward.

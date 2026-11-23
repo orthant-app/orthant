@@ -15,9 +15,8 @@ import { FACTS } from '../lib/facts';
 <style>
   .band { border-block: 1px solid var(--separator); background: var(--raised); }
   /*
-   * A grid, not a wrapping flex row: equal tracks put every figure in a column
-   * aligned with the one above it. A wrapping row packs each line as full as it
-   * goes, so nothing lines up and the strip reads as a run-on sentence.
+   * Keep rows aligned when facts reflow. At desktop widths, size each column
+   * to its own content so the longer performance notes have room to read.
    */
   .strip {
     display: grid;
@@ -42,12 +41,15 @@ import { FACTS } from '../lib/facts';
     .strip { grid-template-columns: minmax(0, 1fr); }
   }
   @media (min-width: 500px) {
-    .strip { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px 24px; }
+    .strip { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 24px; }
+  }
+  @media (min-width: 1080px) {
+    .strip { grid-template-columns: repeat(5, auto); justify-content: space-between; }
   }
   li { display: flex; flex-direction: column; gap: 1px; }
   .value {
     font-family: var(--font-mono); font-size: 15px; font-weight: 600;
     color: var(--label); letter-spacing: -0.01em;
   }
-  .note { font-size: 12.5px; color: var(--label-secondary); }
+  .note { font-size: 12.5px; color: var(--label-secondary); text-wrap: balance; }
 </style>

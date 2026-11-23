@@ -6,7 +6,7 @@ import SpecStrip from '../components/SpecStrip.astro';
 import Command from '../components/Command.astro';
 import RegionDiagram from '../components/RegionDiagram.astro';
 import { currentVersion } from '../lib/releases';
-import { BINDINGS, windowsCombo } from '../lib/commands';
+import { BINDINGS, WINDOWS_MODIFIERS, windowsCombo } from '../lib/commands';
 
 // The newest PUBLISHED STABLE entry. An unpublished release (written at release
 // prep, before the tag is approved) and a beta can therefore never become the
@@ -99,20 +99,16 @@ const jsonLd = {
       {/* Windows' example key is T, not 2: Win+Ctrl+Shift with a digit is
           Windows' own, opening a taskbar app as administrator. */}
       <li>
-        <div class="only-macos"><RegionDiagram cols={3} rows={1} c0={0} c1={1} r0={0} r1={0}
-          title="Left two thirds, bound to a shortcut" label="2/3" combo="⌃⌥2" /></div>
-        <div class="only-windows"><RegionDiagram cols={3} rows={1} c0={0} c1={1} r0={0} r1={0}
-          title="Left two thirds, bound to a shortcut" label="2/3" combo="Win+Ctrl+Shift+T" /></div>
+        <RegionDiagram cols={3} rows={1} c0={0} c1={1} r0={0} r1={0}
+          title="Left two thirds, bound to a shortcut" label="2/3" />
         <p><strong>Bind it.</strong> Press <kbd><span class="only-macos">⌘S</span><span
-          class="only-windows">Ctrl+S</span></kbd> before you let go, name it, give it a key.</p>
+          class="only-windows">Ctrl+S</span></kbd> before you let go, name it, and bind it to{' '}
+          <kbd><span class="only-macos">⌃⌥2</span><span class="only-windows">Win+Ctrl+Shift+T</span></kbd>.</p>
       </li>
       <li>
-        <div class="only-macos"><RegionDiagram cols={12} rows={1} c0={0} c1={7} r0={0} r1={0}
+        <RegionDiagram cols={12} rows={1} c0={0} c1={7} r0={0} r1={0}
           title="The same two thirds on a twelve-column grid, on the same shortcut"
-          label="8/12" combo="⌃⌥2" /></div>
-        <div class="only-windows"><RegionDiagram cols={12} rows={1} c0={0} c1={7} r0={0} r1={0}
-          title="The same two thirds on a twelve-column grid, on the same shortcut"
-          label="8/12" combo="Win+Ctrl+Shift+T" /></div>
+          label="8/12" />
         <p><strong>Press it, from then on.</strong> <kbd><span class="only-macos">⌃⌥2</span><span
           class="only-windows">Win+Ctrl+Shift+T</span></kbd> puts the active window there, in
           any app. Change your grid to twelfths later and the same key still gives you two
@@ -125,17 +121,19 @@ const jsonLd = {
   <section class="section wrap">
     <h2>Or just press a key</h2>
     <p class="lead-sub">Eleven shortcuts out of the box. Every one is rebindable.</p>
-    <ul class="keymap">
+    <p id="keymap-modifiers" class="key-instruction">
+      Hold <kbd><span class="only-macos">⌃⌥</span><span class="only-windows">{WINDOWS_MODIFIERS}</span></kbd>
+      <span class="only-macos"> (Control + Option)</span> and press a key below.
+    </p>
+    <ul class="keymap" aria-describedby="keymap-modifiers">
       {BINDINGS.map((b) => (
         <li>
           {b.kind === 'block'
             ? <RegionDiagram cols={2} rows={2} {...b.block} title={b.label} />
             : <div class="no-glyph" aria-hidden="true">{b.kind === 'summon' ? 'grid' : 'as-is'}</div>}
           <span class="key-label">{b.label}</span>
-          {/* Windows' combos are three times as long: on a phone's two-column
-              map Win+Ctrl+Shift+Enter is wider than its column, so it may
-              break, but only after a +. */}
-          <kbd><span class="only-macos">{b.combo}</span><span class="only-windows">{windowsCombo(b.combo).split('+').map((part, i, all) => i < all.length - 1 ? <Fragment>{part}+<wbr /></Fragment> : part)}</span></kbd>
+          <kbd><span class="only-macos">{b.combo.endsWith('↩') ? 'Return' : b.combo.slice(2)}</span><span
+            class="only-windows">{windowsCombo(b.combo).slice(WINDOWS_MODIFIERS.length + 1)}</span></kbd>
         </li>
       ))}
     </ul>
@@ -246,6 +244,8 @@ const jsonLd = {
   .steps { display: grid; gap: 28px; list-style: none; margin: 0; padding: 0; }
   @media (min-width: 760px) { .steps { grid-template-columns: repeat(3, 1fr); } }
   .steps p { margin: 10px 0 0; color: var(--label-secondary); font-size: 15px; }
+  kbd { font-size: 1em; }
+  .key-instruction { margin: 0 0 24px; }
 
   .keymap {
     display: grid; gap: 20px 16px; list-style: none; margin: 0 0 20px; padding: 0;
@@ -262,7 +262,7 @@ const jsonLd = {
   .keymap li { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
   .keymap :global(.diagram) { width: 100%; max-width: 84px; }
   .key-label { font-size: 14px; }
-  .keymap kbd { white-space: normal; max-width: 100%; }
+  .keymap kbd { font-size: 15px; }
   /* Center and the summon have no shape. The slot keeps its place in the grid
      so the map does not reflow, and says why rather than looking broken. */
   .no-glyph {

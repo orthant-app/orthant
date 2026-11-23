@@ -161,6 +161,31 @@ await fallback.goto(base + '/', { waitUntil: 'load' });
 await checkHomepageTypography(fallback, '/ @390px no-script macOS fallback', 'macos', 390);
 await noScript.close();
 
+// Exercise the facts at larger text sizes around the desktop breakpoint.
+// This targets their layout in Chromium; native minimum-font preferences are
+// also checked in Firefox during browser verification.
+for (const width of [1024, 1080, 1440]) {
+  await page.setViewportSize({ width, height: 900 });
+  for (const platform of ['macos', 'windows']) {
+    await page.goto(`${base}/?platform=${platform}`, { waitUntil: 'load' });
+    await page.addStyleTag({ content: '.strip .value, .strip .note { font-size: 18px !important; }' });
+    const found = await page.evaluate(() => {
+      const text = [...document.querySelectorAll('.strip .value, .strip .note')];
+      return {
+        count: text.length,
+        sizes: text.map((e) => parseFloat(getComputedStyle(e).fontSize)),
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    });
+    const label = `/ @${width}px ${platform} 18px fact text`;
+    if (found.count !== 10 || found.sizes.some((size) => size < 18)) {
+      failures.push(`${label}: expected all five facts at the enlarged text size`);
+    }
+    if (found.overflow > 1) failures.push(`${label}: scrolls horizontally by ${found.overflow}px`);
+    console.log(`${label}: horizontal overflow=${found.overflow}px`);
+  }
+}
+
 // Start each homepage check at the top: a link scrolled into view by a prior
 // interaction does not prove a first-time phone visitor can reach it.
 for (const viewport of [

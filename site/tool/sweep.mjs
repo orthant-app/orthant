@@ -71,6 +71,88 @@ const browser = await chromium.launch();
 const page = await browser.newPage();
 const failures = [];
 
+// Read actual line boxes and computed type: source CSS cannot prove whether a
+// key fits, a diagram shrinks its chord, or a desktop fact note wraps.
+async function checkHomepageTypography(page, label, platform, width) {
+  const found = await page.evaluate(({ platform, width }) => {
+    const errors = [];
+    const visible = (e) => e.checkVisibility({ visibilityProperty: true });
+    const lineCount = (e) => {
+      const range = document.createRange();
+      range.selectNodeContents(e);
+      return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
+    };
+    const list = document.querySelector('.keymap');
+    const instruction = document.getElementById(list.getAttribute('aria-describedby') ?? '');
+    if (!instruction || !visible(instruction)) errors.push('missing shared modifier instruction');
+    const keys = [...list.querySelectorAll('kbd')].filter(visible);
+    const expected = ['O', '←', '→', '↑', '↓', 'U', 'I', 'J', 'K', platform === 'windows' ? 'Enter' : 'Return', 'C'];
+    if (JSON.stringify(keys.map((e) => e.innerText.trim())) !== JSON.stringify(expected)) {
+      errors.push('default tiles must show eleven terminal keys without repeated modifiers');
+    }
+    const ui = getComputedStyle(document.body).fontFamily;
+    for (const key of [...document.querySelectorAll('.steps kbd, .keymap kbd')].filter(visible)) {
+      const type = getComputedStyle(key);
+      if (type.fontFamily !== ui || parseFloat(type.fontSize) < 15) {
+        errors.push(`keycap ${key.innerText.trim()} must use readable UI type (${type.fontFamily}, ${type.fontSize})`);
+      }
+      const container = key.closest('li').getBoundingClientRect();
+      const box = key.getBoundingClientRect();
+      if (box.left < container.left - 1 || box.right > container.right + 1) {
+        errors.push(`keycap ${key.innerText.trim()} exceeds its instruction or tile`);
+      }
+    }
+    if ([...document.querySelectorAll('.steps svg .combo')].some(visible)) {
+      errors.push('walkthrough chord scales inside a diagram instead of reading as HTML');
+    }
+    const steps = [...document.querySelectorAll('.steps > li')];
+    const custom = platform === 'windows' ? 'Win+Ctrl+Shift+T' : '⌃⌥2';
+    for (const step of steps.slice(1)) {
+      if (![...step.querySelectorAll('p kbd')].some((e) => visible(e) && e.innerText.trim() === custom)) {
+        errors.push('bind and reuse instructions must both show the full custom chord');
+      }
+    }
+    const diagrams = steps.flatMap((e) => [...e.querySelectorAll('svg')].filter(visible));
+    if (diagrams.length !== 3) errors.push('expected three visible fraction diagrams');
+    if (width >= 760 && diagrams.length === 3) {
+      const boxes = diagrams.map((e) => e.getBoundingClientRect());
+      if (Math.max(...boxes.map((b) => b.top)) - Math.min(...boxes.map((b) => b.top)) > 1 ||
+          Math.max(...boxes.map((b) => b.height)) - Math.min(...boxes.map((b) => b.height)) > 1) {
+        errors.push('walkthrough fraction diagrams must align');
+      }
+    }
+    const notes = [...document.querySelectorAll('.strip .note')];
+    const noteLines = notes.map(lineCount);
+    if (width >= 1440 && noteLines.some((lines) => lines !== 1)) {
+      errors.push(`wide-desktop fact notes wrap (${noteLines.join(', ')} lines)`);
+    }
+    return { errors, noteLines };
+  }, { platform, width });
+  for (const error of found.errors) failures.push(`${label}: ${error}`);
+  console.log(`${label}: fact note lines=${found.noteLines.join(',')}`);
+}
+
+for (const scheme of ['light', 'dark']) {
+  await page.emulateMedia({ colorScheme: scheme });
+  for (const width of [320, 390, 759, 768, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const platform of ['macos', 'windows']) {
+      await page.goto(`${base}/?platform=${platform}`, { waitUntil: 'load' });
+      await checkHomepageTypography(page, `/ @${width}px ${platform} ${scheme}`, platform, width);
+      // Exercise the switch as well as the initial platform query.
+      const other = platform === 'macos' ? 'windows' : 'macos';
+      await page.locator(`[data-platform-choice="${other}"]`).click();
+      await checkHomepageTypography(page, `/ @${width}px switched ${other} ${scheme}`, other, width);
+    }
+  }
+}
+await page.emulateMedia({ colorScheme: 'light' });
+const noScript = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
+const fallback = await noScript.newPage();
+await fallback.goto(base + '/', { waitUntil: 'load' });
+await checkHomepageTypography(fallback, '/ @390px no-script macOS fallback', 'macos', 390);
+await noScript.close();
+
 // Start each homepage check at the top: a link scrolled into view by a prior
 // interaction does not prove a first-time phone visitor can reach it.
 for (const viewport of [

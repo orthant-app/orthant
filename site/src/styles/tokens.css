@@ -183,7 +183,8 @@ a:hover { text-decoration-thickness: 2px; }
 }
 .skip:focus { transform: none; }
 
-code, kbd, pre { font-family: var(--font-mono); font-size: 0.9em; }
+code, kbd, pre { font-size: 0.9em; }
+code, pre { font-family: var(--font-mono); }
 
 /* An inline path or filename has no spaces for the browser's default line
    breaking to use, so it stays one unbreakable token and pushes the page wider
@@ -195,6 +196,7 @@ code, kbd, pre { font-family: var(--font-mono); font-size: 0.9em; }
 :not(pre) > code { overflow-wrap: break-word; }
 
 kbd {
+  font-family: var(--font-ui);
   background: var(--keycap-fill);
   border: 1px solid var(--keycap-border);
   border-radius: 4px;

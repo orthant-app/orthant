@@ -91,6 +91,14 @@ async function checkHomepageTypography(page, label, platform, width) {
       errors.push('default tiles must show eleven terminal keys without repeated modifiers');
     }
     const ui = getComputedStyle(document.body).fontFamily;
+    const heroKeys = [...document.querySelectorAll('.hero .keys kbd')].filter(visible);
+    if (heroKeys.length !== 3) errors.push('expected three visible hero legend keycaps');
+    for (const key of heroKeys) {
+      const type = getComputedStyle(key);
+      if (type.fontFamily !== ui) {
+        errors.push(`hero keycap ${key.innerText.trim()} must use UI type (${type.fontFamily})`);
+      }
+    }
     for (const key of [...document.querySelectorAll('.steps kbd, .keymap kbd')].filter(visible)) {
       const type = getComputedStyle(key);
       if (type.fontFamily !== ui || parseFloat(type.fontSize) < 15) {
